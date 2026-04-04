@@ -79,12 +79,12 @@
     border-top: 3px solid #e94560;
     overflow-x: auto;
     flex-shrink: 0;
-    min-height: 72px;
+    min-height: 64px;
   }
 
   .block-btn {
-    width: 52px;
-    height: 52px;
+    width: 48px;
+    height: 48px;
     border-radius: 8px;
     border: 3px solid transparent;
     cursor: pointer;
@@ -97,8 +97,8 @@
   .block-btn.selected { border-color: #fff; box-shadow: 0 0 12px rgba(255,255,255,0.5); transform: scale(1.1); }
 
   #modeToggle {
-    width: 56px;
-    height: 56px;
+    width: 48px;
+    height: 48px;
     border-radius: 12px;
     border: 3px solid #e94560;
     background: #0f3460;
@@ -107,7 +107,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 28px;
+    font-size: 24px;
     transition: transform 0.1s, background 0.15s;
   }
   #modeToggle:active { transform: scale(0.9); }
@@ -210,8 +210,8 @@
 // ============================================================
 // CONFIG
 // ============================================================
-const COLS = 24;
-const ROWS = 16;
+const MIN_BLOCK = 36;
+let COLS, ROWS;
 const BASE_BLOCK = 32;
 
 const BLOCK_TYPES = [
@@ -230,7 +230,7 @@ const BLOCK_TYPES = [
 // ============================================================
 // STATE
 // ============================================================
-let grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+let grid = [];
 let selectedBlock = 'grass';
 let mode = 'build'; // 'build' | 'destroy'
 let blockSize = BASE_BLOCK;
@@ -252,10 +252,27 @@ function resize() {
   const w = wrap.clientWidth;
   const h = wrap.clientHeight;
 
+  // compute cols/rows so each block is at least MIN_BLOCK px
+  const newCols = Math.max(6, Math.floor(w / MIN_BLOCK));
+  const newRows = Math.max(6, Math.floor(h / MIN_BLOCK));
+
+  if (COLS !== newCols || ROWS !== newRows) {
+    const oldGrid = grid;
+    const oldCols = COLS || 0;
+    const oldRows = ROWS || 0;
+    COLS = newCols;
+    ROWS = newRows;
+    grid = Array.from({ length: ROWS }, (_, r) =>
+      Array.from({ length: COLS }, (_, c) =>
+        (r < oldRows && c < oldCols && oldGrid[r]) ? (oldGrid[r][c] || null) : null
+      )
+    );
+  }
+
   // fit grid into available space
   const bsW = Math.floor(w / COLS);
   const bsH = Math.floor(h / ROWS);
-  blockSize = Math.max(16, Math.min(bsW, bsH));
+  blockSize = Math.min(bsW, bsH);
 
   const cw = blockSize * COLS;
   const ch = blockSize * ROWS;
@@ -897,8 +914,13 @@ function loadWorld() {
   if (data) {
     try {
       const loaded = JSON.parse(data);
-      if (Array.isArray(loaded) && loaded.length === ROWS) {
-        grid = loaded;
+      if (Array.isArray(loaded) && loaded.length > 0) {
+        // paste loaded data into current grid (may differ in size)
+        grid = Array.from({ length: ROWS }, (_, r) =>
+          Array.from({ length: COLS }, (_, c) =>
+            (r < loaded.length && c < (loaded[r]||[]).length) ? (loaded[r][c] || null) : null
+          )
+        );
         render();
         showToast('Loaded!');
         return;
@@ -921,6 +943,14 @@ function clearWorld() {
   render();
   closeConfirm();
   showToast('All cleared!');
+}
+
+function resizeGrid(newRows, newCols) {
+  return Array.from({ length: newRows }, (_, r) =>
+    Array.from({ length: newCols }, (_, c) =>
+      (r < grid.length && c < (grid[0]||[]).length) ? (grid[r][c] || null) : null
+    )
+  );
 }
 
 // ============================================================
