@@ -1,0 +1,1249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mini Car Builder & Race!</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+@import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700;900&display=swap');
+
+:root {
+  --pink: #FF6B9D;
+  --blue: #4ECDC4;
+  --yellow: #FFE66D;
+  --orange: #FF8C42;
+  --purple: #A855F7;
+  --green: #22C55E;
+  --red: #EF4444;
+  --dark: #2D3436;
+  --light: #F8F9FA;
+  --card-bg: #FFFFFF;
+  --shadow: 0 8px 32px rgba(0,0,0,0.12);
+}
+
+body {
+  font-family: 'Nunito', 'Apple SD Gothic Neo', sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  overflow-x: hidden;
+  color: var(--dark);
+}
+
+h1, h2, h3, .btn {
+  font-family: 'Fredoka One', 'Nunito', sans-serif;
+}
+
+.screen { display: none; min-height: 100vh; padding: 20px; }
+.screen.active { display: flex; flex-direction: column; align-items: center; }
+
+/* ===== TOP BAR ===== */
+.top-bar {
+  width: 100%; max-width: 900px;
+  display: flex; justify-content: space-between; align-items: center;
+  background: rgba(255,255,255,0.15);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  padding: 12px 24px;
+  margin-bottom: 20px;
+  color: white;
+  font-weight: 700;
+  font-size: 1.1em;
+}
+.top-bar .stat { display: flex; align-items: center; gap: 6px; }
+
+/* ===== BUTTONS ===== */
+.btn {
+  border: none; border-radius: 16px; padding: 14px 32px;
+  font-size: 1.15em; cursor: pointer;
+  transition: all 0.2s; color: white;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+  text-transform: uppercase; letter-spacing: 1px;
+}
+.btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.3); }
+.btn:active { transform: translateY(1px); }
+.btn-pink { background: linear-gradient(135deg, #FF6B9D, #FF8A80); }
+.btn-blue { background: linear-gradient(135deg, #4ECDC4, #44B0E0); }
+.btn-yellow { background: linear-gradient(135deg, #FFB347, #FF8C42); color: var(--dark); }
+.btn-green { background: linear-gradient(135deg, #22C55E, #16A34A); }
+.btn-purple { background: linear-gradient(135deg, #A855F7, #7C3AED); }
+.btn-gray { background: linear-gradient(135deg, #9CA3AF, #6B7280); }
+.btn-small { padding: 8px 18px; font-size: 0.9em; border-radius: 12px; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+/* ===== MAIN MENU ===== */
+#mainMenu { justify-content: center; gap: 20px; }
+.game-title {
+  font-size: 3em; color: white; text-align: center;
+  text-shadow: 3px 3px 0 rgba(0,0,0,0.2);
+  margin-bottom: 10px;
+}
+.game-subtitle { color: rgba(255,255,255,0.8); font-size: 1.2em; margin-bottom: 30px; text-align: center; }
+.menu-car {
+  font-size: 6em; animation: bounce 2s infinite;
+  filter: drop-shadow(0 10px 20px rgba(0,0,0,0.3));
+}
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-15px); }
+}
+.menu-buttons { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+
+/* ===== GARAGE (Assembly) ===== */
+#garage { gap: 16px; }
+.garage-layout {
+  width: 100%; max-width: 900px;
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 700px) { .garage-layout { grid-template-columns: 1fr; } }
+
+.card {
+  background: var(--card-bg); border-radius: 20px;
+  padding: 20px; box-shadow: var(--shadow);
+}
+.card h3 { margin-bottom: 12px; font-size: 1.2em; }
+
+.part-category { margin-bottom: 16px; }
+.part-category h4 {
+  font-size: 0.95em; color: #666;
+  margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+}
+.part-options { display: flex; gap: 8px; flex-wrap: wrap; }
+.part-btn {
+  border: 3px solid #E5E7EB; border-radius: 14px;
+  padding: 8px 14px; cursor: pointer;
+  background: white; font-size: 0.9em;
+  transition: all 0.2s; font-weight: 700;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.part-btn:hover { border-color: var(--blue); background: #F0FDFA; }
+.part-btn.selected { border-color: var(--blue); background: #CCFBF1; box-shadow: 0 0 0 2px var(--blue); }
+.part-btn.locked { opacity: 0.4; cursor: not-allowed; }
+.part-btn .part-icon { font-size: 1.5em; }
+.part-btn .part-name { font-size: 0.75em; }
+.part-btn .part-cost { font-size: 0.65em; color: var(--orange); }
+
+/* Stats Radar */
+.stats-display { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.stat-bar-container { width: 100%; }
+.stat-row {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 8px; font-size: 0.9em;
+}
+.stat-label { width: 100px; font-weight: 700; text-align: right; }
+.stat-bar-bg {
+  flex: 1; height: 20px; background: #E5E7EB;
+  border-radius: 10px; overflow: hidden; position: relative;
+}
+.stat-bar-fill {
+  height: 100%; border-radius: 10px;
+  transition: width 0.5s ease;
+}
+.stat-value {
+  position: absolute; right: 8px; top: 50%;
+  transform: translateY(-50%); font-size: 0.75em;
+  font-weight: 900; color: white;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+}
+
+/* Car Preview */
+.car-preview {
+  width: 200px; height: 120px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 5em; position: relative;
+}
+
+/* Tradeoff hint */
+.tradeoff-hint {
+  background: #FEF3C7; border-radius: 12px;
+  padding: 10px 14px; font-size: 0.85em;
+  color: #92400E; margin-top: 8px;
+  border-left: 4px solid var(--orange);
+}
+
+/* ===== SHOP ===== */
+#shop { gap: 16px; }
+.shop-grid {
+  width: 100%; max-width: 900px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+.shop-item {
+  background: white; border-radius: 16px;
+  padding: 16px; text-align: center;
+  box-shadow: var(--shadow);
+  transition: transform 0.2s;
+}
+.shop-item:hover { transform: translateY(-4px); }
+.shop-item .item-icon { font-size: 2.5em; margin-bottom: 8px; }
+.shop-item .item-name { font-weight: 900; margin-bottom: 4px; }
+.shop-item .item-desc { font-size: 0.8em; color: #666; margin-bottom: 8px; }
+.shop-item .item-stats { font-size: 0.75em; color: #888; margin-bottom: 8px; }
+.shop-item.owned { background: #F0FFF4; border: 2px solid var(--green); }
+
+/* ===== RACE ===== */
+#race { gap: 12px; justify-content: flex-start; }
+.race-header {
+  width: 100%; max-width: 900px;
+  display: flex; justify-content: space-between; align-items: center;
+  color: white; font-weight: 700;
+}
+#raceCanvas {
+  border-radius: 20px; box-shadow: var(--shadow);
+  background: #4CAF50; max-width: 100%;
+}
+.race-standings {
+  width: 100%; max-width: 900px;
+  display: flex; gap: 8px; flex-wrap: wrap;
+  justify-content: center;
+}
+.standing-card {
+  background: rgba(255,255,255,0.15);
+  backdrop-filter: blur(10px);
+  border-radius: 12px; padding: 8px 16px;
+  color: white; font-weight: 700;
+  display: flex; align-items: center; gap: 8px;
+  min-width: 150px;
+}
+.standing-card.player { background: rgba(255,255,255,0.3); border: 2px solid var(--yellow); }
+.standing-pos {
+  font-size: 1.5em; width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; background: rgba(255,255,255,0.2);
+}
+
+/* ===== RACE RESULT ===== */
+.result-overlay {
+  position: fixed; top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0,0,0,0.7);
+  display: none; align-items: center; justify-content: center;
+  z-index: 1000;
+}
+.result-overlay.active { display: flex; }
+.result-card {
+  background: white; border-radius: 24px;
+  padding: 40px; text-align: center;
+  max-width: 400px; width: 90%;
+  animation: popIn 0.5s ease;
+}
+@keyframes popIn {
+  0% { transform: scale(0.5); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.result-trophy { font-size: 4em; margin-bottom: 12px; }
+.result-title { font-size: 1.8em; margin-bottom: 8px; }
+.result-details { color: #666; margin-bottom: 20px; font-size: 1.1em; }
+.result-rewards {
+  background: #FEF3C7; border-radius: 12px;
+  padding: 12px; margin-bottom: 20px;
+  font-weight: 700; color: #92400E;
+}
+
+/* ===== TRACK SELECT ===== */
+.track-select {
+  width: 100%; max-width: 900px;
+  display: flex; gap: 12px; flex-wrap: wrap;
+  justify-content: center;
+}
+.track-card {
+  background: white; border-radius: 16px;
+  padding: 16px; text-align: center;
+  width: 200px; cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: all 0.2s; border: 3px solid transparent;
+}
+.track-card:hover { transform: translateY(-4px); border-color: var(--blue); }
+.track-card.locked { opacity: 0.4; cursor: not-allowed; }
+.track-card .track-icon { font-size: 2em; margin-bottom: 6px; }
+.track-card .track-name { font-weight: 900; margin-bottom: 4px; }
+.track-card .track-desc { font-size: 0.75em; color: #666; }
+.track-card .track-bonus { font-size: 0.7em; color: var(--purple); font-weight: 700; margin-top: 4px; }
+
+/* ===== LEVEL UP ===== */
+.levelup-overlay {
+  position: fixed; top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0,0,0,0.8);
+  display: none; align-items: center; justify-content: center;
+  z-index: 1001;
+}
+.levelup-overlay.active { display: flex; }
+.levelup-card {
+  background: linear-gradient(135deg, #FFE66D, #FF8C42);
+  border-radius: 24px; padding: 40px;
+  text-align: center; max-width: 400px; width: 90%;
+  animation: popIn 0.5s ease;
+}
+.levelup-star { font-size: 5em; animation: spin 2s linear infinite; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+.levelup-title { font-size: 2em; margin: 12px 0; }
+.levelup-unlocks { background: rgba(255,255,255,0.5); border-radius: 12px; padding: 12px; margin: 12px 0; }
+</style>
+</head>
+<body>
+
+<!-- ===== MAIN MENU ===== -->
+<div id="mainMenu" class="screen active">
+  <div class="top-bar">
+    <div class="stat">⭐ Level <span id="menuLevel">1</span></div>
+    <div class="stat">🪙 <span id="menuCoins">100</span></div>
+    <div class="stat">🏆 Wins: <span id="menuWins">0</span></div>
+  </div>
+  <div class="menu-car">🏎️</div>
+  <h1 class="game-title">Mini Car Builder</h1>
+  <p class="game-subtitle">Build, Race, Win!</p>
+  <div class="menu-buttons">
+    <button class="btn btn-pink" onclick="showScreen('garage')">🔧 Build Car</button>
+    <button class="btn btn-green" onclick="showScreen('trackSelect')">🏁 Race!</button>
+    <button class="btn btn-yellow" onclick="showScreen('shop')">🛒 Shop</button>
+  </div>
+</div>
+
+<!-- ===== TRACK SELECT ===== -->
+<div id="trackSelect" class="screen">
+  <div class="top-bar">
+    <div class="stat">⭐ Level <span id="trackLevel">1</span></div>
+    <div class="stat">🪙 <span id="trackCoins">100</span></div>
+    <button class="btn btn-small btn-gray" onclick="showScreen('mainMenu')">← Back</button>
+  </div>
+  <h2 style="color:white;margin-bottom:16px;">🗺️ Choose a Track</h2>
+  <div class="track-select" id="trackGrid"></div>
+</div>
+
+<!-- ===== GARAGE ===== -->
+<div id="garage" class="screen">
+  <div class="top-bar">
+    <div class="stat">⭐ Level <span id="garageLevel">1</span></div>
+    <div class="stat">🪙 <span id="garageCoins">100</span></div>
+    <button class="btn btn-small btn-gray" onclick="showScreen('mainMenu')">← Back</button>
+  </div>
+  <h2 style="color:white;margin-bottom:12px;">🔧 Build Your Car</h2>
+  <div class="garage-layout">
+    <div class="card" id="partsPanel">
+      <h3>⚙️ Parts</h3>
+      <div id="partCategories"></div>
+    </div>
+    <div class="card">
+      <h3>📊 Car Stats</h3>
+      <div class="stats-display">
+        <div class="car-preview" id="carPreview">🏎️</div>
+        <div class="stat-bar-container" id="statBars"></div>
+        <div class="tradeoff-hint" id="tradeoffHint">
+          💡 Try different parts! Each choice has trade-offs.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SHOP ===== -->
+<div id="shop" class="screen">
+  <div class="top-bar">
+    <div class="stat">⭐ Level <span id="shopLevel">1</span></div>
+    <div class="stat">🪙 <span id="shopCoins">100</span></div>
+    <button class="btn btn-small btn-gray" onclick="showScreen('mainMenu')">← Back</button>
+  </div>
+  <h2 style="color:white;margin-bottom:16px;">🛒 Parts Shop</h2>
+  <div class="shop-grid" id="shopGrid"></div>
+</div>
+
+<!-- ===== RACE ===== -->
+<div id="race" class="screen">
+  <div class="race-header">
+    <span id="raceTrackName">🏁 Speed Circuit</span>
+    <span id="raceLap">Lap 1/3</span>
+    <span id="raceTimer">0:00</span>
+  </div>
+  <canvas id="raceCanvas" width="800" height="500"></canvas>
+  <div class="race-standings" id="raceStandings"></div>
+</div>
+
+<!-- ===== RESULT OVERLAY ===== -->
+<div class="result-overlay" id="resultOverlay">
+  <div class="result-card">
+    <div class="result-trophy" id="resultTrophy">🏆</div>
+    <div class="result-title" id="resultTitle">1st Place!</div>
+    <div class="result-details" id="resultDetails"></div>
+    <div class="result-rewards" id="resultRewards"></div>
+    <button class="btn btn-green" onclick="closeResult()">🎉 Continue</button>
+  </div>
+</div>
+
+<!-- ===== LEVEL UP OVERLAY ===== -->
+<div class="levelup-overlay" id="levelupOverlay">
+  <div class="levelup-card">
+    <div class="levelup-star">⭐</div>
+    <div class="levelup-title" id="levelupTitle">Level Up!</div>
+    <div class="levelup-unlocks" id="levelupUnlocks"></div>
+    <button class="btn btn-purple" onclick="closeLevelup()">Awesome!</button>
+  </div>
+</div>
+
+<script>
+// ============================================
+// GAME STATE
+// ============================================
+let gameState = {
+  level: 1,
+  xp: 0,
+  xpToNext: 100,
+  coins: 100,
+  wins: 0,
+  ownedParts: new Set(),
+  equipped: { engine: 'small', wheels: 'standard', body: 'light', spoiler: 'none', booster: 'none' },
+};
+
+// ============================================
+// PARTS DATABASE
+// ============================================
+const PARTS = {
+  engine: {
+    icon: '🔧',
+    label: 'Engine',
+    items: {
+      small:  { name: 'Small',  icon: '🔩', cost: 0, level: 1, speed: 25, accel: 30, handling: 10, durability: 10, weight: 10,
+        desc: 'Light & simple', hint: 'Low power but very light!' },
+      medium: { name: 'Medium', icon: '⚙️', cost: 80, level: 2, speed: 45, accel: 40, handling: 5, durability: 15, weight: 25,
+        desc: 'Balanced power', hint: 'Good power but heavier.' },
+      large:  { name: 'Large',  icon: '🔧', cost: 200, level: 4, speed: 70, accel: 50, handling: -10, durability: 20, weight: 50,
+        desc: 'Powerful beast', hint: 'Lots of power! But very heavy, harder to turn.' },
+      turbo:  { name: 'Turbo',  icon: '🚀', cost: 400, level: 7, speed: 90, accel: 80, handling: -15, durability: -5, weight: 40,
+        desc: 'Race engine!', hint: 'Extreme speed! But fragile and hard to control.' },
+    }
+  },
+  wheels: {
+    icon: '🛞',
+    label: 'Wheels',
+    items: {
+      standard: { name: 'Standard', icon: '⚫', cost: 0, level: 1, speed: 10, accel: 10, handling: 20, durability: 15, weight: 10,
+        desc: 'All-round tires', hint: 'Balanced choice for any track.' },
+      slick:    { name: 'Slick',    icon: '🟤', cost: 100, level: 2, speed: 30, accel: 15, handling: 10, durability: 5, weight: 5,
+        desc: 'Racing slicks', hint: 'Faster on smooth tracks, but low grip on bumps!' },
+      offroad:  { name: 'Off-Road', icon: '🟢', cost: 150, level: 3, speed: 5, accel: 10, handling: 35, durability: 40, weight: 20,
+        desc: 'Chunky treads', hint: 'Great grip & durability, but slower top speed.' },
+      spike:    { name: 'Spike',    icon: '🔴', cost: 300, level: 6, speed: -5, accel: 5, handling: 50, durability: 30, weight: 15,
+        desc: 'Maximum grip!', hint: 'Incredible handling! But they slow you down.' },
+    }
+  },
+  body: {
+    icon: '🚗',
+    label: 'Body',
+    items: {
+      light:    { name: 'Light',     icon: '🟡', cost: 0, level: 1, speed: 15, accel: 20, handling: 15, durability: 5, weight: -15,
+        desc: 'Featherweight', hint: 'Super light! Fast but fragile.' },
+      standard: { name: 'Standard',  icon: '🔵', cost: 60, level: 1, speed: 10, accel: 10, handling: 10, durability: 20, weight: 10,
+        desc: 'Balanced frame', hint: 'Good all-round protection.' },
+      armored:  { name: 'Armored',   icon: '⬛', cost: 180, level: 3, speed: -10, accel: -15, handling: -5, durability: 55, weight: 40,
+        desc: 'Tank mode', hint: 'Nearly unbreakable! But very heavy and slow.' },
+      aero:     { name: 'Aero',      icon: '🟣', cost: 350, level: 5, speed: 30, accel: 10, handling: 20, durability: 10, weight: 0,
+        desc: 'Streamlined', hint: 'Great speed & handling, but not very tough.' },
+    }
+  },
+  spoiler: {
+    icon: '🦅',
+    label: 'Spoiler',
+    items: {
+      none:  { name: 'None',  icon: '➖', cost: 0, level: 1, speed: 5, accel: 0, handling: 0, durability: 0, weight: 0,
+        desc: 'No spoiler', hint: 'Less drag, but no downforce.' },
+      small: { name: 'Small', icon: '📐', cost: 70, level: 2, speed: 0, accel: 5, handling: 15, durability: 0, weight: 5,
+        desc: 'Subtle wing', hint: 'A bit more grip in corners.' },
+      large: { name: 'Large', icon: '🔼', cost: 180, level: 4, speed: -10, accel: 0, handling: 30, durability: 5, weight: 10,
+        desc: 'Big wing', hint: 'Great cornering! But adds drag = less top speed.' },
+      f1:    { name: 'F1',    icon: '🏎️', cost: 450, level: 8, speed: -15, accel: 5, handling: 50, durability: 0, weight: 15,
+        desc: 'F1 downforce', hint: 'Maximum downforce! Corners like a dream, but much slower on straights.' },
+    }
+  },
+  booster: {
+    icon: '💨',
+    label: 'Booster',
+    items: {
+      none:   { name: 'None',   icon: '➖', cost: 0, level: 1, speed: 0, accel: 0, handling: 0, durability: 0, weight: 0,
+        desc: 'No booster', hint: 'Stable and predictable.' },
+      nitro:  { name: 'Nitro',  icon: '🔥', cost: 120, level: 3, speed: 15, accel: 30, handling: -10, durability: -5, weight: 5,
+        desc: 'Nitro boost!', hint: 'Great acceleration burst! But harder to control.' },
+      rocket: { name: 'Rocket', icon: '🚀', cost: 350, level: 6, speed: 30, accel: 50, handling: -25, durability: -15, weight: 10,
+        desc: 'ROCKET POWER!', hint: 'Insane speed! Very unstable though...' },
+    }
+  }
+};
+
+// ============================================
+// TRACKS DATABASE
+// ============================================
+const TRACKS = [
+  { id: 'speedway', name: 'Speedway', icon: '🏁', level: 1, laps: 2,
+    desc: 'Long straights, few turns', bonus: 'Speed matters most!',
+    weights: { speed: 1.5, accel: 1.0, handling: 0.5, durability: 0.5 },
+    color: '#4CAF50', innerColor: '#388E3C',
+    shape: 'oval' },
+  { id: 'twisty', name: 'Twisty Road', icon: '🌀', level: 2, laps: 2,
+    desc: 'Lots of tight corners', bonus: 'Handling is key!',
+    weights: { speed: 0.6, accel: 0.8, handling: 1.6, durability: 0.6 },
+    color: '#2196F3', innerColor: '#1565C0',
+    shape: 'twisty' },
+  { id: 'bumpy', name: 'Bumpy Trail', icon: '🪨', level: 3, laps: 2,
+    desc: 'Rough & rocky terrain', bonus: 'Durability helps here!',
+    weights: { speed: 0.7, accel: 0.7, handling: 0.8, durability: 1.5 },
+    color: '#795548', innerColor: '#4E342E',
+    shape: 'bumpy' },
+  { id: 'mountain', name: 'Mountain Pass', icon: '⛰️', level: 4, laps: 3,
+    desc: 'Uphill climbs & sharp turns', bonus: 'Accel + Handling!',
+    weights: { speed: 0.7, accel: 1.4, handling: 1.3, durability: 0.8 },
+    color: '#607D8B', innerColor: '#37474F',
+    shape: 'mountain' },
+  { id: 'city', name: 'City Circuit', icon: '🏙️', level: 5, laps: 3,
+    desc: 'Stop-start city streets', bonus: 'Acceleration wins!',
+    weights: { speed: 0.8, accel: 1.5, handling: 1.2, durability: 0.6 },
+    color: '#9C27B0', innerColor: '#6A1B9A',
+    shape: 'city' },
+  { id: 'desert', name: 'Desert Rally', icon: '🏜️', level: 6, laps: 3,
+    desc: 'Sand & long curves', bonus: 'Speed + Durability!',
+    weights: { speed: 1.3, accel: 0.8, handling: 0.7, durability: 1.3 },
+    color: '#FF9800', innerColor: '#E65100',
+    shape: 'desert' },
+  { id: 'ice', name: 'Ice Track', icon: '🧊', level: 7, laps: 3,
+    desc: 'Slippery ice everywhere!', bonus: 'Handling is everything!',
+    weights: { speed: 0.5, accel: 0.6, handling: 1.8, durability: 0.8 },
+    color: '#00BCD4', innerColor: '#00838F',
+    shape: 'ice' },
+  { id: 'volcano', name: 'Volcano Run', icon: '🌋', level: 8, laps: 3,
+    desc: 'Extreme heat & danger!', bonus: 'Durability or bust!',
+    weights: { speed: 0.8, accel: 0.9, handling: 0.8, durability: 1.8 },
+    color: '#F44336', innerColor: '#B71C1C',
+    shape: 'volcano' },
+  { id: 'rainbow', name: 'Rainbow Road', icon: '🌈', level: 9, laps: 3,
+    desc: 'The ultimate challenge!', bonus: 'Everything matters!',
+    weights: { speed: 1.2, accel: 1.2, handling: 1.2, durability: 1.2 },
+    color: '#E91E63', innerColor: '#880E4F',
+    shape: 'rainbow' },
+  { id: 'champion', name: 'Champion Cup', icon: '🏆', level: 10, laps: 4,
+    desc: 'Final showdown!', bonus: 'Best build wins!',
+    weights: { speed: 1.3, accel: 1.3, handling: 1.3, durability: 1.3 },
+    color: '#FFD700', innerColor: '#B8860B',
+    shape: 'champion' },
+];
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+function getCarStats() {
+  let stats = { speed: 0, accel: 0, handling: 0, durability: 0, weight: 0 };
+  for (let cat in gameState.equipped) {
+    const partId = gameState.equipped[cat];
+    const part = PARTS[cat].items[partId];
+    if (part) {
+      stats.speed += part.speed;
+      stats.accel += part.accel;
+      stats.handling += part.handling;
+      stats.durability += part.durability;
+      stats.weight += part.weight;
+    }
+  }
+  // Weight penalty: every 10 weight over 30 reduces speed/accel by 3
+  const weightPenalty = Math.max(0, (stats.weight - 30) / 10) * 3;
+  stats.speed = Math.max(5, stats.speed - weightPenalty);
+  stats.accel = Math.max(5, stats.accel - weightPenalty);
+  // Clamp all stats 0-100
+  for (let k of ['speed', 'accel', 'handling', 'durability']) {
+    stats[k] = Math.max(0, Math.min(100, Math.round(stats[k])));
+  }
+  return stats;
+}
+
+function getTradeoffHint() {
+  const stats = getCarStats();
+  const hints = [];
+  if (stats.speed > 70 && stats.handling < 30) hints.push("⚡ Super fast but hard to turn! Might struggle on twisty tracks.");
+  if (stats.handling > 70 && stats.speed < 30) hints.push("🔄 Great cornering but slow. Straight tracks will be tough.");
+  if (stats.durability > 60 && stats.speed < 30) hints.push("🛡️ Very tough but slow. Consider a lighter body?");
+  if (stats.accel > 70 && stats.handling < 30) hints.push("🚀 Quick off the line but unstable! Watch those corners.");
+  if (stats.weight > 60) hints.push("⚖️ Heavy build! All that weight is slowing you down.");
+  if (stats.speed < 20 && stats.accel < 20) hints.push("🐢 Very slow... Try a bigger engine?");
+  if (hints.length === 0) {
+    if (stats.speed > 50 && stats.handling > 50) hints.push("✅ Nice balanced build! Good for many tracks.");
+    else hints.push("💡 Try different parts! Each choice has trade-offs.");
+  }
+  return hints[0];
+}
+
+function isPartOwned(cat, partId) {
+  const part = PARTS[cat].items[partId];
+  return part.cost === 0 || gameState.ownedParts.has(`${cat}_${partId}`);
+}
+
+function isPartUnlocked(cat, partId) {
+  const part = PARTS[cat].items[partId];
+  return gameState.level >= part.level;
+}
+
+function saveGame() {
+  const data = {
+    ...gameState,
+    ownedParts: [...gameState.ownedParts],
+  };
+  localStorage.setItem('miniCarBuilder', JSON.stringify(data));
+}
+
+function loadGame() {
+  const data = localStorage.getItem('miniCarBuilder');
+  if (data) {
+    const parsed = JSON.parse(data);
+    gameState = { ...parsed, ownedParts: new Set(parsed.ownedParts) };
+  }
+  // Ensure starter parts are owned
+  for (let cat in PARTS) {
+    for (let id in PARTS[cat].items) {
+      if (PARTS[cat].items[id].cost === 0) gameState.ownedParts.add(`${cat}_${id}`);
+    }
+  }
+}
+
+// ============================================
+// SCREEN MANAGEMENT
+// ============================================
+function showScreen(screenId) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(screenId).classList.add('active');
+  updateAllUI();
+  if (screenId === 'garage') renderGarage();
+  if (screenId === 'shop') renderShop();
+  if (screenId === 'trackSelect') renderTrackSelect();
+}
+
+function updateAllUI() {
+  document.querySelectorAll('[id$="Level"]').forEach(el => el.textContent = gameState.level);
+  document.querySelectorAll('[id$="Coins"]').forEach(el => el.textContent = gameState.coins);
+  document.getElementById('menuWins').textContent = gameState.wins;
+}
+
+// ============================================
+// GARAGE
+// ============================================
+function renderGarage() {
+  const container = document.getElementById('partCategories');
+  container.innerHTML = '';
+
+  for (let cat in PARTS) {
+    const catData = PARTS[cat];
+    const div = document.createElement('div');
+    div.className = 'part-category';
+    div.innerHTML = `<h4>${catData.icon} ${catData.label}</h4><div class="part-options" id="parts_${cat}"></div>`;
+    container.appendChild(div);
+
+    const optionsDiv = div.querySelector('.part-options');
+    for (let id in catData.items) {
+      const part = catData.items[id];
+      const owned = isPartOwned(cat, id);
+      const unlocked = isPartUnlocked(cat, id);
+      const selected = gameState.equipped[cat] === id;
+
+      const btn = document.createElement('div');
+      btn.className = `part-btn ${selected ? 'selected' : ''} ${(!owned || !unlocked) ? 'locked' : ''}`;
+      btn.innerHTML = `
+        <span class="part-icon">${part.icon}</span>
+        <span class="part-name">${part.name}</span>
+        ${!owned ? `<span class="part-cost">🪙 ${part.cost}</span>` : ''}
+        ${!unlocked ? `<span class="part-cost">🔒 Lv.${part.level}</span>` : ''}
+      `;
+
+      if (owned && unlocked) {
+        btn.onclick = () => {
+          gameState.equipped[cat] = id;
+          saveGame();
+          renderGarage();
+        };
+      }
+      optionsDiv.appendChild(btn);
+    }
+  }
+
+  renderStats();
+}
+
+function renderStats() {
+  const stats = getCarStats();
+  const container = document.getElementById('statBars');
+  container.innerHTML = '';
+
+  const statConfig = [
+    { key: 'speed', label: '⚡ Speed', color: '#FF6B9D' },
+    { key: 'accel', label: '🚀 Accel', color: '#4ECDC4' },
+    { key: 'handling', label: '🔄 Handle', color: '#A855F7' },
+    { key: 'durability', label: '🛡️ Tough', color: '#FFB347' },
+  ];
+
+  for (let s of statConfig) {
+    const row = document.createElement('div');
+    row.className = 'stat-row';
+    row.innerHTML = `
+      <span class="stat-label">${s.label}</span>
+      <div class="stat-bar-bg">
+        <div class="stat-bar-fill" style="width:${stats[s.key]}%;background:${s.color}"></div>
+        <span class="stat-value">${stats[s.key]}</span>
+      </div>
+    `;
+    container.appendChild(row);
+  }
+
+  // Weight display
+  const weightRow = document.createElement('div');
+  weightRow.className = 'stat-row';
+  const w = Math.max(0, Math.min(100, stats.weight));
+  weightRow.innerHTML = `
+    <span class="stat-label">⚖️ Weight</span>
+    <div class="stat-bar-bg">
+      <div class="stat-bar-fill" style="width:${w}%;background:#6B7280"></div>
+      <span class="stat-value">${stats.weight}</span>
+    </div>
+  `;
+  container.appendChild(weightRow);
+
+  document.getElementById('tradeoffHint').textContent = getTradeoffHint();
+}
+
+// ============================================
+// SHOP
+// ============================================
+function renderShop() {
+  const grid = document.getElementById('shopGrid');
+  grid.innerHTML = '';
+
+  for (let cat in PARTS) {
+    for (let id in PARTS[cat].items) {
+      const part = PARTS[cat].items[id];
+      if (part.cost === 0) continue; // skip free parts
+
+      const owned = isPartOwned(cat, id);
+      const unlocked = isPartUnlocked(cat, id);
+
+      const div = document.createElement('div');
+      div.className = `shop-item ${owned ? 'owned' : ''}`;
+      div.innerHTML = `
+        <div class="item-icon">${part.icon}</div>
+        <div class="item-name">${PARTS[cat].label}: ${part.name}</div>
+        <div class="item-desc">${part.desc}</div>
+        <div class="item-stats">
+          ⚡${part.speed > 0 ? '+' : ''}${part.speed}
+          🚀${part.accel > 0 ? '+' : ''}${part.accel}
+          🔄${part.handling > 0 ? '+' : ''}${part.handling}
+          🛡️${part.durability > 0 ? '+' : ''}${part.durability}
+        </div>
+        ${owned
+          ? '<span style="color:var(--green);font-weight:900">✅ Owned</span>'
+          : !unlocked
+            ? `<span style="color:#999;font-weight:700">🔒 Need Level ${part.level}</span>`
+            : `<button class="btn btn-small btn-yellow" onclick="buyPart('${cat}','${id}')" ${gameState.coins < part.cost ? 'disabled' : ''}>
+                🪙 ${part.cost}
+              </button>`
+        }
+      `;
+      grid.appendChild(div);
+    }
+  }
+}
+
+function buyPart(cat, id) {
+  const part = PARTS[cat].items[id];
+  if (gameState.coins < part.cost) return;
+  if (isPartOwned(cat, id)) return;
+
+  gameState.coins -= part.cost;
+  gameState.ownedParts.add(`${cat}_${id}`);
+  saveGame();
+  renderShop();
+  updateAllUI();
+}
+
+// ============================================
+// TRACK SELECT
+// ============================================
+function renderTrackSelect() {
+  const grid = document.getElementById('trackGrid');
+  grid.innerHTML = '';
+
+  for (let track of TRACKS) {
+    const unlocked = gameState.level >= track.level;
+    const div = document.createElement('div');
+    div.className = `track-card ${unlocked ? '' : 'locked'}`;
+    div.innerHTML = `
+      <div class="track-icon">${track.icon}</div>
+      <div class="track-name">${track.name}</div>
+      <div class="track-desc">${unlocked ? track.desc : `🔒 Level ${track.level}`}</div>
+      <div class="track-bonus">${unlocked ? track.bonus : ''}</div>
+    `;
+    if (unlocked) {
+      div.onclick = () => startRace(track);
+    }
+    grid.appendChild(div);
+  }
+}
+
+// ============================================
+// RACING ENGINE
+// ============================================
+let raceState = null;
+let raceAnimFrame = null;
+
+function startRace(track) {
+  showScreen('race');
+  document.getElementById('raceTrackName').textContent = `${track.icon} ${track.name}`;
+
+  const canvas = document.getElementById('raceCanvas');
+  const ctx = canvas.getContext('2d');
+
+  // Generate track path
+  const trackPath = generateTrackPath(track, canvas.width, canvas.height);
+
+  // Create racers
+  const playerStats = getCarStats();
+  const aiCars = generateAICars(track);
+
+  const racers = [
+    { name: 'YOU', color: '#FFD700', stats: playerStats, isPlayer: true,
+      progress: 0, lap: 0, speed: 0, finished: false, finishTime: 0,
+      emoji: '🏎️', wobble: 0 },
+    ...aiCars.map((ai, i) => ({
+      name: ai.name, color: ai.color, stats: ai.stats, isPlayer: false,
+      progress: 0, lap: 0, speed: 0, finished: false, finishTime: 0,
+      emoji: ai.emoji, wobble: 0
+    }))
+  ];
+
+  raceState = {
+    track, trackPath, racers,
+    totalLaps: track.laps,
+    time: 0, countdown: 3,
+    phase: 'countdown', // countdown, racing, finished
+  };
+
+  // Start countdown
+  raceCountdown(ctx, canvas);
+}
+
+function generateTrackPath(track, w, h) {
+  const points = [];
+  const cx = w / 2, cy = h / 2;
+  const rx = w * 0.38, ry = h * 0.38;
+  const numPoints = 800;
+
+  for (let i = 0; i < numPoints; i++) {
+    const t = (i / numPoints) * Math.PI * 2;
+    let x, y;
+
+    switch (track.shape) {
+      case 'oval':
+        x = cx + Math.cos(t) * rx;
+        y = cy + Math.sin(t) * ry * 0.6;
+        break;
+      case 'twisty':
+        x = cx + Math.cos(t) * rx + Math.sin(t * 3) * 40;
+        y = cy + Math.sin(t) * ry + Math.cos(t * 3) * 40;
+        break;
+      case 'bumpy':
+        x = cx + Math.cos(t) * (rx + Math.sin(t * 5) * 30);
+        y = cy + Math.sin(t) * (ry + Math.cos(t * 5) * 30);
+        break;
+      case 'mountain':
+        x = cx + Math.cos(t) * rx + Math.sin(t * 2) * 60;
+        y = cy + Math.sin(t) * ry * 0.7 + Math.cos(t * 4) * 30;
+        break;
+      case 'city':
+        { const angle = t;
+          const r2 = rx * (0.8 + 0.2 * Math.abs(Math.sin(angle * 2)));
+          x = cx + Math.cos(angle) * r2;
+          y = cy + Math.sin(angle) * ry * 0.7; }
+        break;
+      default:
+        x = cx + Math.cos(t) * rx + Math.sin(t * 4) * 25;
+        y = cy + Math.sin(t) * ry + Math.cos(t * 4) * 25;
+        break;
+    }
+    points.push({ x, y });
+  }
+  return points;
+}
+
+function generateAICars(track) {
+  const names = ['Red Racer', 'Blue Bolt', 'Green Machine'];
+  const colors = ['#EF4444', '#3B82F6', '#22C55E'];
+  const emojis = ['🔴', '🔵', '🟢'];
+  const difficultyBase = 35 + (track.level - 1) * 6;
+
+  return names.map((name, i) => {
+    const variance = () => Math.floor(Math.random() * 20 - 10);
+    return {
+      name, color: colors[i], emoji: emojis[i],
+      stats: {
+        speed: Math.min(95, difficultyBase + variance() + (i === 0 ? 10 : 0)),
+        accel: Math.min(95, difficultyBase + variance() + (i === 1 ? 10 : 0)),
+        handling: Math.min(95, difficultyBase + variance() + (i === 2 ? 10 : 0)),
+        durability: Math.min(95, difficultyBase + variance()),
+      }
+    };
+  });
+}
+
+function raceCountdown(ctx, canvas) {
+  let count = 3;
+  const countInterval = setInterval(() => {
+    drawTrack(ctx, canvas);
+    // Draw countdown
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 120px Fredoka One, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(count > 0 ? count : 'GO!', canvas.width / 2, canvas.height / 2);
+
+    if (count <= 0) {
+      clearInterval(countInterval);
+      raceState.phase = 'racing';
+      raceLoop(ctx, canvas);
+    }
+    count--;
+  }, 800);
+}
+
+function raceLoop(ctx, canvas) {
+  if (!raceState || raceState.phase === 'finished') return;
+
+  const dt = 1 / 60;
+  raceState.time += dt;
+
+  const track = raceState.track;
+  const path = raceState.trackPath;
+  const totalLen = path.length;
+
+  // Update racers
+  for (let racer of raceState.racers) {
+    if (racer.finished) continue;
+
+    const s = racer.stats;
+    // Calculate effective speed based on track segment
+    const pathIdx = Math.floor(racer.progress % totalLen);
+    const nextIdx = (pathIdx + 1) % totalLen;
+    const dx = path[nextIdx].x - path[pathIdx].x;
+    const dy = path[nextIdx].y - path[pathIdx].y;
+    const curvature = Math.abs(dx * dy) * 0.01; // rough curvature measure
+
+    // Speed score weighted by track
+    const w = track.weights;
+    let effectiveSpeed = (
+      s.speed * w.speed +
+      s.accel * w.accel +
+      s.handling * w.handling * (1 + curvature) +
+      s.durability * w.durability
+    ) / (w.speed + w.accel + w.handling + w.durability);
+
+    // Handling penalty on curves
+    if (curvature > 0.3) {
+      const handlingFactor = s.handling / 100;
+      effectiveSpeed *= (0.5 + 0.5 * handlingFactor);
+    }
+
+    // Add some randomness for excitement
+    effectiveSpeed *= (0.95 + Math.random() * 0.1);
+    racer.wobble = Math.sin(raceState.time * 10 + raceState.racers.indexOf(racer)) * 3;
+
+    // Acceleration model
+    const targetSpeed = effectiveSpeed * 0.04;
+    const accelRate = 0.005 + (s.accel / 100) * 0.015;
+    racer.speed += (targetSpeed - racer.speed) * accelRate;
+
+    racer.progress += racer.speed;
+
+    // Check lap
+    const newLap = Math.floor(racer.progress / totalLen);
+    if (newLap > racer.lap) {
+      racer.lap = newLap;
+      if (racer.lap >= raceState.totalLaps) {
+        racer.finished = true;
+        racer.finishTime = raceState.time;
+      }
+    }
+  }
+
+  // Draw
+  drawTrack(ctx, canvas);
+  drawRacers(ctx, canvas);
+  updateStandings();
+
+  // Update UI
+  const playerRacer = raceState.racers[0];
+  const currentLap = Math.min(playerRacer.lap + 1, raceState.totalLaps);
+  document.getElementById('raceLap').textContent = `Lap ${currentLap}/${raceState.totalLaps}`;
+  const mins = Math.floor(raceState.time / 60);
+  const secs = Math.floor(raceState.time % 60);
+  document.getElementById('raceTimer').textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+
+  // Check race end
+  if (raceState.racers.every(r => r.finished)) {
+    raceState.phase = 'finished';
+    setTimeout(() => showRaceResult(), 500);
+    return;
+  }
+
+  raceAnimFrame = requestAnimationFrame(() => raceLoop(ctx, canvas));
+}
+
+function drawTrack(ctx, canvas) {
+  const w = canvas.width, h = canvas.height;
+  const track = raceState.track;
+
+  // Background
+  ctx.fillStyle = track.color;
+  ctx.fillRect(0, 0, w, h);
+
+  // Draw grass/terrain pattern
+  ctx.fillStyle = track.innerColor;
+  for (let i = 0; i < 30; i++) {
+    const x = (i * 71 + raceState.time * 3) % w;
+    const y = (i * 53) % h;
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const path = raceState.trackPath;
+
+  // Track road (wide)
+  ctx.strokeStyle = '#555';
+  ctx.lineWidth = 50;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(path[0].x, path[0].y);
+  for (let i = 1; i < path.length; i++) {
+    ctx.lineTo(path[i].x, path[i].y);
+  }
+  ctx.closePath();
+  ctx.stroke();
+
+  // Road surface
+  ctx.strokeStyle = '#888';
+  ctx.lineWidth = 44;
+  ctx.beginPath();
+  ctx.moveTo(path[0].x, path[0].y);
+  for (let i = 1; i < path.length; i++) {
+    ctx.lineTo(path[i].x, path[i].y);
+  }
+  ctx.closePath();
+  ctx.stroke();
+
+  // Center dashes
+  ctx.strokeStyle = '#FFD700';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([10, 15]);
+  ctx.beginPath();
+  ctx.moveTo(path[0].x, path[0].y);
+  for (let i = 1; i < path.length; i++) {
+    ctx.lineTo(path[i].x, path[i].y);
+  }
+  ctx.closePath();
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Start/finish line
+  const startPt = path[0];
+  ctx.fillStyle = 'white';
+  ctx.fillRect(startPt.x - 3, startPt.y - 25, 6, 50);
+  ctx.fillStyle = 'black';
+  for (let row = 0; row < 8; row++) {
+    for (let col = 0; col < 1; col++) {
+      if ((row + col) % 2 === 0) {
+        ctx.fillRect(startPt.x - 3 + col * 3, startPt.y - 25 + row * 6.25, 3, 6.25);
+      }
+    }
+  }
+}
+
+function drawRacers(ctx, canvas) {
+  const path = raceState.trackPath;
+  const totalLen = path.length;
+
+  // Sort by draw order (back to front)
+  const sorted = [...raceState.racers].sort((a, b) => a.progress - b.progress);
+
+  for (let racer of sorted) {
+    const idx = Math.floor(racer.progress % totalLen);
+    const nextIdx = (idx + 1) % totalLen;
+    const pt = path[idx];
+    const nextPt = path[nextIdx];
+
+    // Calculate angle
+    const angle = Math.atan2(nextPt.y - pt.y, nextPt.x - pt.x);
+
+    const x = pt.x + racer.wobble * Math.cos(angle + Math.PI / 2);
+    const y = pt.y + racer.wobble * Math.sin(angle + Math.PI / 2);
+
+    // Draw car body
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath();
+    ctx.ellipse(2, 3, 14, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Car body
+    ctx.fillStyle = racer.color;
+    ctx.beginPath();
+    ctx.roundRect(-14, -8, 28, 16, 6);
+    ctx.fill();
+
+    // Windshield
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.beginPath();
+    ctx.roundRect(2, -5, 8, 10, 3);
+    ctx.fill();
+
+    // Wheels
+    ctx.fillStyle = '#333';
+    ctx.fillRect(-12, -10, 6, 4);
+    ctx.fillRect(-12, 6, 6, 4);
+    ctx.fillRect(6, -10, 6, 4);
+    ctx.fillRect(6, 6, 6, 4);
+
+    ctx.restore();
+
+    // Player indicator
+    if (racer.isPlayer) {
+      ctx.fillStyle = '#FFD700';
+      ctx.font = 'bold 14px Nunito';
+      ctx.textAlign = 'center';
+      ctx.fillText('▼ YOU', x, y - 18);
+    }
+  }
+}
+
+function updateStandings() {
+  const container = document.getElementById('raceStandings');
+  container.innerHTML = '';
+
+  const sorted = [...raceState.racers].sort((a, b) => {
+    if (a.finished && b.finished) return a.finishTime - b.finishTime;
+    if (a.finished) return -1;
+    if (b.finished) return 1;
+    return b.progress - a.progress;
+  });
+
+  sorted.forEach((racer, i) => {
+    const div = document.createElement('div');
+    div.className = `standing-card ${racer.isPlayer ? 'player' : ''}`;
+    const posEmoji = ['🥇', '🥈', '🥉', '4️⃣'][i] || `${i + 1}`;
+    div.innerHTML = `
+      <span class="standing-pos">${posEmoji}</span>
+      <span>${racer.isPlayer ? '⭐ ' : ''}${racer.name}</span>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function showRaceResult() {
+  const sorted = [...raceState.racers].sort((a, b) => a.finishTime - b.finishTime);
+  const playerPos = sorted.findIndex(r => r.isPlayer) + 1;
+
+  const trophies = ['🏆', '🥈', '🥉', '😢'];
+  const titles = ['1st Place!', '2nd Place!', '3rd Place!', '4th Place...'];
+  const coinRewards = [100, 50, 25, 10];
+  const xpRewards = [80, 50, 30, 15];
+
+  // Apply track level bonus
+  const trackBonus = raceState.track.level;
+  const coins = Math.floor(coinRewards[playerPos - 1] * (1 + trackBonus * 0.15));
+  const xp = Math.floor(xpRewards[playerPos - 1] * (1 + trackBonus * 0.1));
+
+  document.getElementById('resultTrophy').textContent = trophies[playerPos - 1];
+  document.getElementById('resultTitle').textContent = titles[playerPos - 1];
+
+  const mins = Math.floor(raceState.racers[0].finishTime / 60);
+  const secs = Math.floor(raceState.racers[0].finishTime % 60);
+  document.getElementById('resultDetails').textContent =
+    `Track: ${raceState.track.name} | Time: ${mins}:${secs.toString().padStart(2, '0')}`;
+
+  document.getElementById('resultRewards').textContent =
+    `🪙 +${coins} coins | ⭐ +${xp} XP`;
+
+  gameState.coins += coins;
+  gameState.xp += xp;
+  if (playerPos === 1) gameState.wins++;
+
+  // Check level up
+  let leveledUp = false;
+  let newLevel = gameState.level;
+  while (gameState.xp >= gameState.xpToNext && gameState.level < 10) {
+    gameState.xp -= gameState.xpToNext;
+    gameState.level++;
+    gameState.xpToNext = Math.floor(gameState.xpToNext * 1.4);
+    leveledUp = true;
+    newLevel = gameState.level;
+  }
+
+  saveGame();
+
+  document.getElementById('resultOverlay').classList.add('active');
+
+  if (leveledUp) {
+    pendingLevelUp = newLevel;
+  }
+}
+
+let pendingLevelUp = null;
+
+function closeResult() {
+  document.getElementById('resultOverlay').classList.remove('active');
+
+  if (pendingLevelUp) {
+    showLevelUp(pendingLevelUp);
+    pendingLevelUp = null;
+  } else {
+    showScreen('mainMenu');
+  }
+}
+
+function showLevelUp(level) {
+  document.getElementById('levelupTitle').textContent = `Level ${level}!`;
+
+  // Find newly unlocked parts
+  const unlocks = [];
+  for (let cat in PARTS) {
+    for (let id in PARTS[cat].items) {
+      const part = PARTS[cat].items[id];
+      if (part.level === level) {
+        unlocks.push(`${PARTS[cat].icon} ${PARTS[cat].label}: ${part.name}`);
+      }
+    }
+  }
+  // Find newly unlocked tracks
+  for (let t of TRACKS) {
+    if (t.level === level) {
+      unlocks.push(`${t.icon} Track: ${t.name}`);
+    }
+  }
+
+  document.getElementById('levelupUnlocks').innerHTML = unlocks.length
+    ? '<b>New Unlocks:</b><br>' + unlocks.join('<br>')
+    : 'Keep racing to unlock more!';
+
+  document.getElementById('levelupOverlay').classList.add('active');
+}
+
+function closeLevelup() {
+  document.getElementById('levelupOverlay').classList.remove('active');
+  showScreen('mainMenu');
+}
+
+// ============================================
+// INIT
+// ============================================
+loadGame();
+updateAllUI();
+</script>
+</body>
+</html>

@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Block Builder - Marvel x Minecraft</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a2e;
+    font-family: 'Segoe UI', sans-serif;
+    overflow: hidden;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  #topBar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 12px;
+    background: #16213e;
+    border-bottom: 3px solid #e94560;
+    min-height: 48px;
+    flex-shrink: 0;
+  }
+
+  #topBar h1 {
+    color: #e94560;
+    font-size: 18px;
+    font-weight: 900;
+    text-shadow: 2px 2px 0 #0f3460;
+    letter-spacing: 1px;
+  }
+
+  .top-btn {
+    background: #0f3460;
+    color: #eee;
+    border: 2px solid #e94560;
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.1s;
+  }
+  .top-btn:active { transform: scale(0.93); }
+
+  #topButtons { display: flex; gap: 8px; }
+
+  #canvasWrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: #87CEEB;
+    background: linear-gradient(180deg, #87CEEB 0%, #b8e4f0 60%, #7ec850 60%, #5a9a32 100%);
+    position: relative;
+  }
+
+  canvas {
+    display: block;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+
+  #toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px;
+    background: #16213e;
+    border-top: 3px solid #e94560;
+    overflow-x: auto;
+    flex-shrink: 0;
+    min-height: 72px;
+  }
+
+  .block-btn {
+    width: 52px;
+    height: 52px;
+    border-radius: 8px;
+    border: 3px solid transparent;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: transform 0.1s, border-color 0.15s;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+  .block-btn:active { transform: scale(0.9); }
+  .block-btn.selected { border-color: #fff; box-shadow: 0 0 12px rgba(255,255,255,0.5); transform: scale(1.1); }
+
+  #modeToggle {
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
+    border: 3px solid #e94560;
+    background: #0f3460;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    transition: transform 0.1s, background 0.15s;
+  }
+  #modeToggle:active { transform: scale(0.9); }
+  #modeToggle.destroy { background: #e94560; }
+
+  .separator {
+    width: 2px;
+    height: 40px;
+    background: #e94560;
+    flex-shrink: 0;
+    margin: 0 4px;
+  }
+
+  #particles { position: absolute; top: 0; left: 0; pointer-events: none; }
+
+  /* toast */
+  #toast {
+    position: fixed;
+    top: 60px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-80px);
+    background: #e94560;
+    color: #fff;
+    padding: 10px 24px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 16px;
+    z-index: 100;
+    transition: transform 0.3s ease;
+    pointer-events: none;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* confirm modal */
+  #confirmModal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+  #confirmModal.show { display: flex; }
+  #confirmBox {
+    background: #16213e;
+    border: 3px solid #e94560;
+    border-radius: 16px;
+    padding: 28px;
+    text-align: center;
+    max-width: 320px;
+  }
+  #confirmBox p { color: #eee; font-size: 18px; margin-bottom: 20px; font-weight: 700; }
+  #confirmBox button {
+    padding: 12px 28px;
+    border-radius: 12px;
+    border: none;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    margin: 0 8px;
+  }
+  #confirmYes { background: #e94560; color: #fff; }
+  #confirmNo { background: #0f3460; color: #eee; border: 2px solid #e94560; }
+</style>
+</head>
+<body>
+
+<div id="topBar">
+  <h1>BLOCK BUILDER</h1>
+  <div id="topButtons">
+    <button class="top-btn" onclick="saveWorld()">Save</button>
+    <button class="top-btn" onclick="loadWorld()">Load</button>
+    <button class="top-btn" onclick="confirmClear()">Clear</button>
+  </div>
+</div>
+
+<div id="canvasWrap">
+  <canvas id="game"></canvas>
+  <canvas id="particles"></canvas>
+</div>
+
+<div id="toolbar">
+  <div id="modeToggle" onclick="toggleMode()" title="Build / Destroy">+</div>
+  <div class="separator"></div>
+  <div id="blockPalette"></div>
+</div>
+
+<div id="toast"></div>
+
+<div id="confirmModal">
+  <div id="confirmBox">
+    <p>Clear everything?</p>
+    <button id="confirmYes" onclick="clearWorld()">Yes!</button>
+    <button id="confirmNo" onclick="closeConfirm()">No</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// CONFIG
+// ============================================================
+const COLS = 24;
+const ROWS = 16;
+const BASE_BLOCK = 32;
+
+const BLOCK_TYPES = [
+  { id: 'grass',     name: 'Grass',      emoji: '' },
+  { id: 'dirt',      name: 'Dirt',       emoji: '' },
+  { id: 'stone',     name: 'Stone',      emoji: '' },
+  { id: 'wood',      name: 'Wood',       emoji: '' },
+  { id: 'water',     name: 'Water',      emoji: '' },
+  { id: 'lava',      name: 'Lava',       emoji: '' },
+  { id: 'tnt',       name: 'TNT',        emoji: '' },
+  { id: 'ironman',   name: 'Iron Man',   emoji: '' },
+  { id: 'hulk',      name: 'Hulk',       emoji: '' },
+  { id: 'spider',    name: 'Spider-Man', emoji: '' },
+];
+
+// ============================================================
+// STATE
+// ============================================================
+let grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+let selectedBlock = 'grass';
+let mode = 'build'; // 'build' | 'destroy'
+let blockSize = BASE_BLOCK;
+let canvasOffsetX = 0;
+let canvasOffsetY = 0;
+let particles = [];
+let animFrame = 0;
+
+// ============================================================
+// CANVAS SETUP
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const pCanvas = document.getElementById('particles');
+const pCtx = pCanvas.getContext('2d');
+
+function resize() {
+  const wrap = document.getElementById('canvasWrap');
+  const w = wrap.clientWidth;
+  const h = wrap.clientHeight;
+
+  // fit grid into available space
+  const bsW = Math.floor(w / COLS);
+  const bsH = Math.floor(h / ROWS);
+  blockSize = Math.max(16, Math.min(bsW, bsH));
+
+  const cw = blockSize * COLS;
+  const ch = blockSize * ROWS;
+  canvas.width = cw;
+  canvas.height = ch;
+  pCanvas.width = w;
+  pCanvas.height = h;
+  pCanvas.style.width = w + 'px';
+  pCanvas.style.height = h + 'px';
+
+  canvasOffsetX = Math.floor((w - cw) / 2);
+  canvasOffsetY = Math.floor((h - ch) / 2);
+  canvas.style.marginLeft = canvasOffsetX + 'px';
+  canvas.style.marginTop = canvasOffsetY + 'px';
+
+  render();
+}
+window.addEventListener('resize', resize);
+
+// ============================================================
+// BLOCK DRAWING (pixel art style)
+// ============================================================
+function drawBlock(x, y, type, size) {
+  const s = size || blockSize;
+  const px = x * s;
+  const py = y * s;
+
+  ctx.save();
+  switch (type) {
+    case 'grass':
+      ctx.fillStyle = '#8B6914';
+      ctx.fillRect(px, py, s, s);
+      ctx.fillStyle = '#4CAF50';
+      ctx.fillRect(px, py, s, Math.floor(s * 0.35));
+      // noise
+      for (let i = 0; i < 6; i++) {
+        ctx.fillStyle = i % 2 === 0 ? '#3E8E41' : '#66BB6A';
+        const nx = px + ((i * 7 + 3) % s);
+        ctx.fillRect(nx, py, Math.ceil(s/8), Math.ceil(s * 0.35));
+      }
+      break;
+
+    case 'dirt':
+      ctx.fillStyle = '#8B6914';
+      ctx.fillRect(px, py, s, s);
+      for (let i = 0; i < 5; i++) {
+        ctx.fillStyle = '#7A5A10';
+        ctx.fillRect(px + ((i*11+2)%s), py + ((i*7+4)%s), Math.ceil(s/6), Math.ceil(s/6));
+      }
+      break;
+
+    case 'stone':
+      ctx.fillStyle = '#888';
+      ctx.fillRect(px, py, s, s);
+      ctx.fillStyle = '#777';
+      ctx.fillRect(px + Math.floor(s*0.1), py + Math.floor(s*0.2), Math.floor(s*0.4), Math.floor(s*0.3));
+      ctx.fillStyle = '#999';
+      ctx.fillRect(px + Math.floor(s*0.5), py + Math.floor(s*0.5), Math.floor(s*0.35), Math.floor(s*0.35));
+      break;
+
+    case 'wood':
+      ctx.fillStyle = '#A0522D';
+      ctx.fillRect(px, py, s, s);
+      ctx.fillStyle = '#8B4513';
+      for (let i = 0; i < 4; i++) {
+        const ly = py + Math.floor(s * (i + 0.5) / 4);
+        ctx.fillRect(px, ly, s, Math.max(1, Math.floor(s/16)));
+      }
+      break;
+
+    case 'water':
+      ctx.fillStyle = 'rgba(30, 144, 255, 0.6)';
+      ctx.fillRect(px, py, s, s);
+      ctx.fillStyle = 'rgba(100, 200, 255, 0.4)';
+      const waveOff = Math.floor(Math.sin(animFrame * 0.05 + x) * s * 0.1);
+      ctx.fillRect(px, py + Math.floor(s*0.3) + waveOff, s, Math.floor(s*0.15));
+      ctx.fillRect(px, py + Math.floor(s*0.65) + waveOff, s, Math.floor(s*0.15));
+      break;
+
+    case 'lava':
+      ctx.fillStyle = '#D32F2F';
+      ctx.fillRect(px, py, s, s);
+      ctx.fillStyle = '#FF6F00';
+      const lOff = Math.floor(Math.sin(animFrame * 0.08 + x + y) * s * 0.15);
+      ctx.fillRect(px + Math.floor(s*0.2), py + Math.floor(s*0.2) + lOff, Math.floor(s*0.3), Math.floor(s*0.3));
+      ctx.fillStyle = '#FFAB00';
+      ctx.fillRect(px + Math.floor(s*0.5), py + Math.floor(s*0.5) - lOff, Math.floor(s*0.25), Math.floor(s*0.25));
+      break;
+
+    case 'tnt':
+      ctx.fillStyle = '#D32F2F';
+      ctx.fillRect(px, py, s, s);
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(px + Math.floor(s*0.15), py + Math.floor(s*0.3), Math.floor(s*0.7), Math.floor(s*0.4));
+      ctx.fillStyle = '#000';
+      ctx.font = `bold ${Math.floor(s*0.32)}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('TNT', px + s/2, py + s/2 + 1);
+      break;
+
+    case 'ironman':
+      // red body
+      ctx.fillStyle = '#C62828';
+      ctx.fillRect(px, py, s, s);
+      // gold face plate
+      ctx.fillStyle = '#FFD600';
+      ctx.fillRect(px + Math.floor(s*0.2), py + Math.floor(s*0.15), Math.floor(s*0.6), Math.floor(s*0.45));
+      // eyes
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(px + Math.floor(s*0.25), py + Math.floor(s*0.28), Math.floor(s*0.18), Math.floor(s*0.12));
+      ctx.fillRect(px + Math.floor(s*0.55), py + Math.floor(s*0.28), Math.floor(s*0.18), Math.floor(s*0.12));
+      // arc reactor
+      ctx.fillStyle = '#4FC3F7';
+      ctx.beginPath();
+      ctx.arc(px + s/2, py + s*0.78, s*0.1, 0, Math.PI*2);
+      ctx.fill();
+      break;
+
+    case 'hulk':
+      // green body
+      ctx.fillStyle = '#2E7D32';
+      ctx.fillRect(px, py, s, s);
+      // face
+      ctx.fillStyle = '#4CAF50';
+      ctx.fillRect(px + Math.floor(s*0.15), py + Math.floor(s*0.1), Math.floor(s*0.7), Math.floor(s*0.5));
+      // angry eyes
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(px + Math.floor(s*0.2), py + Math.floor(s*0.22), Math.floor(s*0.2), Math.floor(s*0.12));
+      ctx.fillRect(px + Math.floor(s*0.55), py + Math.floor(s*0.22), Math.floor(s*0.2), Math.floor(s*0.12));
+      ctx.fillStyle = '#000';
+      ctx.fillRect(px + Math.floor(s*0.28), py + Math.floor(s*0.25), Math.floor(s*0.08), Math.floor(s*0.08));
+      ctx.fillRect(px + Math.floor(s*0.6), py + Math.floor(s*0.25), Math.floor(s*0.08), Math.floor(s*0.08));
+      // purple pants
+      ctx.fillStyle = '#7B1FA2';
+      ctx.fillRect(px, py + Math.floor(s*0.7), s, Math.floor(s*0.3));
+      break;
+
+    case 'spider':
+      // red body
+      ctx.fillStyle = '#D32F2F';
+      ctx.fillRect(px, py, s, s);
+      // blue sections
+      ctx.fillStyle = '#1565C0';
+      ctx.fillRect(px, py + Math.floor(s*0.55), s, Math.floor(s*0.45));
+      ctx.fillRect(px, py, Math.floor(s*0.2), s);
+      ctx.fillRect(px + Math.floor(s*0.8), py, Math.floor(s*0.2), s);
+      // eyes
+      ctx.fillStyle = '#fff';
+      // left eye - angular
+      ctx.beginPath();
+      ctx.moveTo(px + s*0.2, py + s*0.3);
+      ctx.lineTo(px + s*0.43, py + s*0.22);
+      ctx.lineTo(px + s*0.43, py + s*0.42);
+      ctx.lineTo(px + s*0.2, py + s*0.38);
+      ctx.fill();
+      // right eye
+      ctx.beginPath();
+      ctx.moveTo(px + s*0.8, py + s*0.3);
+      ctx.lineTo(px + s*0.57, py + s*0.22);
+      ctx.lineTo(px + s*0.57, py + s*0.42);
+      ctx.lineTo(px + s*0.8, py + s*0.38);
+      ctx.fill();
+      // web lines
+      ctx.strokeStyle = '#111';
+      ctx.lineWidth = Math.max(1, Math.floor(s/16));
+      ctx.beginPath();
+      ctx.moveTo(px + s/2, py);
+      ctx.lineTo(px + s/2, py + s*0.55);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(px + s*0.15, py + s*0.1);
+      ctx.lineTo(px + s*0.85, py + s*0.5);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(px + s*0.85, py + s*0.1);
+      ctx.lineTo(px + s*0.15, py + s*0.5);
+      ctx.stroke();
+      break;
+  }
+
+  // block outline
+  ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
+  // highlight edge
+  ctx.fillStyle = 'rgba(255,255,255,0.1)';
+  ctx.fillRect(px, py, s, Math.max(1, Math.floor(s/16)));
+  ctx.fillRect(px, py, Math.max(1, Math.floor(s/16)), s);
+
+  ctx.restore();
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+function render() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // grid background
+  ctx.fillStyle = 'rgba(200, 230, 255, 0.3)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // grid lines
+  ctx.strokeStyle = 'rgba(0,0,0,0.07)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x <= COLS; x++) {
+    ctx.beginPath();
+    ctx.moveTo(x * blockSize + 0.5, 0);
+    ctx.lineTo(x * blockSize + 0.5, canvas.height);
+    ctx.stroke();
+  }
+  for (let y = 0; y <= ROWS; y++) {
+    ctx.beginPath();
+    ctx.moveTo(0, y * blockSize + 0.5);
+    ctx.lineTo(canvas.width, y * blockSize + 0.5);
+    ctx.stroke();
+  }
+
+  // blocks
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (grid[r][c]) {
+        drawBlock(c, r, grid[r][c]);
+      }
+    }
+  }
+}
+
+// ============================================================
+// PARTICLES
+// ============================================================
+function spawnParticles(cx, cy, color, count) {
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x: cx,
+      y: cy,
+      vx: (Math.random() - 0.5) * 8,
+      vy: (Math.random() - 0.5) * 8 - 3,
+      life: 30 + Math.random() * 20,
+      maxLife: 50,
+      size: 3 + Math.random() * 5,
+      color: color,
+    });
+  }
+}
+
+function spawnExplosion(cx, cy) {
+  const colors = ['#FF6F00', '#FFD600', '#D32F2F', '#FF3D00', '#fff'];
+  for (let i = 0; i < 40; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 2 + Math.random() * 8;
+    particles.push({
+      x: cx,
+      y: cy,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 20 + Math.random() * 30,
+      maxLife: 50,
+      size: 4 + Math.random() * 8,
+      color: colors[Math.floor(Math.random() * colors.length)],
+    });
+  }
+}
+
+function updateParticles() {
+  pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.3; // gravity
+    p.life--;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+
+    const alpha = p.life / p.maxLife;
+    pCtx.globalAlpha = alpha;
+    pCtx.fillStyle = p.color;
+    pCtx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+  }
+  pCtx.globalAlpha = 1;
+}
+
+// ============================================================
+// SOUND (Web Audio API synth)
+// ============================================================
+let audioCtx;
+function getAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playPlace() {
+  try {
+    const ac = getAudio();
+    const o = ac.createOscillator();
+    const g = ac.createGain();
+    o.type = 'square';
+    o.frequency.setValueAtTime(600, ac.currentTime);
+    o.frequency.exponentialRampToValueAtTime(900, ac.currentTime + 0.08);
+    g.gain.setValueAtTime(0.15, ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.12);
+    o.connect(g).connect(ac.destination);
+    o.start(); o.stop(ac.currentTime + 0.12);
+  } catch(e) {}
+}
+
+function playBreak() {
+  try {
+    const ac = getAudio();
+    const o = ac.createOscillator();
+    const g = ac.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(400, ac.currentTime);
+    o.frequency.exponentialRampToValueAtTime(80, ac.currentTime + 0.15);
+    g.gain.setValueAtTime(0.12, ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.15);
+    o.connect(g).connect(ac.destination);
+    o.start(); o.stop(ac.currentTime + 0.15);
+  } catch(e) {}
+}
+
+function playExplosion() {
+  try {
+    const ac = getAudio();
+    const bufferSize = ac.sampleRate * 0.4;
+    const buffer = ac.createBuffer(1, bufferSize, ac.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 2);
+    }
+    const src = ac.createBufferSource();
+    src.buffer = buffer;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.3, ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.4);
+    const f = ac.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.setValueAtTime(800, ac.currentTime);
+    f.frequency.exponentialRampToValueAtTime(100, ac.currentTime + 0.3);
+    src.connect(f).connect(g).connect(ac.destination);
+    src.start(); src.stop(ac.currentTime + 0.4);
+  } catch(e) {}
+}
+
+function playHero() {
+  try {
+    const ac = getAudio();
+    const notes = [523, 659, 784]; // C5, E5, G5
+    notes.forEach((freq, i) => {
+      const o = ac.createOscillator();
+      const g = ac.createGain();
+      o.type = 'triangle';
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(0, ac.currentTime + i * 0.08);
+      g.gain.linearRampToValueAtTime(0.12, ac.currentTime + i * 0.08 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + i * 0.08 + 0.2);
+      o.connect(g).connect(ac.destination);
+      o.start(ac.currentTime + i * 0.08);
+      o.stop(ac.currentTime + i * 0.08 + 0.2);
+    });
+  } catch(e) {}
+}
+
+// ============================================================
+// INTERACTION
+// ============================================================
+function getGridPos(clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  const x = clientX - rect.left;
+  const y = clientY - rect.top;
+  const col = Math.floor(x / blockSize);
+  const row = Math.floor(y / blockSize);
+  if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return null;
+  return { col, row };
+}
+
+function handleTap(clientX, clientY) {
+  const pos = getGridPos(clientX, clientY);
+  if (!pos) return;
+
+  const { col, row } = pos;
+
+  if (mode === 'build') {
+    if (!grid[row][col]) {
+      grid[row][col] = selectedBlock;
+      const isHero = ['ironman', 'hulk', 'spider'].includes(selectedBlock);
+      if (isHero) playHero(); else playPlace();
+      // place particle
+      const rect = canvas.getBoundingClientRect();
+      const cx = rect.left + col * blockSize + blockSize/2 - canvasOffsetX + canvasOffsetX;
+      const cy = rect.top + row * blockSize + blockSize/2;
+      // convert to particle canvas coords
+      const pRect = pCanvas.getBoundingClientRect();
+      const pcx = cx - pRect.left + canvasOffsetX;
+      const pcy = cy - pRect.top;
+      spawnParticles(pcx, pcy, '#fff', 6);
+    }
+  } else {
+    // destroy mode
+    if (grid[row][col]) {
+      const blockType = grid[row][col];
+      const rect = canvas.getBoundingClientRect();
+      const pcx = canvasOffsetX + col * blockSize + blockSize/2;
+      const pcy = (rect.top - document.getElementById('canvasWrap').getBoundingClientRect().top) + row * blockSize + blockSize/2;
+
+      if (blockType === 'tnt') {
+        // EXPLODE! 3x3 area
+        playExplosion();
+        spawnExplosion(pcx, pcy);
+        for (let dr = -1; dr <= 1; dr++) {
+          for (let dc = -1; dc <= 1; dc++) {
+            const nr = row + dr;
+            const nc = col + dc;
+            if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && grid[nr][nc]) {
+              grid[nr][nc] = null;
+            }
+          }
+        }
+        showToast('BOOM!');
+      } else {
+        grid[row][col] = null;
+        playBreak();
+        const colors = { grass: '#4CAF50', dirt: '#8B6914', stone: '#888', wood: '#A0522D',
+                        water: '#1E90FF', lava: '#D32F2F', ironman: '#C62828', hulk: '#2E7D32', spider: '#D32F2F' };
+        spawnParticles(pcx, pcy, colors[blockType] || '#888', 10);
+      }
+    }
+  }
+  render();
+}
+
+// Mouse
+canvas.addEventListener('mousedown', (e) => {
+  e.preventDefault();
+  handleTap(e.clientX, e.clientY);
+});
+
+// support drag to paint
+let dragging = false;
+canvas.addEventListener('mousedown', () => { dragging = true; });
+window.addEventListener('mouseup', () => { dragging = false; });
+canvas.addEventListener('mousemove', (e) => {
+  if (!dragging) return;
+  e.preventDefault();
+  handleTap(e.clientX, e.clientY);
+});
+
+// Touch
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  const t = e.touches[0];
+  handleTap(t.clientX, t.clientY);
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  const t = e.touches[0];
+  handleTap(t.clientX, t.clientY);
+}, { passive: false });
+
+// ============================================================
+// MODE TOGGLE
+// ============================================================
+function toggleMode() {
+  const btn = document.getElementById('modeToggle');
+  if (mode === 'build') {
+    mode = 'destroy';
+    btn.textContent = '\u26CF'; // pickaxe unicode
+    btn.classList.add('destroy');
+    showToast('Destroy Mode!');
+  } else {
+    mode = 'build';
+    btn.textContent = '+';
+    btn.classList.remove('destroy');
+    showToast('Build Mode!');
+  }
+}
+
+// ============================================================
+// PALETTE
+// ============================================================
+function buildPalette() {
+  const palette = document.getElementById('blockPalette');
+  palette.style.display = 'flex';
+  palette.style.gap = '6px';
+
+  BLOCK_TYPES.forEach(bt => {
+    const c = document.createElement('canvas');
+    c.width = 48;
+    c.height = 48;
+    c.className = 'block-btn';
+    if (bt.id === selectedBlock) c.classList.add('selected');
+    c.dataset.block = bt.id;
+    c.title = bt.name;
+
+    // draw preview
+    const tCtx = c.getContext('2d');
+    const origCtx = ctx;
+    const origSize = blockSize;
+    // temporarily use this canvas context
+    // We'll draw directly
+    drawBlockPreview(tCtx, bt.id, 48);
+
+    c.addEventListener('click', () => {
+      selectedBlock = bt.id;
+      document.querySelectorAll('.block-btn').forEach(b => b.classList.remove('selected'));
+      c.classList.add('selected');
+      if (mode === 'destroy') {
+        mode = 'build';
+        document.getElementById('modeToggle').textContent = '+';
+        document.getElementById('modeToggle').classList.remove('destroy');
+      }
+    });
+
+    palette.appendChild(c);
+  });
+}
+
+function drawBlockPreview(tCtx, type, size) {
+  const s = size;
+  tCtx.clearRect(0, 0, s, s);
+
+  switch (type) {
+    case 'grass':
+      tCtx.fillStyle = '#8B6914';
+      tCtx.fillRect(0, 0, s, s);
+      tCtx.fillStyle = '#4CAF50';
+      tCtx.fillRect(0, 0, s, Math.floor(s * 0.35));
+      break;
+    case 'dirt':
+      tCtx.fillStyle = '#8B6914';
+      tCtx.fillRect(0, 0, s, s);
+      tCtx.fillStyle = '#7A5A10';
+      tCtx.fillRect(8, 12, 10, 10);
+      tCtx.fillRect(28, 24, 8, 8);
+      break;
+    case 'stone':
+      tCtx.fillStyle = '#888';
+      tCtx.fillRect(0, 0, s, s);
+      tCtx.fillStyle = '#777';
+      tCtx.fillRect(5, 10, 18, 14);
+      tCtx.fillStyle = '#999';
+      tCtx.fillRect(25, 25, 16, 16);
+      break;
+    case 'wood':
+      tCtx.fillStyle = '#A0522D';
+      tCtx.fillRect(0, 0, s, s);
+      tCtx.fillStyle = '#8B4513';
+      for (let i = 0; i < 4; i++) tCtx.fillRect(0, Math.floor(s*(i+0.5)/4), s, 2);
+      break;
+    case 'water':
+      tCtx.fillStyle = 'rgba(30, 144, 255, 0.7)';
+      tCtx.fillRect(0, 0, s, s);
+      tCtx.fillStyle = 'rgba(100, 200, 255, 0.5)';
+      tCtx.fillRect(0, 15, s, 6);
+      tCtx.fillRect(0, 32, s, 6);
+      break;
+    case 'lava':
+      tCtx.fillStyle = '#D32F2F';
+      tCtx.fillRect(0, 0, s, s);
+      tCtx.fillStyle = '#FF6F00';
+      tCtx.fillRect(10, 10, 14, 14);
+      tCtx.fillStyle = '#FFAB00';
+      tCtx.fillRect(26, 26, 12, 12);
+      break;
+    case 'tnt':
+      tCtx.fillStyle = '#D32F2F';
+      tCtx.fillRect(0, 0, s, s);
+      tCtx.fillStyle = '#fff';
+      tCtx.fillRect(7, 14, 34, 20);
+      tCtx.fillStyle = '#000';
+      tCtx.font = 'bold 15px monospace';
+      tCtx.textAlign = 'center';
+      tCtx.textBaseline = 'middle';
+      tCtx.fillText('TNT', s/2, s/2 + 1);
+      break;
+    case 'ironman':
+      tCtx.fillStyle = '#C62828';
+      tCtx.fillRect(0, 0, s, s);
+      tCtx.fillStyle = '#FFD600';
+      tCtx.fillRect(10, 7, 28, 22);
+      tCtx.fillStyle = '#fff';
+      tCtx.fillRect(12, 14, 9, 6);
+      tCtx.fillRect(27, 14, 9, 6);
+      tCtx.fillStyle = '#4FC3F7';
+      tCtx.beginPath();
+      tCtx.arc(s/2, s*0.78, 5, 0, Math.PI*2);
+      tCtx.fill();
+      break;
+    case 'hulk':
+      tCtx.fillStyle = '#2E7D32';
+      tCtx.fillRect(0, 0, s, s);
+      tCtx.fillStyle = '#4CAF50';
+      tCtx.fillRect(7, 5, 34, 24);
+      tCtx.fillStyle = '#fff';
+      tCtx.fillRect(10, 11, 10, 6);
+      tCtx.fillRect(27, 11, 10, 6);
+      tCtx.fillStyle = '#7B1FA2';
+      tCtx.fillRect(0, 34, s, 14);
+      break;
+    case 'spider':
+      tCtx.fillStyle = '#D32F2F';
+      tCtx.fillRect(0, 0, s, s);
+      tCtx.fillStyle = '#1565C0';
+      tCtx.fillRect(0, 27, s, 21);
+      tCtx.fillStyle = '#fff';
+      tCtx.beginPath();
+      tCtx.moveTo(10, 14);
+      tCtx.lineTo(21, 10);
+      tCtx.lineTo(21, 20);
+      tCtx.lineTo(10, 18);
+      tCtx.fill();
+      tCtx.beginPath();
+      tCtx.moveTo(38, 14);
+      tCtx.lineTo(27, 10);
+      tCtx.lineTo(27, 20);
+      tCtx.lineTo(38, 18);
+      tCtx.fill();
+      break;
+  }
+
+  // outline
+  tCtx.strokeStyle = 'rgba(0,0,0,0.3)';
+  tCtx.lineWidth = 1;
+  tCtx.strokeRect(0.5, 0.5, s-1, s-1);
+}
+
+// ============================================================
+// SAVE / LOAD / CLEAR
+// ============================================================
+function saveWorld() {
+  localStorage.setItem('blockgame_save', JSON.stringify(grid));
+  showToast('Saved!');
+}
+
+function loadWorld() {
+  const data = localStorage.getItem('blockgame_save');
+  if (data) {
+    try {
+      const loaded = JSON.parse(data);
+      if (Array.isArray(loaded) && loaded.length === ROWS) {
+        grid = loaded;
+        render();
+        showToast('Loaded!');
+        return;
+      }
+    } catch(e) {}
+  }
+  showToast('No saved world found');
+}
+
+function confirmClear() {
+  document.getElementById('confirmModal').classList.add('show');
+}
+
+function closeConfirm() {
+  document.getElementById('confirmModal').classList.remove('show');
+}
+
+function clearWorld() {
+  grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+  render();
+  closeConfirm();
+  showToast('All cleared!');
+}
+
+// ============================================================
+// TOAST
+// ============================================================
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 1200);
+}
+
+// ============================================================
+// ANIMATION LOOP
+// ============================================================
+function loop() {
+  animFrame++;
+  // re-render for animated blocks (water, lava)
+  let hasAnimated = false;
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (grid[r][c] === 'water' || grid[r][c] === 'lava') {
+        hasAnimated = true;
+        break;
+      }
+    }
+    if (hasAnimated) break;
+  }
+  if (hasAnimated) render();
+  updateParticles();
+  requestAnimationFrame(loop);
+}
+
+// ============================================================
+// INIT
+// ============================================================
+buildPalette();
+resize();
+loop();
+</script>
+</body>
+</html>

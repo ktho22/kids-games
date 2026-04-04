@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Star Adventure - English & Math</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+@import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Noto+Sans+KR:wght@400;700&display=swap');
+
+body {
+  font-family: 'Fredoka One', 'Noto Sans KR', sans-serif;
+  background: #1a1a2e;
+  overflow: hidden;
+  height: 100vh;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ===== SCREENS ===== */
+.screen { display: none; width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; }
+.screen.active { display: flex; }
+
+/* ===== TITLE SCREEN ===== */
+#title-screen {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  flex-direction: column; align-items: center; justify-content: center; gap: 30px;
+}
+.title-stars {
+  font-size: 60px;
+  animation: twinkle 2s infinite;
+}
+@keyframes twinkle {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.1); opacity: 0.8; }
+}
+.game-title {
+  font-size: 52px; color: #fff;
+  text-shadow: 3px 3px 0 #e94560, 6px 6px 0 rgba(0,0,0,0.2);
+  text-align: center; line-height: 1.3;
+}
+.game-subtitle {
+  font-size: 22px; color: #ffd93d; text-align: center;
+}
+.btn-play {
+  background: linear-gradient(180deg, #ff6b6b, #e94560);
+  color: #fff; border: none; padding: 18px 60px;
+  font-size: 32px; font-family: inherit; border-radius: 50px;
+  cursor: pointer; box-shadow: 0 6px 0 #c0392b, 0 10px 20px rgba(0,0,0,0.3);
+  transition: all 0.1s;
+}
+.btn-play:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 #c0392b;
+}
+.character-title {
+  font-size: 100px;
+  animation: bounce-char 1s infinite;
+}
+@keyframes bounce-char {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-15px); }
+}
+
+/* ===== MAP SCREEN ===== */
+#map-screen {
+  background: linear-gradient(180deg, #87CEEB 0%, #98D8C8 40%, #7BC67E 60%, #5BA55B 100%);
+  flex-direction: column; align-items: center;
+  overflow-y: auto; overflow-x: hidden;
+}
+.map-header {
+  width: 100%; padding: 15px 20px;
+  background: rgba(0,0,0,0.15);
+  display: flex; justify-content: space-between; align-items: center;
+  position: sticky; top: 0; z-index: 10;
+  backdrop-filter: blur(10px);
+}
+.total-stars {
+  font-size: 24px; color: #ffd93d;
+}
+.map-title {
+  font-size: 24px; color: #fff;
+  text-shadow: 2px 2px 0 rgba(0,0,0,0.3);
+}
+.map-container {
+  width: 100%; max-width: 500px;
+  padding: 30px 20px 100px;
+  display: flex; flex-direction: column; align-items: center; gap: 15px;
+}
+.stage-row {
+  display: flex; justify-content: center; width: 100%;
+  position: relative;
+}
+.stage-row:nth-child(odd) { padding-left: 60px; }
+.stage-row:nth-child(even) { padding-right: 60px; }
+
+.stage-btn {
+  width: 80px; height: 80px; border-radius: 50%;
+  border: 4px solid #fff;
+  font-size: 28px; font-family: inherit; color: #fff;
+  cursor: pointer; position: relative;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 0 rgba(0,0,0,0.3), 0 6px 15px rgba(0,0,0,0.2);
+  transition: all 0.2s;
+}
+.stage-btn:active { transform: scale(0.95); }
+.stage-btn.locked {
+  background: #95a5a6; cursor: not-allowed; opacity: 0.6;
+}
+.stage-btn.unlocked {
+  background: linear-gradient(180deg, #3498db, #2980b9);
+  animation: pulse-stage 2s infinite;
+}
+.stage-btn.cleared {
+  background: linear-gradient(180deg, #2ecc71, #27ae60);
+}
+.stage-btn.current {
+  background: linear-gradient(180deg, #f39c12, #e67e22);
+  animation: pulse-stage 1s infinite;
+  border-color: #ffd93d;
+  box-shadow: 0 4px 0 rgba(0,0,0,0.3), 0 0 20px rgba(243,156,18,0.5);
+}
+@keyframes pulse-stage {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+.stage-stars {
+  position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%);
+  font-size: 14px; white-space: nowrap;
+}
+.stage-type {
+  position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+  font-size: 11px; background: rgba(0,0,0,0.5); color: #fff;
+  padding: 2px 8px; border-radius: 10px; white-space: nowrap;
+}
+.path-line {
+  position: absolute;
+  width: 4px; height: 30px;
+  background: rgba(255,255,255,0.4);
+  left: 50%; transform: translateX(-50%);
+  top: -22px;
+  border-radius: 2px;
+}
+
+/* ===== GAME SCREEN ===== */
+#game-screen {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  flex-direction: column; align-items: center; justify-content: center;
+}
+.game-header {
+  position: absolute; top: 0; width: 100%; padding: 15px 20px;
+  display: flex; justify-content: space-between; align-items: center;
+  background: rgba(0,0,0,0.2);
+}
+.stage-label {
+  font-size: 20px; color: #fff;
+}
+.hearts-display {
+  font-size: 28px; letter-spacing: 4px;
+}
+.timer-display {
+  font-size: 20px; color: #ffd93d;
+}
+.game-content {
+  background: rgba(255,255,255,0.95);
+  border-radius: 30px; padding: 40px 30px;
+  max-width: 450px; width: 90%;
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+  position: relative;
+}
+.question-number {
+  font-size: 14px; color: #95a5a6; margin-bottom: 5px;
+}
+.question-text {
+  font-size: 28px; color: #2c3e50;
+  margin-bottom: 8px; line-height: 1.4;
+}
+.question-hint {
+  font-size: 16px; color: #7f8c8d; margin-bottom: 20px;
+  font-family: 'Noto Sans KR', sans-serif;
+  font-weight: 400;
+}
+.question-image {
+  font-size: 64px; margin-bottom: 15px;
+}
+.answers-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 12px; margin-top: 10px;
+}
+.answer-btn {
+  padding: 16px 10px; border-radius: 16px;
+  border: 3px solid #e0e0e0;
+  background: #fff; font-size: 22px;
+  font-family: inherit; cursor: pointer;
+  transition: all 0.2s; color: #2c3e50;
+}
+.answer-btn:hover {
+  border-color: #3498db; background: #ebf5fb;
+}
+.answer-btn.correct {
+  border-color: #2ecc71; background: #d5f5e3;
+  animation: correctPop 0.4s;
+}
+.answer-btn.wrong {
+  border-color: #e74c3c; background: #fadbd8;
+  animation: shake 0.4s;
+}
+@keyframes correctPop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-8px); }
+  75% { transform: translateX(8px); }
+}
+.progress-bar {
+  position: absolute; bottom: 0; left: 0; width: 100%; height: 8px;
+  background: #ecf0f1; border-radius: 0 0 30px 30px; overflow: hidden;
+}
+.progress-fill {
+  height: 100%; background: linear-gradient(90deg, #3498db, #2ecc71);
+  transition: width 0.3s; border-radius: 0 0 30px 30px;
+}
+
+/* ===== RESULT SCREEN ===== */
+#result-screen {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+}
+.result-box {
+  background: rgba(255,255,255,0.95);
+  border-radius: 30px; padding: 40px; text-align: center;
+  max-width: 400px; width: 90%;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+}
+.result-title {
+  font-size: 36px; color: #2c3e50; margin-bottom: 10px;
+}
+.result-stars {
+  font-size: 60px; margin: 15px 0;
+}
+.result-stars .star-empty { opacity: 0.2; }
+.result-score {
+  font-size: 20px; color: #7f8c8d; margin-bottom: 5px;
+  font-family: 'Noto Sans KR', sans-serif;
+}
+.result-message {
+  font-size: 18px; color: #e94560; margin-bottom: 20px;
+  font-family: 'Noto Sans KR', sans-serif;
+}
+.result-buttons {
+  display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;
+}
+.btn-result {
+  padding: 14px 30px; border-radius: 25px; border: none;
+  font-size: 18px; font-family: inherit; cursor: pointer;
+  color: #fff; box-shadow: 0 4px 0 rgba(0,0,0,0.2);
+  transition: all 0.1s;
+}
+.btn-result:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,0.2); }
+.btn-retry { background: linear-gradient(180deg, #e67e22, #d35400); }
+.btn-next { background: linear-gradient(180deg, #2ecc71, #27ae60); }
+.btn-map { background: linear-gradient(180deg, #3498db, #2980b9); }
+
+/* ===== OVERLAY ===== */
+.overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.7); display: none;
+  align-items: center; justify-content: center; z-index: 100;
+}
+.overlay.active { display: flex; }
+.feedback-popup {
+  font-size: 72px;
+  animation: popIn 0.5s;
+}
+@keyframes popIn {
+  0% { transform: scale(0) rotate(-20deg); opacity: 0; }
+  70% { transform: scale(1.2) rotate(5deg); }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+
+/* ===== CONFETTI ===== */
+.confetti-container {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 99;
+}
+.confetti {
+  position: absolute; width: 10px; height: 10px;
+  top: -10px; animation: confettiFall 3s forwards;
+}
+@keyframes confettiFall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 480px) {
+  .game-title { font-size: 36px; }
+  .btn-play { font-size: 24px; padding: 14px 45px; }
+  .question-text { font-size: 24px; }
+  .answer-btn { font-size: 18px; padding: 12px 8px; }
+  .stage-btn { width: 65px; height: 65px; font-size: 22px; }
+}
+</style>
+</head>
+<body>
+
+<!-- TITLE SCREEN -->
+<div id="title-screen" class="screen active">
+  <div class="title-stars">&#11088;&#11088;&#11088;</div>
+  <div class="character-title">&#128640;</div>
+  <div class="game-title">Star Adventure</div>
+  <div class="game-subtitle">English & Math &#127891;</div>
+  <button class="btn-play" onclick="showMap()">START!</button>
+</div>
+
+<!-- MAP SCREEN -->
+<div id="map-screen" class="screen">
+  <div class="map-header">
+    <div class="total-stars" id="total-stars">&#11088; 0 / 60</div>
+    <div class="map-title">&#127759; World Map</div>
+  </div>
+  <div class="map-container" id="map-container"></div>
+</div>
+
+<!-- GAME SCREEN -->
+<div id="game-screen" class="screen">
+  <div class="game-header">
+    <div class="stage-label" id="stage-label">Stage 1</div>
+    <div class="hearts-display" id="hearts-display"></div>
+    <div class="timer-display" id="timer-display"></div>
+  </div>
+  <div class="game-content">
+    <div class="question-number" id="question-number"></div>
+    <div class="question-image" id="question-image"></div>
+    <div class="question-text" id="question-text"></div>
+    <div class="question-hint" id="question-hint"></div>
+    <div class="answers-grid" id="answers-grid"></div>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+  </div>
+</div>
+
+<!-- RESULT SCREEN -->
+<div id="result-screen" class="screen">
+  <div class="result-box">
+    <div class="result-title" id="result-title"></div>
+    <div class="result-stars" id="result-stars"></div>
+    <div class="result-score" id="result-score"></div>
+    <div class="result-message" id="result-message"></div>
+    <div class="result-buttons" id="result-buttons"></div>
+  </div>
+</div>
+
+<!-- FEEDBACK OVERLAY -->
+<div class="overlay" id="feedback-overlay">
+  <div class="feedback-popup" id="feedback-popup"></div>
+</div>
+
+<!-- CONFETTI -->
+<div class="confetti-container" id="confetti-container"></div>
+
+<script>
+// ===== GAME STATE =====
+const state = {
+  stages: JSON.parse(localStorage.getItem('starAdventureStages') || 'null') || Array(20).fill(null).map(() => ({ stars: 0, cleared: false })),
+  currentStage: 0,
+  hearts: 3,
+  score: 0,
+  questionIndex: 0,
+  questions: [],
+  timerStart: 0,
+};
+
+function save() {
+  localStorage.setItem('starAdventureStages', JSON.stringify(state.stages));
+}
+
+// ===== STAGE DATA =====
+const stageDefinitions = [
+  // --- STAGE 1-5: Easy English ---
+  {
+    type: 'English', label: 'ABC',
+    generate() {
+      const items = [
+        { img: '&#128055;', q: 'What animal is this?', hint: '이 동물은 뭘까요?', answers: ['Pig', 'Dog', 'Cat', 'Cow'], correct: 0 },
+        { img: '&#128049;', q: 'What animal is this?', hint: '이 동물은 뭘까요?', answers: ['Bird', 'Fish', 'Cat', 'Pig'], correct: 2 },
+        { img: '&#128054;', q: 'What animal is this?', hint: '이 동물은 뭘까요?', answers: ['Cat', 'Dog', 'Cow', 'Fish'], correct: 1 },
+        { img: '&#128046;', q: 'What animal is this?', hint: '이 동물은 뭘까요?', answers: ['Pig', 'Dog', 'Horse', 'Cow'], correct: 3 },
+        { img: '&#128038;', q: 'What animal is this?', hint: '이 동물은 뭘까요?', answers: ['Bird', 'Fish', 'Cat', 'Dog'], correct: 0 },
+      ];
+      return shuffle(items).slice(0, 5);
+    }
+  },
+  {
+    type: 'English', label: 'Colors',
+    generate() {
+      const items = [
+        { img: '&#10084;&#65039;', q: 'What color is this?', hint: '무슨 색일까요?', answers: ['Red', 'Blue', 'Green', 'Yellow'], correct: 0 },
+        { img: '&#128153;', q: 'What color is this?', hint: '무슨 색일까요?', answers: ['Red', 'Blue', 'Green', 'Yellow'], correct: 1 },
+        { img: '&#128154;', q: 'What color is this?', hint: '무슨 색일까요?', answers: ['Red', 'Blue', 'Green', 'Yellow'], correct: 2 },
+        { img: '&#128155;', q: 'What color is this?', hint: '무슨 색일까요?', answers: ['Red', 'Blue', 'Green', 'Yellow'], correct: 3 },
+        { img: '&#128156;', q: 'What color is this?', hint: '무슨 색일까요?', answers: ['Purple', 'Orange', 'Pink', 'Brown'], correct: 0 },
+      ];
+      return shuffle(items).slice(0, 5);
+    }
+  },
+  {
+    type: 'Math', label: '1+1',
+    generate() {
+      const qs = [];
+      for (let i = 0; i < 5; i++) {
+        const a = randInt(1, 5), b = randInt(1, 5);
+        const correct = a + b;
+        qs.push({
+          img: numEmoji(a) + ' + ' + numEmoji(b),
+          q: `${a} + ${b} = ?`,
+          hint: '더하기를 해보세요!',
+          answers: makeChoices(correct, 2, 10),
+          correct: 0
+        });
+      }
+      return qs;
+    }
+  },
+  {
+    type: 'English', label: 'Fruits',
+    generate() {
+      const items = [
+        { img: '&#127822;', q: 'What fruit is this?', hint: '이 과일은 뭘까요?', answers: ['Apple', 'Banana', 'Orange', 'Grape'], correct: 0 },
+        { img: '&#127820;', q: 'What fruit is this?', hint: '이 과일은 뭘까요?', answers: ['Apple', 'Banana', 'Orange', 'Grape'], correct: 1 },
+        { img: '&#127818;', q: 'What fruit is this?', hint: '이 과일은 뭘까요?', answers: ['Melon', 'Banana', 'Watermelon', 'Grape'], correct: 2 },
+        { img: '&#127815;', q: 'What fruit is this?', hint: '이 과일은 뭘까요?', answers: ['Apple', 'Cherry', 'Orange', 'Grape'], correct: 3 },
+        { img: '&#127827;', q: 'What fruit is this?', hint: '이 과일은 뭘까요?', answers: ['Apple', 'Strawberry', 'Peach', 'Grape'], correct: 1 },
+      ];
+      return shuffle(items).slice(0, 5);
+    }
+  },
+  {
+    type: 'Math', label: 'Count',
+    generate() {
+      const emojis = ['&#127822;','&#11088;','&#128154;','&#127880;','&#128302;'];
+      const qs = [];
+      for (let i = 0; i < 5; i++) {
+        const count = randInt(2, 7);
+        const em = emojis[i % emojis.length];
+        const display = Array(count).fill(em).join(' ');
+        qs.push({
+          img: display,
+          q: 'How many?',
+          hint: '몇 개일까요?',
+          answers: makeChoices(count, 1, 9),
+          correct: 0
+        });
+      }
+      return qs;
+    }
+  },
+  // --- STAGE 6-10: Medium ---
+  {
+    type: 'English', label: 'Body',
+    generate() {
+      const items = [
+        { img: '&#128064;', q: 'What is this?', hint: '이건 뭘까요?', answers: ['Eyes', 'Nose', 'Mouth', 'Ears'], correct: 0 },
+        { img: '&#128067;', q: 'What is this?', hint: '이건 뭘까요?', answers: ['Eyes', 'Nose', 'Mouth', 'Ears'], correct: 1 },
+        { img: '&#128068;', q: 'What is this?', hint: '이건 뭘까요?', answers: ['Eyes', 'Nose', 'Mouth', 'Ears'], correct: 2 },
+        { img: '&#128066;', q: 'What is this?', hint: '이건 뭘까요?', answers: ['Eyes', 'Nose', 'Mouth', 'Ear'], correct: 3 },
+        { img: '&#9995;', q: 'What is this?', hint: '이건 뭘까요?', answers: ['Foot', 'Hand', 'Head', 'Leg'], correct: 1 },
+      ];
+      return shuffle(items).slice(0, 5);
+    }
+  },
+  {
+    type: 'Math', label: 'Minus',
+    generate() {
+      const qs = [];
+      for (let i = 0; i < 5; i++) {
+        const a = randInt(4, 10), b = randInt(1, a - 1);
+        const correct = a - b;
+        qs.push({
+          img: '',
+          q: `${a} - ${b} = ?`,
+          hint: '빼기를 해보세요!',
+          answers: makeChoices(correct, 0, 10),
+          correct: 0
+        });
+      }
+      return qs;
+    }
+  },
+  {
+    type: 'English', label: 'Weather',
+    generate() {
+      const items = [
+        { img: '&#9728;&#65039;', q: "What's the weather?", hint: '날씨가 어때요?', answers: ['Sunny', 'Rainy', 'Snowy', 'Cloudy'], correct: 0 },
+        { img: '&#127783;&#65039;', q: "What's the weather?", hint: '날씨가 어때요?', answers: ['Sunny', 'Rainy', 'Snowy', 'Windy'], correct: 1 },
+        { img: '&#127784;&#65039;', q: "What's the weather?", hint: '날씨가 어때요?', answers: ['Sunny', 'Rainy', 'Snowy', 'Cloudy'], correct: 2 },
+        { img: '&#9729;&#65039;', q: "What's the weather?", hint: '날씨가 어때요?', answers: ['Sunny', 'Rainy', 'Snowy', 'Cloudy'], correct: 3 },
+        { img: '&#127744;', q: "What's the weather?", hint: '날씨가 어때요?', answers: ['Sunny', 'Rainy', 'Windy', 'Cloudy'], correct: 2 },
+      ];
+      return shuffle(items).slice(0, 5);
+    }
+  },
+  {
+    type: 'Math', label: 'Compare',
+    generate() {
+      const qs = [];
+      for (let i = 0; i < 5; i++) {
+        let a = randInt(1, 10), b = randInt(1, 10);
+        while (a === b) b = randInt(1, 10);
+        const bigger = Math.max(a, b);
+        qs.push({
+          img: `${a} &#128293; ${b}`,
+          q: 'Which is bigger?',
+          hint: '어떤 수가 더 클까요?',
+          answers: [`${a}`, `${b}`, `${a + b}`, `${Math.abs(a - b)}`],
+          correct: a > b ? 0 : 1
+        });
+      }
+      return qs;
+    }
+  },
+  {
+    type: 'English', label: 'Food',
+    generate() {
+      const items = [
+        { img: '&#127829;', q: 'What food is this?', hint: '이 음식은 뭘까요?', answers: ['Pizza', 'Cake', 'Bread', 'Rice'], correct: 0 },
+        { img: '&#127846;', q: 'What food is this?', hint: '이 음식은 뭘까요?', answers: ['Pizza', 'Ice Cream', 'Bread', 'Rice'], correct: 1 },
+        { img: '&#127838;', q: 'What food is this?', hint: '이 음식은 뭘까요?', answers: ['Pizza', 'Cake', 'Bread', 'Rice'], correct: 2 },
+        { img: '&#127858;', q: 'What food is this?', hint: '이 음식은 뭘까요?', answers: ['Pizza', 'Cake', 'Burger', 'Rice'], correct: 2 },
+        { img: '&#127370;', q: 'What food is this?', hint: '이 음식은 뭘까요?', answers: ['Sushi', 'Cake', 'Bread', 'Pasta'], correct: 0 },
+      ];
+      return shuffle(items).slice(0, 5);
+    }
+  },
+  // --- STAGE 11-15: Harder ---
+  {
+    type: 'English', label: 'Spell',
+    generate() {
+      const words = [
+        { word: 'CAT', hint: '고양이', answers: ['CAT', 'CET', 'KAT', 'COT'] },
+        { word: 'DOG', hint: '강아지', answers: ['DOG', 'DAG', 'DIG', 'DOK'] },
+        { word: 'SUN', hint: '태양', answers: ['SAN', 'SON', 'SUN', 'SIN'], correct: 2 },
+        { word: 'RED', hint: '빨간색', answers: ['RAD', 'RED', 'RID', 'ROD'], correct: 1 },
+        { word: 'BIG', hint: '큰', answers: ['BAG', 'BOG', 'BUG', 'BIG'], correct: 3 },
+      ];
+      return words.map(w => ({
+        img: '&#128221;',
+        q: `Spell: "${w.word}"`,
+        hint: `"${w.hint}" 스펠링은?`,
+        answers: w.answers,
+        correct: w.correct !== undefined ? w.correct : 0
+      }));
+    }
+  },
+  {
+    type: 'Math', label: '+10',
+    generate() {
+      const qs = [];
+      for (let i = 0; i < 5; i++) {
+        const a = randInt(5, 15), b = randInt(1, 10);
+        const correct = a + b;
+        qs.push({
+          img: '', q: `${a} + ${b} = ?`,
+          hint: '큰 수 더하기!',
+          answers: makeChoices(correct, 5, 25),
+          correct: 0
+        });
+      }
+      return qs;
+    }
+  },
+  {
+    type: 'English', label: 'Opposite',
+    generate() {
+      const items = [
+        { q: 'Opposite of BIG?', hint: 'BIG의 반대말은?', answers: ['Small', 'Tall', 'Fast', 'Hot'], correct: 0 },
+        { q: 'Opposite of HOT?', hint: 'HOT의 반대말은?', answers: ['Big', 'Small', 'Cold', 'Fast'], correct: 2 },
+        { q: 'Opposite of FAST?', hint: 'FAST의 반대말은?', answers: ['Big', 'Slow', 'Cold', 'Tall'], correct: 1 },
+        { q: 'Opposite of HAPPY?', hint: 'HAPPY의 반대말은?', answers: ['Sad', 'Slow', 'Cold', 'Tall'], correct: 0 },
+        { q: 'Opposite of UP?', hint: 'UP의 반대말은?', answers: ['Left', 'Right', 'Down', 'Out'], correct: 2 },
+      ];
+      return shuffle(items).map(it => ({ ...it, img: '&#128260;' }));
+    }
+  },
+  {
+    type: 'Math', label: 'Shape',
+    generate() {
+      const items = [
+        { img: '&#128308;', q: 'What shape?', hint: '무슨 모양일까요?', answers: ['Circle', 'Square', 'Triangle', 'Star'], correct: 0 },
+        { img: '&#128999;', q: 'What shape?', hint: '무슨 모양일까요?', answers: ['Circle', 'Square', 'Triangle', 'Star'], correct: 1 },
+        { img: '&#128316;', q: 'What shape?', hint: '무슨 모양일까요?', answers: ['Circle', 'Square', 'Triangle', 'Star'], correct: 2 },
+        { img: '&#11088;', q: 'What shape?', hint: '무슨 모양일까요?', answers: ['Circle', 'Square', 'Triangle', 'Star'], correct: 3 },
+        { img: '&#128167;', q: 'How many sides does a triangle have?', hint: '삼각형의 변은 몇 개?', answers: ['2', '3', '4', '5'], correct: 1 },
+      ];
+      return shuffle(items).slice(0, 5);
+    }
+  },
+  {
+    type: 'English', label: 'Numbers',
+    generate() {
+      const items = [
+        { q: 'How do you say "1"?', hint: '1을 영어로?', answers: ['One', 'Two', 'Three', 'Four'], correct: 0 },
+        { q: 'How do you say "5"?', hint: '5를 영어로?', answers: ['Three', 'Four', 'Five', 'Six'], correct: 2 },
+        { q: 'How do you say "8"?', hint: '8을 영어로?', answers: ['Seven', 'Eight', 'Nine', 'Ten'], correct: 1 },
+        { q: 'How do you say "10"?', hint: '10을 영어로?', answers: ['Eight', 'Nine', 'Ten', 'Eleven'], correct: 2 },
+        { q: 'How do you say "3"?', hint: '3을 영어로?', answers: ['One', 'Two', 'Three', 'Four'], correct: 2 },
+      ];
+      return shuffle(items).map(it => ({ ...it, img: '&#128290;' }));
+    }
+  },
+  // --- STAGE 16-20: Challenge ---
+  {
+    type: 'Math', label: 'Mix+',
+    generate() {
+      const qs = [];
+      for (let i = 0; i < 5; i++) {
+        const isAdd = Math.random() > 0.5;
+        let a, b, correct;
+        if (isAdd) {
+          a = randInt(3, 12); b = randInt(3, 12); correct = a + b;
+        } else {
+          a = randInt(6, 18); b = randInt(1, a - 1); correct = a - b;
+        }
+        qs.push({
+          img: '', q: `${a} ${isAdd ? '+' : '-'} ${b} = ?`,
+          hint: isAdd ? '더하기!' : '빼기!',
+          answers: makeChoices(correct, 1, 25),
+          correct: 0
+        });
+      }
+      return qs;
+    }
+  },
+  {
+    type: 'English', label: 'Sentence',
+    generate() {
+      const items = [
+        { q: '"I ___ a boy."', hint: '나는 남자아이___', answers: ['am', 'is', 'are', 'be'], correct: 0 },
+        { q: '"She ___ happy."', hint: '그녀는 행복___', answers: ['am', 'is', 'are', 'be'], correct: 1 },
+        { q: '"They ___ friends."', hint: '그들은 친구___', answers: ['am', 'is', 'are', 'be'], correct: 2 },
+        { q: '"I ___ apples."', hint: '나는 사과를 좋아___', answers: ['like', 'likes', 'liking', 'liked'], correct: 0 },
+        { q: '"He ___ fast."', hint: '그는 빨리 달린___', answers: ['run', 'runs', 'running', 'ran'], correct: 1 },
+      ];
+      return shuffle(items).map(it => ({ ...it, img: '&#128172;' }));
+    }
+  },
+  {
+    type: 'Math', label: 'Pattern',
+    generate() {
+      const items = [
+        { q: '2, 4, 6, 8, ?', hint: '다음 숫자는?', answers: ['9', '10', '11', '12'], correct: 1 },
+        { q: '1, 3, 5, 7, ?', hint: '다음 숫자는?', answers: ['8', '9', '10', '11'], correct: 1 },
+        { q: '5, 10, 15, 20, ?', hint: '다음 숫자는?', answers: ['22', '25', '30', '24'], correct: 1 },
+        { q: '10, 8, 6, 4, ?', hint: '다음 숫자는?', answers: ['1', '2', '3', '0'], correct: 1 },
+        { q: '3, 6, 9, 12, ?', hint: '다음 숫자는?', answers: ['13', '14', '15', '16'], correct: 2 },
+      ];
+      return shuffle(items).map(it => ({ ...it, img: '&#128300;' }));
+    }
+  },
+  {
+    type: 'English', label: 'Read',
+    generate() {
+      const items = [
+        { q: '"The cat is on the ___"', hint: '고양이가 ___위에 있어요', img: '&#128049;&#128716;', answers: ['bed', 'bad', 'bid', 'bud'], correct: 0 },
+        { q: '"I see a big ___"', hint: '큰 ___가 보여요', img: '&#128054;', answers: ['dig', 'dog', 'dug', 'dag'], correct: 1 },
+        { q: '"The sun is ___"', hint: '태양이 ___해요', img: '&#9728;&#65039;', answers: ['cold', 'dark', 'hot', 'wet'], correct: 2 },
+        { q: '"Fish live in ___"', hint: '물고기는 ___에 살아요', img: '&#128032;', answers: ['sky', 'land', 'fire', 'water'], correct: 3 },
+        { q: '"Birds can ___"', hint: '새는 ___할 수 있어요', img: '&#128038;', answers: ['fly', 'swim', 'dig', 'drive'], correct: 0 },
+      ];
+      return shuffle(items);
+    }
+  },
+  {
+    type: 'Math', label: 'Boss!',
+    generate() {
+      const qs = [];
+      // Mixed challenging questions
+      for (let i = 0; i < 5; i++) {
+        const type = i % 3;
+        if (type === 0) {
+          const a = randInt(5, 15), b = randInt(5, 15);
+          const correct = a + b;
+          qs.push({ img: '&#128123;', q: `${a} + ${b} = ?`, hint: '보스 문제! 힘내세요!', answers: makeChoices(correct, 5, 30), correct: 0 });
+        } else if (type === 1) {
+          const a = randInt(10, 20), b = randInt(1, a);
+          const correct = a - b;
+          qs.push({ img: '&#128123;', q: `${a} - ${b} = ?`, hint: '보스 문제! 힘내세요!', answers: makeChoices(correct, 0, 20), correct: 0 });
+        } else {
+          const a = randInt(2, 5), b = randInt(2, 5), c = randInt(1, 3);
+          const correct = a + b + c;
+          qs.push({ img: '&#128123;', q: `${a} + ${b} + ${c} = ?`, hint: '세 수를 더해보세요!', answers: makeChoices(correct, 3, 20), correct: 0 });
+        }
+      }
+      return qs;
+    }
+  },
+];
+
+// ===== HELPERS =====
+function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+function shuffle(arr) { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = randInt(0, i); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function numEmoji(n) {
+  const nums = ['0&#65039;&#8419;','1&#65039;&#8419;','2&#65039;&#8419;','3&#65039;&#8419;','4&#65039;&#8419;','5&#65039;&#8419;','6&#65039;&#8419;','7&#65039;&#8419;','8&#65039;&#8419;','9&#65039;&#8419;'];
+  return nums[n] || n;
+}
+function makeChoices(correct, min, max) {
+  const choices = new Set([correct]);
+  while (choices.size < 4) {
+    let c = randInt(Math.max(min, correct - 5), Math.min(max, correct + 5));
+    if (c !== correct) choices.add(c);
+  }
+  const arr = [...choices];
+  // correct is always at index 0 internally, we shuffle display
+  return arr;
+}
+
+// ===== SCREENS =====
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function showMap() {
+  showScreen('map-screen');
+  renderMap();
+}
+
+function renderMap() {
+  const container = document.getElementById('map-container');
+  container.innerHTML = '';
+  let totalStars = 0;
+  state.stages.forEach((s, i) => totalStars += s.stars);
+  document.getElementById('total-stars').innerHTML = `&#11088; ${totalStars} / 60`;
+
+  stageDefinitions.forEach((def, i) => {
+    const s = state.stages[i];
+    const unlocked = i === 0 || state.stages[i - 1].cleared;
+    const isCurrent = unlocked && !s.cleared;
+
+    const row = document.createElement('div');
+    row.className = 'stage-row';
+
+    const btn = document.createElement('button');
+    let cls = 'stage-btn';
+    if (s.cleared) cls += ' cleared';
+    else if (isCurrent) cls += ' current';
+    else if (unlocked) cls += ' unlocked';
+    else cls += ' locked';
+    btn.className = cls;
+    btn.innerHTML = s.cleared ? '&#10003;' : (i + 1);
+
+    if (unlocked) {
+      btn.onclick = () => startStage(i);
+    }
+
+    const starsEl = document.createElement('div');
+    starsEl.className = 'stage-stars';
+    if (s.cleared) {
+      starsEl.innerHTML = (s.stars >= 1 ? '&#11088;' : '&#9734;') + (s.stars >= 2 ? '&#11088;' : '&#9734;') + (s.stars >= 3 ? '&#11088;' : '&#9734;');
+    }
+
+    const typeEl = document.createElement('div');
+    typeEl.className = 'stage-type';
+    typeEl.textContent = def.type + ' ' + def.label;
+
+    btn.appendChild(starsEl);
+    btn.appendChild(typeEl);
+    row.appendChild(btn);
+    container.appendChild(row);
+  });
+}
+
+// ===== GAME =====
+function startStage(index) {
+  state.currentStage = index;
+  state.hearts = 3;
+  state.score = 0;
+  state.questionIndex = 0;
+  state.questions = stageDefinitions[index].generate();
+  state.timerStart = Date.now();
+
+  document.getElementById('stage-label').textContent = `Stage ${index + 1}`;
+  showScreen('game-screen');
+  renderQuestion();
+}
+
+function renderQuestion() {
+  const q = state.questions[state.questionIndex];
+  document.getElementById('question-number').textContent = `${state.questionIndex + 1} / ${state.questions.length}`;
+  document.getElementById('question-image').innerHTML = q.img || '';
+  document.getElementById('question-text').textContent = q.q;
+  document.getElementById('question-hint').textContent = q.hint || '';
+  document.getElementById('progress-fill').style.width = `${(state.questionIndex / state.questions.length) * 100}%`;
+
+  // Hearts
+  const heartsEl = document.getElementById('hearts-display');
+  heartsEl.innerHTML = '';
+  for (let i = 0; i < 3; i++) {
+    heartsEl.innerHTML += i < state.hearts ? '&#10084;&#65039;' : '&#129293;';
+  }
+
+  // Timer
+  updateTimer();
+
+  // Answers - shuffle display order
+  const grid = document.getElementById('answers-grid');
+  grid.innerHTML = '';
+  const correctAnswer = q.answers[q.correct];
+  const shuffledAnswers = shuffle(q.answers);
+
+  shuffledAnswers.forEach(ans => {
+    const btn = document.createElement('button');
+    btn.className = 'answer-btn';
+    btn.textContent = ans;
+    btn.onclick = () => handleAnswer(btn, ans === correctAnswer, correctAnswer, grid);
+    grid.appendChild(btn);
+  });
+}
+
+function updateTimer() {
+  const elapsed = Math.floor((Date.now() - state.timerStart) / 1000);
+  const min = Math.floor(elapsed / 60);
+  const sec = elapsed % 60;
+  document.getElementById('timer-display').textContent = `${min}:${sec.toString().padStart(2, '0')}`;
+}
+
+let timerInterval = setInterval(updateTimer, 1000);
+
+function handleAnswer(btn, isCorrect, correctAnswer, grid) {
+  // Disable all buttons
+  grid.querySelectorAll('.answer-btn').forEach(b => {
+    b.onclick = null;
+    b.style.pointerEvents = 'none';
+  });
+
+  if (isCorrect) {
+    btn.classList.add('correct');
+    state.score++;
+    showFeedback('&#127881;');
+  } else {
+    btn.classList.add('wrong');
+    state.hearts--;
+    // Highlight correct
+    grid.querySelectorAll('.answer-btn').forEach(b => {
+      if (b.textContent === correctAnswer) b.classList.add('correct');
+    });
+    showFeedback('&#128546;');
+    // Update hearts
+    const heartsEl = document.getElementById('hearts-display');
+    heartsEl.innerHTML = '';
+    for (let i = 0; i < 3; i++) {
+      heartsEl.innerHTML += i < state.hearts ? '&#10084;&#65039;' : '&#129293;';
+    }
+  }
+
+  setTimeout(() => {
+    if (state.hearts <= 0) {
+      showResult(false);
+      return;
+    }
+    state.questionIndex++;
+    if (state.questionIndex >= state.questions.length) {
+      showResult(true);
+    } else {
+      renderQuestion();
+    }
+  }, 1000);
+}
+
+function showFeedback(emoji) {
+  const overlay = document.getElementById('feedback-overlay');
+  document.getElementById('feedback-popup').innerHTML = emoji;
+  overlay.classList.add('active');
+  setTimeout(() => overlay.classList.remove('active'), 700);
+}
+
+function showResult(completed) {
+  const elapsed = Math.floor((Date.now() - state.timerStart) / 1000);
+  const total = state.questions.length;
+  let stars = 0;
+
+  if (completed) {
+    if (state.score === total && state.hearts === 3) stars = 3;
+    else if (state.score >= total - 1 && state.hearts >= 2) stars = 2;
+    else stars = 1;
+
+    // Update stage data
+    if (stars > state.stages[state.currentStage].stars) {
+      state.stages[state.currentStage].stars = stars;
+    }
+    state.stages[state.currentStage].cleared = true;
+    save();
+
+    spawnConfetti();
+  }
+
+  showScreen('result-screen');
+
+  document.getElementById('result-title').textContent = completed ? 'Stage Clear!' : 'Try Again!';
+
+  const starsHtml = completed
+    ? [1, 2, 3].map(i => i <= stars ? '&#11088;' : '<span class="star-empty">&#11088;</span>').join('')
+    : '&#128546;';
+  document.getElementById('result-stars').innerHTML = starsHtml;
+
+  document.getElementById('result-score').textContent = `${state.score} / ${total} correct  |  ${Math.floor(elapsed / 60)}:${(elapsed % 60).toString().padStart(2, '0')}`;
+
+  const messages = completed
+    ? (stars === 3 ? '&#127775; Perfect! &#52572;&#44256;&#50556;! &#127775;' : stars === 2 ? '&#128079; Great job! &#51096;&#54664;&#50612;! &#128079;' : '&#128170; Good! &#44340;&#52268;&#50500;! &#128170;')
+    : '&#128170; &#45796;&#49884; &#46020;&#51204;&#54644;&#48372;&#51088;!';
+  document.getElementById('result-message').innerHTML = messages;
+
+  const btns = document.getElementById('result-buttons');
+  btns.innerHTML = '';
+
+  const retryBtn = document.createElement('button');
+  retryBtn.className = 'btn-result btn-retry';
+  retryBtn.innerHTML = '&#128260; Retry';
+  retryBtn.onclick = () => startStage(state.currentStage);
+  btns.appendChild(retryBtn);
+
+  const mapBtn = document.createElement('button');
+  mapBtn.className = 'btn-result btn-map';
+  mapBtn.innerHTML = '&#128506; Map';
+  mapBtn.onclick = showMap;
+  btns.appendChild(mapBtn);
+
+  if (completed && state.currentStage < 19) {
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'btn-result btn-next';
+    nextBtn.innerHTML = 'Next &#9654;';
+    nextBtn.onclick = () => startStage(state.currentStage + 1);
+    btns.appendChild(nextBtn);
+  }
+}
+
+function spawnConfetti() {
+  const container = document.getElementById('confetti-container');
+  container.innerHTML = '';
+  const colors = ['#e74c3c', '#3498db', '#2ecc71', '#f1c40f', '#9b59b6', '#e67e22', '#1abc9c'];
+  for (let i = 0; i < 50; i++) {
+    const el = document.createElement('div');
+    el.className = 'confetti';
+    el.style.left = Math.random() * 100 + '%';
+    el.style.background = colors[Math.floor(Math.random() * colors.length)];
+    el.style.animationDelay = Math.random() * 2 + 's';
+    el.style.borderRadius = Math.random() > 0.5 ? '50%' : '0';
+    el.style.width = randInt(6, 12) + 'px';
+    el.style.height = randInt(6, 12) + 'px';
+    container.appendChild(el);
+  }
+  setTimeout(() => container.innerHTML = '', 4000);
+}
+</script>
+</body>
+</html>

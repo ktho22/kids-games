@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>옥토넛 동물구조대 - 영서 & 영우</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+body { font-family: 'Arial', sans-serif; overflow: hidden; touch-action: manipulation; background: #0a1628; }
+
+.screen { display: none; width: 100vw; height: 100vh; position: fixed; top: 0; left: 0; flex-direction: column; align-items: center; }
+.screen.active { display: flex; }
+.screen.scrollable { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.btn { padding: 16px 32px; border: none; border-radius: 20px; font-size: 22px; font-weight: bold; cursor: pointer; transition: transform 0.15s; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+.btn:active { transform: scale(0.95); }
+.coin-display { position: fixed; top: 16px; right: 16px; background: linear-gradient(135deg, #FFD700, #FFA500); color: #333; padding: 8px 18px; border-radius: 30px; font-size: 20px; font-weight: bold; z-index: 100; box-shadow: 0 3px 10px rgba(0,0,0,0.3); display: none; }
+.coin-display.show { display: flex; align-items: center; gap: 8px; }
+.back-btn { position: fixed; top: 16px; left: 16px; background: rgba(255,255,255,0.2); color: white; border: 2px solid rgba(255,255,255,0.4); padding: 10px 20px; border-radius: 16px; font-size: 18px; font-weight: bold; cursor: pointer; z-index: 100; display: none; }
+.back-btn.show { display: block; }
+
+/* 타이틀 */
+#title-screen { background: linear-gradient(180deg, #0066aa 0%, #003366 50%, #001a33 100%); justify-content: center; }
+.title-bubbles { position: absolute; width: 100%; height: 100%; overflow: hidden; pointer-events: none; }
+.bubble { position: absolute; background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4), rgba(255,255,255,0.1)); border-radius: 50%; animation: bubbleUp linear infinite; }
+@keyframes bubbleUp { 0% { transform: translateY(100vh) scale(0.5); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(-20vh) scale(1); opacity: 0; } }
+.title-content { z-index: 10; text-align: center; }
+.title-logo { font-size: 48px; font-weight: bold; color: #FFD700; text-shadow: 0 4px 20px rgba(255,215,0,0.5); margin-bottom: 8px; }
+.title-sub { font-size: 24px; color: #87CEEB; margin-bottom: 30px; }
+.title-chars { display: flex; gap: 30px; margin-bottom: 30px; justify-content: center; }
+.title-char { width: 100px; height: 100px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 20px rgba(0,0,0,0.4); position: relative; }
+.title-char .char-name { position: absolute; bottom: -28px; font-size: 16px; color: white; font-weight: bold; white-space: nowrap; }
+#start-btn { background: linear-gradient(135deg, #FFD700, #FFA500); color: #333; font-size: 28px; padding: 20px 50px; border-radius: 30px; animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+
+/* 맵 */
+#map-screen { background: linear-gradient(180deg, #0088cc 0%, #005588 40%, #003355 100%); }
+.map-title { font-size: 26px; color: #FFD700; font-weight: bold; margin-top: 65px; margin-bottom: 12px; text-shadow: 0 2px 10px rgba(0,0,0,0.5); z-index: 10; }
+.mission-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; padding: 10px 16px; max-width: 500px; width: 100%; z-index: 10; }
+.mission-card { background: linear-gradient(135deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05)); border: 3px solid rgba(255,255,255,0.2); border-radius: 20px; padding: 14px 10px; text-align: center; cursor: pointer; transition: transform 0.2s; position: relative; }
+.mission-card:active { transform: scale(0.95); }
+.mission-card.locked { opacity: 0.4; pointer-events: none; }
+.mission-card.completed { border-color: #4ECDC4; }
+.mission-card.completed::after { content: '✅'; position: absolute; top: 6px; right: 6px; font-size: 16px; }
+.mission-icon { font-size: 40px; margin-bottom: 4px; }
+.mission-name { color: white; font-size: 14px; font-weight: bold; }
+.mission-reward { color: #FFD700; font-size: 13px; margin-top: 2px; }
+.map-bottom { display: flex; gap: 12px; margin-top: 10px; margin-bottom: 20px; z-index: 10; }
+.map-bottom .btn { font-size: 17px; padding: 12px 24px; }
+.shop-btn { background: linear-gradient(135deg, #9B59B6, #8E44AD); color: white; }
+.char-btn { background: linear-gradient(135deg, #E74C3C, #C0392B); color: white; }
+
+/* 미션 공통 */
+.mission-screen { background: linear-gradient(180deg, #1a6fa0 0%, #0d4a6e 100%); justify-content: flex-start; }
+.mission-header { text-align: center; margin-top: 70px; margin-bottom: 16px; z-index: 10; }
+.mission-header h2 { color: #FFD700; font-size: 24px; margin-bottom: 4px; }
+.mission-header p { color: #87CEEB; font-size: 16px; }
+.mission-area { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; padding: 16px; z-index: 10; }
+.animal-display { font-size: 70px; margin-bottom: 14px; animation: bob 2s ease-in-out infinite; }
+@keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+.help-text { color: white; font-size: 18px; text-align: center; margin-bottom: 16px; background: rgba(0,0,0,0.3); padding: 10px 20px; border-radius: 14px; }
+
+/* 숫자세기 */
+.count-items { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-bottom: 20px; max-width: 320px; }
+.count-item { font-size: 36px; animation: pop 0.3s ease-out; }
+@keyframes pop { 0% { transform: scale(0); } 70% { transform: scale(1.2); } 100% { transform: scale(1); } }
+.answer-buttons { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+.answer-btn { width: 65px; height: 65px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.15); color: white; font-size: 28px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+.answer-btn:active { transform: scale(0.9); }
+.answer-btn.correct { background: #4ECDC4; border-color: #4ECDC4; animation: correctPop 0.5s; }
+.answer-btn.wrong { background: #E74C3C; border-color: #E74C3C; animation: shake 0.5s; }
+@keyframes correctPop { 0% { transform: scale(1); } 50% { transform: scale(1.3); } 100% { transform: scale(1); } }
+@keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+
+/* 색깔 */
+.color-target { width: 90px; height: 90px; border-radius: 20px; margin-bottom: 16px; box-shadow: 0 6px 20px rgba(0,0,0,0.4); border: 4px solid rgba(255,255,255,0.3); }
+.color-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.color-opt { width: 75px; height: 75px; border-radius: 18px; border: 3px solid rgba(255,255,255,0.2); cursor: pointer; transition: transform 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+.color-opt:active { transform: scale(0.9); }
+
+/* 짝맞추기 */
+.match-grid { display: grid; gap: 10px; }
+.match-card { width: 80px; height: 80px; border-radius: 14px; background: linear-gradient(135deg, #3498DB, #2980B9); border: 3px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 36px; cursor: pointer; transition: transform 0.3s; }
+.match-card.flipped { background: linear-gradient(135deg, #2ECC71, #27AE60); }
+.match-card.matched { background: linear-gradient(135deg, #FFD700, #FFA500); border-color: #FFD700; }
+.match-card .card-front { display: none; }
+.match-card.flipped .card-front, .match-card.matched .card-front { display: block; }
+.match-card .card-back { font-size: 26px; }
+.match-card.flipped .card-back, .match-card.matched .card-back { display: none; }
+
+/* 버블 */
+.bubble-area { position: relative; width: 100%; max-width: 380px; height: 320px; background: rgba(0,0,0,0.2); border-radius: 20px; overflow: hidden; }
+.game-bubble { position: absolute; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 26px; cursor: pointer; animation: floatB 3s ease-in-out infinite; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+@keyframes floatB { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+
+/* 미로 */
+.path-grid { display: grid; gap: 3px; }
+.path-cell { width: 46px; height: 46px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 22px; cursor: pointer; transition: background 0.2s; }
+.path-wall { background: #2C3E50; }
+.path-open { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08); }
+.path-current { background: #3498DB; box-shadow: 0 0 12px rgba(52,152,219,0.5); }
+.path-goal { background: rgba(231,76,60,0.3); border: 2px solid #E74C3C; animation: goalP 1.5s infinite; }
+@keyframes goalP { 0%,100% { box-shadow: 0 0 8px rgba(231,76,60,0.3); } 50% { box-shadow: 0 0 20px rgba(231,76,60,0.6); } }
+.path-visited { background: rgba(52,152,219,0.15); }
+
+/* 분류 */
+.sort-animal { font-size: 64px; margin-bottom: 12px; animation: bob 2s ease-in-out infinite; }
+.sort-label { color: white; font-size: 18px; margin-bottom: 16px; }
+.sort-bins { display: flex; gap: 16px; justify-content: center; }
+.sort-bin { width: 120px; height: 120px; border-radius: 18px; border: 3px dashed rgba(255,255,255,0.4); display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; background: rgba(255,255,255,0.05); }
+.sort-bin:active { transform: scale(0.95); }
+.sort-bin-icon { font-size: 36px; margin-bottom: 4px; }
+.sort-bin-label { color: white; font-size: 14px; font-weight: bold; }
+
+/* 크기비교 */
+.size-options { display: flex; gap: 24px; justify-content: center; align-items: flex-end; }
+.size-choice { display: flex; flex-direction: column; align-items: center; cursor: pointer; transition: transform 0.2s; padding: 10px; border-radius: 16px; background: rgba(255,255,255,0.08); }
+.size-choice:active { transform: scale(0.95); }
+.size-choice-label { color: white; font-size: 14px; margin-top: 6px; }
+
+/* 그림자 매칭 */
+.shadow-area { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+.shadow-target { font-size: 70px; filter: brightness(0) opacity(0.6); }
+.shadow-options { display: flex; gap: 16px; }
+.shadow-opt { font-size: 50px; cursor: pointer; padding: 8px; border-radius: 12px; background: rgba(255,255,255,0.08); transition: transform 0.2s; }
+.shadow-opt:active { transform: scale(0.9); }
+
+/* 패턴 */
+.pattern-row { display: flex; gap: 10px; align-items: center; margin-bottom: 20px; font-size: 40px; }
+.pattern-blank { width: 55px; height: 55px; border: 3px dashed #FFD700; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 30px; color: #FFD700; }
+
+/* 덧셈 */
+.math-problem { color: white; font-size: 48px; font-weight: bold; margin-bottom: 20px; text-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+
+/* 방향 */
+.direction-grid { display: grid; grid-template-columns: repeat(3, 70px); grid-template-rows: repeat(3, 70px); gap: 8px; }
+.dir-btn { border-radius: 14px; border: 2px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: white; font-size: 30px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.dir-btn:active { background: rgba(255,255,255,0.3); }
+.dir-btn.empty { visibility: hidden; }
+.dir-target { display: flex; gap: 12px; margin-bottom: 20px; align-items: center; }
+.dir-arrow { font-size: 36px; padding: 6px 12px; border-radius: 10px; }
+.dir-done { background: rgba(78,205,196,0.3); }
+.dir-todo { background: rgba(255,255,255,0.1); }
+
+/* 성공 오버레이 */
+.success-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 200; align-items: center; justify-content: center; flex-direction: column; }
+.success-overlay.active { display: flex; }
+.success-content { text-align: center; animation: successIn 0.5s ease-out; }
+@keyframes successIn { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+.success-animal { font-size: 90px; margin-bottom: 12px; }
+.success-text { color: white; font-size: 26px; font-weight: bold; margin-bottom: 6px; }
+.success-coins { color: #FFD700; font-size: 22px; margin-bottom: 20px; }
+.success-btn { background: linear-gradient(135deg, #4ECDC4, #2ECC71); color: white; font-size: 20px; padding: 14px 36px; }
+
+/* 상점 */
+#shop-screen { background: linear-gradient(180deg, #2C1654 0%, #1a0d33 100%); }
+.shop-title { color: #FFD700; font-size: 26px; font-weight: bold; margin-top: 65px; margin-bottom: 6px; }
+.shop-subtitle { color: #BB86FC; font-size: 15px; margin-bottom: 14px; }
+.char-tabs { display: flex; gap: 10px; margin-bottom: 14px; }
+.char-tab { padding: 8px 20px; border-radius: 18px; border: 2px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: white; font-size: 15px; font-weight: bold; cursor: pointer; }
+.char-tab.active { background: linear-gradient(135deg, #9B59B6, #8E44AD); border-color: #BB86FC; }
+.shop-items { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 0 16px 100px; max-width: 450px; width: 100%; }
+.shop-item { background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05)); border: 2px solid rgba(255,255,255,0.15); border-radius: 18px; padding: 14px; text-align: center; cursor: pointer; transition: all 0.2s; }
+.shop-item:active { transform: scale(0.95); }
+.shop-item.owned { border-color: #4ECDC4; }
+.shop-item.equipped { border-color: #FFD700; box-shadow: 0 0 12px rgba(255,215,0,0.3); }
+.shop-item-icon { font-size: 40px; margin-bottom: 6px; }
+.shop-item-name { color: white; font-size: 13px; font-weight: bold; margin-bottom: 3px; }
+.shop-item-price { color: #FFD700; font-size: 13px; }
+.shop-item.owned .shop-item-price { color: #4ECDC4; }
+
+/* 캐릭터 화면 */
+#char-screen { background: linear-gradient(180deg, #1a3a5c 0%, #0d1f33 100%); justify-content: flex-start; }
+.char-display { display: flex; gap: 30px; margin-top: 80px; z-index: 10; justify-content: center; }
+.char-box { text-align: center; }
+.char-canvas { width: 150px; height: 200px; margin: 0 auto 10px; }
+.char-name-label { color: white; font-size: 20px; font-weight: bold; }
+.char-title { color: #87CEEB; font-size: 13px; margin-top: 2px; }
+.rescued-section { margin-top: 24px; text-align: center; z-index: 10; }
+.rescued-title { color: #FFD700; font-size: 20px; font-weight: bold; margin-bottom: 10px; }
+.rescued-animals { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-width: 350px; margin: 0 auto; }
+.rescued-animal { font-size: 32px; background: rgba(255,255,255,0.1); padding: 6px; border-radius: 10px; }
+
+@media (max-width: 400px) {
+  .title-logo { font-size: 36px; }
+  .mission-grid { gap: 10px; padding: 8px 12px; }
+  .mission-icon { font-size: 32px; }
+  .match-card { width: 68px; height: 68px; font-size: 30px; }
+  .path-cell { width: 40px; height: 40px; font-size: 18px; }
+}
+</style>
+</head>
+<body>
+
+<div class="coin-display" id="coinDisplay">🪙 <span id="coinCount">0</span></div>
+<div class="back-btn" id="backBtn" onclick="goToMap()">◀ 돌아가기</div>
+
+<!-- 타이틀 -->
+<div class="screen active" id="title-screen">
+  <div class="title-bubbles" id="titleBubbles"></div>
+  <div class="title-content">
+    <div class="title-logo">🐙 옥토넛 동물구조대</div>
+    <div class="title-sub">영서 & 영우의 모험</div>
+    <div class="title-chars">
+      <div class="title-char" style="background:linear-gradient(135deg,#FF6B6B,#FF4444)">
+        <canvas class="title-char-canvas" id="titleChar1" width="100" height="100"></canvas>
+        <span class="char-name">영서 슈퍼</span>
+      </div>
+      <div class="title-char" style="background:linear-gradient(135deg,#4ECDC4,#2ECC71)">
+        <canvas class="title-char-canvas" id="titleChar2" width="100" height="100"></canvas>
+        <span class="char-name">영우 슈퍼</span>
+      </div>
+    </div>
+    <button class="btn" id="start-btn" onclick="startGame()">🌊 출동하기!</button>
+  </div>
+</div>
+
+<!-- 맵 -->
+<div class="screen scrollable" id="map-screen">
+  <div class="map-title">🗺️ 구조 미션을 선택하세요!</div>
+  <div class="mission-grid" id="missionGrid"></div>
+  <div class="map-bottom">
+    <button class="btn shop-btn" onclick="openShop()">🛒 상점</button>
+    <button class="btn char-btn" onclick="openChars()">🦸 캐릭터</button>
+  </div>
+</div>
+
+<!-- 미션 -->
+<div class="screen mission-screen" id="mission-screen">
+  <div class="mission-header" id="missionHeader"></div>
+  <div class="mission-area" id="missionArea"></div>
+</div>
+
+<!-- 상점 -->
+<div class="screen scrollable" id="shop-screen">
+  <div class="shop-title">🛒 장비 상점</div>
+  <div class="shop-subtitle">옥토코인으로 장비를 구매하세요!</div>
+  <div class="char-tabs" id="charTabs"></div>
+  <div class="shop-items" id="shopItems"></div>
+</div>
+
+<!-- 캐릭터 -->
+<div class="screen" id="char-screen">
+  <div class="char-display" id="charDisplay"></div>
+  <div class="rescued-section">
+    <div class="rescued-title">🏆 구조한 동물들</div>
+    <div class="rescued-animals" id="rescuedAnimals"></div>
+  </div>
+</div>
+
+<!-- 성공 -->
+<div class="success-overlay" id="successOverlay">
+  <div class="success-content">
+    <div class="success-animal" id="successAnimal"></div>
+    <div class="success-text" id="successText"></div>
+    <div class="success-coins" id="successCoins"></div>
+    <button class="btn success-btn" onclick="closeSuccess()">👍 좋아!</button>
+  </div>
+</div>
+
+<script>
+// ===== 게임 상태 =====
+let gameState = {
+  coins: 0,
+  completedMissions: [],
+  rescuedAnimals: [],
+  characters: {
+    youngseo: { name: '영서 슈퍼', equipment: {} },
+    youngwoo: { name: '영우 슈퍼', equipment: {} }
+  },
+  ownedItems: []
+};
+
+function saveGame() { localStorage.setItem('octonaut_save2', JSON.stringify(gameState)); }
+function loadGame() { const s = localStorage.getItem('octonaut_save2'); if (s) gameState = JSON.parse(s); }
+loadGame();
+
+// ===== 캐릭터 그리기 =====
+const CHAR_COLORS = { youngseo: { skin: '#FFD4A3', hair: '#3D2B1F', shirt: '#FF4444', pants: '#2244AA' }, youngwoo: { skin: '#FFD4A3', hair: '#3D2B1F', shirt: '#2ECC71', pants: '#2244AA' } };
+
+function drawCharacter(canvas, charKey, size) {
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  const s = (size || 1);
+  const cx = w / 2, cy = h / 2;
+  const colors = CHAR_COLORS[charKey];
+  const equip = gameState.characters[charKey].equipment;
+
+  // 망토
+  if (equip.cape) {
+    const capeItem = shopItems.find(i => i.id === equip.cape);
+    ctx.fillStyle = capeItem ? capeItem.capeColor || '#E74C3C' : '#E74C3C';
+    ctx.beginPath();
+    ctx.moveTo(cx - 18*s, cy - 5*s);
+    ctx.quadraticCurveTo(cx - 30*s, cy + 20*s, cx - 22*s, cy + 35*s);
+    ctx.lineTo(cx + 22*s, cy + 35*s);
+    ctx.quadraticCurveTo(cx + 30*s, cy + 20*s, cx + 18*s, cy - 5*s);
+    ctx.fill();
+  }
+
+  // 몸통
+  ctx.fillStyle = colors.shirt;
+  ctx.beginPath();
+  ctx.roundRect(cx - 16*s, cy, 32*s, 28*s, 6*s);
+  ctx.fill();
+
+  // 바지
+  ctx.fillStyle = colors.pants;
+  ctx.fillRect(cx - 14*s, cy + 24*s, 12*s, 16*s);
+  ctx.fillRect(cx + 2*s, cy + 24*s, 12*s, 16*s);
+
+  // 신발
+  if (equip.boots) {
+    const bootsItem = shopItems.find(i => i.id === equip.boots);
+    ctx.fillStyle = bootsItem ? bootsItem.bootsColor || '#8B4513' : '#8B4513';
+  } else {
+    ctx.fillStyle = '#333';
+  }
+  ctx.beginPath();
+  ctx.roundRect(cx - 16*s, cy + 38*s, 14*s, 6*s, 3*s);
+  ctx.roundRect(cx + 2*s, cy + 38*s, 14*s, 6*s, 3*s);
+  ctx.fill();
+
+  // 팔
+  ctx.fillStyle = colors.skin;
+  ctx.fillRect(cx - 24*s, cy + 2*s, 8*s, 18*s);
+  ctx.fillRect(cx + 16*s, cy + 2*s, 8*s, 18*s);
+
+  // 머리
+  ctx.fillStyle = colors.skin;
+  ctx.beginPath();
+  ctx.arc(cx, cy - 12*s, 18*s, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 머리카락
+  ctx.fillStyle = colors.hair;
+  ctx.beginPath();
+  ctx.arc(cx, cy - 16*s, 18*s, Math.PI, Math.PI * 2);
+  ctx.fill();
+  ctx.fillRect(cx - 18*s, cy - 18*s, 36*s, 8*s);
+
+  // 눈
+  ctx.fillStyle = '#333';
+  ctx.beginPath();
+  ctx.arc(cx - 7*s, cy - 12*s, 2.5*s, 0, Math.PI * 2);
+  ctx.arc(cx + 7*s, cy - 12*s, 2.5*s, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 눈 반짝
+  ctx.fillStyle = 'white';
+  ctx.beginPath();
+  ctx.arc(cx - 6*s, cy - 13*s, 1*s, 0, Math.PI * 2);
+  ctx.arc(cx + 8*s, cy - 13*s, 1*s, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 입
+  ctx.strokeStyle = '#C0392B';
+  ctx.lineWidth = 1.5*s;
+  ctx.beginPath();
+  ctx.arc(cx, cy - 5*s, 5*s, 0.1, Math.PI - 0.1);
+  ctx.stroke();
+
+  // 모자/헬멧
+  if (equip.hat) {
+    const hatItem = shopItems.find(i => i.id === equip.hat);
+    if (hatItem) {
+      if (hatItem.id === 'crown') {
+        ctx.fillStyle = '#FFD700';
+        ctx.beginPath();
+        ctx.moveTo(cx - 16*s, cy - 26*s);
+        ctx.lineTo(cx - 18*s, cy - 38*s);
+        ctx.lineTo(cx - 10*s, cy - 32*s);
+        ctx.lineTo(cx, cy - 40*s);
+        ctx.lineTo(cx + 10*s, cy - 32*s);
+        ctx.lineTo(cx + 18*s, cy - 38*s);
+        ctx.lineTo(cx + 16*s, cy - 26*s);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#E74C3C';
+        ctx.beginPath(); ctx.arc(cx, cy - 34*s, 2*s, 0, Math.PI*2); ctx.fill();
+      } else if (hatItem.id === 'diver_mask') {
+        ctx.strokeStyle = '#00BCD4';
+        ctx.lineWidth = 3*s;
+        ctx.beginPath();
+        ctx.ellipse(cx - 7*s, cy - 12*s, 6*s, 5*s, 0, 0, Math.PI*2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.ellipse(cx + 7*s, cy - 12*s, 6*s, 5*s, 0, 0, Math.PI*2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx - 1*s, cy - 12*s);
+        ctx.lineTo(cx + 1*s, cy - 12*s);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(0,188,212,0.2)';
+        ctx.beginPath(); ctx.ellipse(cx - 7*s, cy - 12*s, 5*s, 4*s, 0, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(cx + 7*s, cy - 12*s, 5*s, 4*s, 0, 0, Math.PI*2); ctx.fill();
+      } else if (hatItem.id === 'pirate_hat') {
+        ctx.fillStyle = '#1a1a1a';
+        ctx.beginPath();
+        ctx.ellipse(cx, cy - 26*s, 22*s, 6*s, 0, 0, Math.PI*2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(cx - 18*s, cy - 28*s);
+        ctx.quadraticCurveTo(cx, cy - 48*s, cx + 18*s, cy - 28*s);
+        ctx.fill();
+        ctx.fillStyle = 'white';
+        ctx.beginPath(); ctx.arc(cx, cy - 34*s, 4*s, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#1a1a1a';
+        ctx.beginPath(); ctx.arc(cx, cy - 34*s, 2.5*s, 0, Math.PI*2); ctx.fill();
+      } else {
+        // 기본 헬멧
+        ctx.fillStyle = hatItem.hatColor || '#3498DB';
+        ctx.beginPath();
+        ctx.arc(cx, cy - 18*s, 19*s, Math.PI, Math.PI * 2);
+        ctx.fill();
+        ctx.fillRect(cx - 19*s, cy - 20*s, 38*s, 4*s);
+      }
+    }
+  }
+
+  // 무기 (오른손)
+  if (equip.weapon) {
+    const wpn = shopItems.find(i => i.id === equip.weapon);
+    if (wpn) {
+      ctx.save();
+      ctx.translate(cx + 28*s, cy + 8*s);
+      ctx.rotate(-0.3);
+      if (wpn.id === 'sword') {
+        ctx.fillStyle = '#AAA';
+        ctx.fillRect(-2*s, -22*s, 4*s, 20*s);
+        ctx.fillStyle = '#8B4513';
+        ctx.fillRect(-4*s, -2*s, 8*s, 6*s);
+        ctx.fillStyle = '#FFD700';
+        ctx.fillRect(-6*s, -2*s, 12*s, 2*s);
+      } else if (wpn.id === 'trident') {
+        ctx.fillStyle = '#FFD700';
+        ctx.fillRect(-1.5*s, -24*s, 3*s, 26*s);
+        ctx.fillRect(-8*s, -26*s, 16*s, 3*s);
+        ctx.fillRect(-8*s, -30*s, 3*s, 7*s);
+        ctx.fillRect(5*s, -30*s, 3*s, 7*s);
+        ctx.fillRect(-1.5*s, -32*s, 3*s, 9*s);
+      } else if (wpn.id === 'star_wand') {
+        ctx.fillStyle = '#DDA0DD';
+        ctx.fillRect(-1.5*s, -18*s, 3*s, 22*s);
+        ctx.fillStyle = '#FFD700';
+        drawStar(ctx, 0, -22*s, 6*s, 5);
+      } else if (wpn.id === 'bubble_gun') {
+        ctx.fillStyle = '#00BCD4';
+        ctx.beginPath();
+        ctx.roundRect(-5*s, -12*s, 10*s, 16*s, 3*s);
+        ctx.fill();
+        ctx.fillStyle = '#0097A7';
+        ctx.fillRect(-2*s, -18*s, 4*s, 8*s);
+        // 버블
+        ctx.fillStyle = 'rgba(135,206,235,0.5)';
+        ctx.beginPath(); ctx.arc(-3*s, -22*s, 3*s, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(4*s, -25*s, 2*s, 0, Math.PI*2); ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+
+  // 방패 (왼손)
+  if (equip.shield) {
+    const shd = shopItems.find(i => i.id === equip.shield);
+    if (shd) {
+      ctx.save();
+      ctx.translate(cx - 30*s, cy + 6*s);
+      if (shd.id === 'shield1') {
+        ctx.fillStyle = '#C0392B';
+        ctx.beginPath();
+        ctx.moveTo(0, -12*s);
+        ctx.lineTo(10*s, -8*s);
+        ctx.lineTo(10*s, 4*s);
+        ctx.lineTo(0, 12*s);
+        ctx.lineTo(-10*s, 4*s);
+        ctx.lineTo(-10*s, -8*s);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#FFD700';
+        drawStar(ctx, 0, -1*s, 4*s, 5);
+      } else if (shd.id === 'shell_shield') {
+        ctx.fillStyle = '#E8A87C';
+        ctx.beginPath();
+        ctx.arc(0, 0, 11*s, 0, Math.PI*2);
+        ctx.fill();
+        ctx.strokeStyle = '#C68642';
+        ctx.lineWidth = 1.5*s;
+        for (let a = 0; a < Math.PI*2; a += Math.PI/4) {
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(Math.cos(a)*10*s, Math.sin(a)*10*s);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+  }
+}
+
+function drawStar(ctx, cx, cy, r, points) {
+  ctx.beginPath();
+  for (let i = 0; i < points * 2; i++) {
+    const radius = i % 2 === 0 ? r : r * 0.4;
+    const angle = (i * Math.PI / points) - Math.PI / 2;
+    const x = cx + Math.cos(angle) * radius;
+    const y = cy + Math.sin(angle) * radius;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+
+// ===== 미션 데이터 (12개) =====
+const missions = [
+  { id: 1, name: '바다거북 구하기', icon: '🐢', animal: '🐢', animalName: '바다거북', reward: 10, type: 'counting', desc: '물고기를 세어주세요!' },
+  { id: 2, name: '산호 색깔 맞추기', icon: '🐠', animal: '🐠', animalName: '열대어', reward: 10, type: 'color', desc: '같은 색깔을 찾아주세요!' },
+  { id: 3, name: '짝꿍 찾아주기', icon: '🦈', animal: '🦈', animalName: '상어', reward: 15, type: 'match', desc: '같은 동물 짝을 찾아주세요!' },
+  { id: 4, name: '버블 터뜨리기', icon: '🐡', animal: '🐡', animalName: '복어', reward: 10, type: 'bubble', desc: '버블을 모두 터뜨려주세요!' },
+  { id: 5, name: '미로 탈출 돕기', icon: '🐙', animal: '🐙', animalName: '문어', reward: 20, type: 'maze', desc: '문어에게 가는 길을 찾으세요!' },
+  { id: 6, name: '동물 집 찾기', icon: '🦭', animal: '🦭', animalName: '물범', reward: 15, type: 'sort', desc: '동물들의 집을 찾아주세요!' },
+  { id: 7, name: '크기 비교하기', icon: '🐋', animal: '🐋', animalName: '고래', reward: 10, type: 'size', desc: '더 큰 동물을 골라주세요!' },
+  { id: 8, name: '그림자 맞추기', icon: '🐬', animal: '🐬', animalName: '돌고래', reward: 15, type: 'shadow', desc: '그림자의 주인을 찾아주세요!' },
+  { id: 9, name: '패턴 완성하기', icon: '🦑', animal: '🦑', animalName: '오징어', reward: 15, type: 'pattern', desc: '빈 칸에 올 동물은?' },
+  { id: 10, name: '덧셈 구조대', icon: '🦀', animal: '🦀', animalName: '게', reward: 15, type: 'math', desc: '덧셈을 풀어 구출하세요!' },
+  { id: 11, name: '방향 안내하기', icon: '🐧', animal: '🐧', animalName: '펭귄', reward: 20, type: 'direction', desc: '펭귄에게 길을 알려주세요!' },
+  { id: 12, name: '먹이 주기', icon: '🦐', animal: '🦐', animalName: '새우', reward: 10, type: 'feeding', desc: '동물에게 맞는 먹이를 주세요!' },
+];
+
+// ===== 상점 아이템 =====
+const shopItems = [
+  { id: 'helmet_blue', name: '파란 헬멧', icon: '🪖', price: 10, slot: 'hat', hatColor: '#3498DB' },
+  { id: 'crown', name: '왕관', icon: '👑', price: 30, slot: 'hat' },
+  { id: 'diver_mask', name: '잠수 마스크', icon: '🤿', price: 15, slot: 'hat' },
+  { id: 'pirate_hat', name: '해적 모자', icon: '🏴‍☠️', price: 25, slot: 'hat' },
+  { id: 'sword', name: '용사의 검', icon: '⚔️', price: 20, slot: 'weapon' },
+  { id: 'trident', name: '삼지창', icon: '🔱', price: 30, slot: 'weapon' },
+  { id: 'star_wand', name: '별 지팡이', icon: '⭐', price: 25, slot: 'weapon' },
+  { id: 'bubble_gun', name: '버블건', icon: '🫧', price: 20, slot: 'weapon' },
+  { id: 'shield1', name: '영웅 방패', icon: '🛡️', price: 20, slot: 'shield' },
+  { id: 'shell_shield', name: '조개 방패', icon: '🐚', price: 15, slot: 'shield' },
+  { id: 'cape_red', name: '빨간 망토', icon: '🦸‍♂️', price: 25, slot: 'cape', capeColor: '#E74C3C' },
+  { id: 'cape_blue', name: '파란 망토', icon: '🦸', price: 25, slot: 'cape', capeColor: '#3498DB' },
+  { id: 'boots_gold', name: '황금 부츠', icon: '👢', price: 20, slot: 'boots', bootsColor: '#FFD700' },
+  { id: 'boots_rocket', name: '로켓 부츠', icon: '🚀', price: 35, slot: 'boots', bootsColor: '#E74C3C' },
+];
+
+// ===== 화면 전환 =====
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.getElementById('coinDisplay').classList.toggle('show', id !== 'title-screen');
+  document.getElementById('backBtn').classList.toggle('show', id !== 'title-screen' && id !== 'map-screen');
+  document.getElementById('coinCount').textContent = gameState.coins;
+}
+function startGame() { showScreen('map-screen'); renderMap(); }
+function goToMap() { showScreen('map-screen'); renderMap(); }
+
+// 타이틀 버블
+(function() {
+  const c = document.getElementById('titleBubbles');
+  for (let i = 0; i < 12; i++) {
+    const b = document.createElement('div');
+    b.className = 'bubble';
+    const sz = 10 + Math.random() * 25;
+    b.style.cssText = `width:${sz}px;height:${sz}px;left:${Math.random()*100}%;animation-duration:${4+Math.random()*6}s;animation-delay:${Math.random()*5}s;`;
+    c.appendChild(b);
+  }
+})();
+
+// ===== 맵 =====
+function renderMap() {
+  const grid = document.getElementById('missionGrid');
+  grid.innerHTML = '';
+  missions.forEach((m, i) => {
+    const completed = gameState.completedMissions.includes(m.id);
+    // 첫 미션은 항상 열림. 나머지는 이전 미션 1회 이상 클리어 필요
+    const unlocked = i === 0 || gameState.completedMissions.includes(missions[i-1].id);
+    const card = document.createElement('div');
+    card.className = `mission-card ${completed ? 'completed' : ''} ${!unlocked ? 'locked' : ''}`;
+    card.innerHTML = `
+      <div class="mission-icon">${m.icon}</div>
+      <div class="mission-name">${m.name}</div>
+      <div class="mission-reward">🪙 ${m.reward}</div>
+      ${!unlocked ? '<div style="color:#aaa;font-size:12px;margin-top:2px">🔒</div>' : ''}
+    `;
+    if (unlocked) card.onclick = () => startMission(m);
+    grid.appendChild(card);
+  });
+}
+
+// ===== 미션 시작 =====
+function startMission(mission) {
+  showScreen('mission-screen');
+  document.getElementById('missionHeader').innerHTML = `<h2>${mission.icon} ${mission.name}</h2><p>${mission.desc}</p>`;
+  const area = document.getElementById('missionArea');
+  area.innerHTML = '';
+  const fn = missionHandlers[mission.type];
+  if (fn) fn(area, mission);
+}
+
+// ===== 미션 핸들러 =====
+const missionHandlers = {};
+
+// 1. 숫자 세기
+missionHandlers.counting = (area, mission) => {
+  let round = 0, total = 3;
+  const items = ['🐟','🐠','🐡','🦐','🦀','🐚'];
+  function next() {
+    if (round >= total) { completeMission(mission); return; }
+    area.innerHTML = '';
+    const count = 1 + Math.floor(Math.random() * 6);
+    const item = items[Math.floor(Math.random() * items.length)];
+    area.innerHTML = `<div class="animal-display">${mission.animal}</div><div class="help-text">${item} 가 몇 개? (${round+1}/${total})</div>`;
+    const itemsDiv = document.createElement('div'); itemsDiv.className = 'count-items';
+    for (let i = 0; i < count; i++) { const s = document.createElement('span'); s.className = 'count-item'; s.textContent = item; s.style.animationDelay = i*0.1+'s'; itemsDiv.appendChild(s); }
+    area.appendChild(itemsDiv);
+    const btns = document.createElement('div'); btns.className = 'answer-buttons';
+    let ans = new Set([count]); while (ans.size < 4) ans.add(1+Math.floor(Math.random()*7));
+    [...ans].sort(() => Math.random()-0.5).forEach(n => {
+      const b = document.createElement('button'); b.className = 'answer-btn'; b.textContent = n;
+      b.onclick = () => { if (n===count) { b.classList.add('correct'); round++; setTimeout(next,700); } else { b.classList.add('wrong'); setTimeout(()=>b.classList.remove('wrong'),400); } };
+      btns.appendChild(b);
+    });
+    area.appendChild(btns);
+  }
+  next();
+};
+
+// 2. 색깔 맞추기
+missionHandlers.color = (area, mission) => {
+  let round = 0, total = 3;
+  const colors = [{n:'빨강',h:'#E74C3C'},{n:'파랑',h:'#3498DB'},{n:'초록',h:'#2ECC71'},{n:'노랑',h:'#F1C40F'},{n:'주황',h:'#E67E22'},{n:'보라',h:'#9B59B6'}];
+  function next() {
+    if (round >= total) { completeMission(mission); return; }
+    area.innerHTML = `<div class="animal-display">${mission.animal}</div><div class="help-text">같은 색깔을 찾아주세요! (${round+1}/${total})</div>`;
+    const target = colors[Math.floor(Math.random()*colors.length)];
+    const td = document.createElement('div'); td.className='color-target'; td.style.background=target.h; area.appendChild(td);
+    let opts = new Set([target.h]); while(opts.size<6) opts.add(colors[Math.floor(Math.random()*colors.length)].h);
+    const od = document.createElement('div'); od.className='color-options';
+    [...opts].sort(()=>Math.random()-0.5).forEach(c=>{
+      const d=document.createElement('div'); d.className='color-opt'; d.style.background=c;
+      d.onclick=()=>{ if(c===target.h){d.style.border='4px solid white';round++;setTimeout(next,500);} else{d.style.opacity='0.3';setTimeout(()=>d.style.opacity='1',300);} };
+      od.appendChild(d);
+    });
+    area.appendChild(od);
+  }
+  next();
+};
+
+// 3. 짝 맞추기
+missionHandlers.match = (area, mission) => {
+  const pool = ['🐢','🐙','🐠','🦀','🐬','🦈','🐡','🦭'];
+  const picked = pool.sort(()=>Math.random()-0.5).slice(0,4);
+  const cards = [...picked,...picked].sort(()=>Math.random()-0.5);
+  let flipped=[], matched=0;
+  area.innerHTML = `<div class="animal-display">${mission.animal}</div><div class="help-text">같은 동물 짝을 찾아주세요!</div>`;
+  const grid = document.createElement('div'); grid.className='match-grid'; grid.style.gridTemplateColumns='repeat(4,80px)';
+  cards.forEach((a,i)=>{
+    const c=document.createElement('div'); c.className='match-card'; c.dataset.animal=a; c.dataset.index=i;
+    c.innerHTML=`<span class="card-front">${a}</span><span class="card-back">❓</span>`;
+    c.onclick=()=>{
+      if(flipped.length>=2||c.classList.contains('flipped')||c.classList.contains('matched'))return;
+      c.classList.add('flipped'); flipped.push(c);
+      if(flipped.length===2){
+        if(flipped[0].dataset.animal===flipped[1].dataset.animal){ flipped.forEach(x=>x.classList.add('matched')); matched++; flipped=[]; if(matched===4)setTimeout(()=>completeMission(mission),500); }
+        else { setTimeout(()=>{flipped.forEach(x=>x.classList.remove('flipped'));flipped=[];},700); }
+      }
+    };
+    grid.appendChild(c);
+  });
+  area.appendChild(grid);
+};
+
+// 4. 버블 터뜨리기
+missionHandlers.bubble = (area, mission) => {
+  let popped=0; const total=10;
+  area.innerHTML = `<div class="animal-display">${mission.animal}</div><div class="help-text">버블을 모두 터뜨려주세요!</div>`;
+  const ba=document.createElement('div'); ba.className='bubble-area'; area.appendChild(ba);
+  const prog=document.createElement('div'); prog.className='help-text'; prog.style.marginTop='12px'; prog.textContent=`0 / ${total}`; area.appendChild(prog);
+  const cols=['#E74C3C','#3498DB','#2ECC71','#F1C40F','#9B59B6','#E67E22','#1ABC9C','#FF6B9D'];
+  const emos=['🐟','🐠','⭐','🫧','💎','🐚','🦐','🌊'];
+  function spawn(){
+    if(popped>=total)return;
+    const b=document.createElement('div'); b.className='game-bubble';
+    const sz=45+Math.random()*25, col=cols[Math.floor(Math.random()*cols.length)];
+    b.style.cssText=`width:${sz}px;height:${sz}px;left:${5+Math.random()*75}%;top:${5+Math.random()*75}%;background:radial-gradient(circle at 30% 30%,${col}88,${col});animation-delay:${Math.random()}s;`;
+    b.textContent=emos[Math.floor(Math.random()*emos.length)];
+    b.onclick=()=>{b.style.transform='scale(1.5)';b.style.opacity='0';setTimeout(()=>b.remove(),150);popped++;prog.textContent=`${popped} / ${total}`;if(popped>=total)setTimeout(()=>completeMission(mission),400);else setTimeout(spawn,200);};
+    ba.appendChild(b);
+  }
+  for(let i=0;i<4;i++) setTimeout(()=>spawn(),i*250);
+};
+
+// 5. 미로
+missionHandlers.maze = (area, mission) => {
+  const maze=[[0,1,0,0,0,0],[0,1,0,1,1,0],[0,0,0,0,1,0],[0,1,1,0,0,0],[0,0,1,0,1,0],[1,0,0,0,1,0]];
+  let pos={r:0,c:0}; const goal={r:5,c:5};
+  area.innerHTML = `<div class="help-text">🚢 배를 터치해서 🐙 문어에게 가세요!</div>`;
+  const grid=document.createElement('div'); grid.className='path-grid'; grid.style.gridTemplateColumns='repeat(6,46px)';
+  function render(){
+    grid.innerHTML='';
+    for(let r=0;r<6;r++) for(let c=0;c<6;c++){
+      const cell=document.createElement('div'); cell.className='path-cell';
+      if(maze[r][c]===1){cell.classList.add('path-wall');cell.textContent='🪨';}
+      else if(r===pos.r&&c===pos.c){cell.classList.add('path-current');cell.textContent='🚢';}
+      else if(r===goal.r&&c===goal.c){cell.classList.add('path-goal');cell.textContent='🐙';}
+      else{cell.classList.add('path-open');if(maze[r][c]===2)cell.classList.add('path-visited');}
+      if(maze[r][c]!==1) cell.onclick=()=>{
+        const dr=Math.abs(r-pos.r),dc=Math.abs(c-pos.c);
+        if((dr===1&&dc===0)||(dr===0&&dc===1)){maze[pos.r][pos.c]=2;pos={r,c};render();if(r===goal.r&&c===goal.c)setTimeout(()=>completeMission(mission),400);}
+      };
+      grid.appendChild(cell);
+    }
+  }
+  render(); area.appendChild(grid);
+};
+
+// 6. 분류
+missionHandlers.sort = (area, mission) => {
+  const animals=[{e:'🐟',n:'물고기',h:'sea'},{e:'🐕',n:'강아지',h:'land'},{e:'🐢',n:'거북이',h:'sea'},{e:'🐈',n:'고양이',h:'land'},{e:'🐬',n:'돌고래',h:'sea'},{e:'🐰',n:'토끼',h:'land'},{e:'🦈',n:'상어',h:'sea'},{e:'🐘',n:'코끼리',h:'land'}].sort(()=>Math.random()-0.5).slice(0,6);
+  let cur=0;
+  function next(){
+    if(cur>=animals.length){completeMission(mission);return;}
+    const a=animals[cur]; area.innerHTML='';
+    area.innerHTML=`<div class="sort-animal">${a.e}</div><div class="sort-label">${a.n}의 집은 어디일까요? (${cur+1}/${animals.length})</div>`;
+    const bins=document.createElement('div'); bins.className='sort-bins';
+    [{id:'sea',ic:'🌊',lb:'바다'},{id:'land',ic:'🏠',lb:'땅'}].forEach(b=>{
+      const d=document.createElement('div'); d.className='sort-bin';
+      d.innerHTML=`<div class="sort-bin-icon">${b.ic}</div><div class="sort-bin-label">${b.lb}</div>`;
+      d.onclick=()=>{if(b.id===a.h){d.style.borderColor='#4ECDC4';cur++;setTimeout(next,500);}else{d.style.borderColor='#E74C3C';setTimeout(()=>d.style.borderColor='rgba(255,255,255,0.4)',400);}};
+      bins.appendChild(d);
+    });
+    area.appendChild(bins);
+  }
+  next();
+};
+
+// 7. 크기 비교
+missionHandlers.size = (area, mission) => {
+  let round=0, total=4;
+  const pairs=[ {a:'🐁',an:'쥐',as:30,b:'🐘',bn:'코끼리',bs:60,big:'b'}, {a:'🐋',an:'고래',as:60,b:'🐟',bn:'물고기',bs:30,big:'a'}, {a:'🦐',an:'새우',as:28,b:'🦈',bn:'상어',bs:56,big:'b'}, {a:'🐊',an:'악어',as:52,b:'🐸',bn:'개구리',bs:30,big:'a'}, {a:'🐢',an:'거북이',as:40,b:'🐙',bn:'문어',bs:55,big:'b'}, {a:'🐕',an:'강아지',as:45,b:'🐈',bn:'고양이',bs:38,big:'a'} ].sort(()=>Math.random()-0.5);
+  function next(){
+    if(round>=total){completeMission(mission);return;}
+    const p=pairs[round%pairs.length]; area.innerHTML='';
+    area.innerHTML=`<div class="animal-display">${mission.animal}</div><div class="help-text">더 큰 동물을 골라주세요! (${round+1}/${total})</div>`;
+    const opts=document.createElement('div'); opts.className='size-options';
+    [{key:'a',e:p.a,n:p.an,s:p.as},{key:'b',e:p.b,n:p.bn,s:p.bs}].sort(()=>Math.random()-0.5).forEach(o=>{
+      const d=document.createElement('div'); d.className='size-choice';
+      d.innerHTML=`<span style="font-size:${o.s}px">${o.e}</span><span class="size-choice-label">${o.n}</span>`;
+      d.onclick=()=>{if(o.key===p.big){d.style.background='rgba(78,205,196,0.3)';round++;setTimeout(next,600);}else{d.style.background='rgba(231,76,60,0.3)';setTimeout(()=>d.style.background='rgba(255,255,255,0.08)',400);}};
+      opts.appendChild(d);
+    });
+    area.appendChild(opts);
+  }
+  next();
+};
+
+// 8. 그림자 맞추기
+missionHandlers.shadow = (area, mission) => {
+  let round=0, total=4;
+  const animals=['🐢','🐙','🦈','🐬','🐠','🦭','🐡','🦀','🐋','🐧'];
+  function next(){
+    if(round>=total){completeMission(mission);return;}
+    area.innerHTML='';
+    const target=animals[Math.floor(Math.random()*animals.length)];
+    area.innerHTML=`<div class="animal-display">${mission.animal}</div><div class="help-text">이 그림자의 주인은? (${round+1}/${total})</div>`;
+    const sa=document.createElement('div'); sa.className='shadow-area';
+    const st=document.createElement('div'); st.className='shadow-target'; st.textContent=target; sa.appendChild(st);
+    let opts=new Set([target]); while(opts.size<4) opts.add(animals[Math.floor(Math.random()*animals.length)]);
+    const od=document.createElement('div'); od.className='shadow-options';
+    [...opts].sort(()=>Math.random()-0.5).forEach(a=>{
+      const d=document.createElement('div'); d.className='shadow-opt'; d.textContent=a;
+      d.onclick=()=>{if(a===target){d.style.background='rgba(78,205,196,0.3)';round++;setTimeout(next,600);}else{d.style.opacity='0.3';setTimeout(()=>d.style.opacity='1',400);}};
+      od.appendChild(d);
+    });
+    sa.appendChild(od); area.appendChild(sa);
+  }
+  next();
+};
+
+// 9. 패턴 완성
+missionHandlers.pattern = (area, mission) => {
+  let round=0, total=3;
+  function next(){
+    if(round>=total){completeMission(mission);return;}
+    area.innerHTML='';
+    const pool=['🐟','🐠','🐡','🦐','🦀','🐚','🐬','🐙'];
+    const a=pool[Math.floor(Math.random()*pool.length)], b=pool.filter(x=>x!==a)[Math.floor(Math.random()*(pool.length-1))];
+    const pattern=[a,b,a,b,a]; // a,b 반복 → 다음은 b
+    const answer=b;
+    area.innerHTML=`<div class="animal-display">${mission.animal}</div><div class="help-text">빈 칸에 올 동물은? (${round+1}/${total})</div>`;
+    const row=document.createElement('div'); row.className='pattern-row';
+    pattern.forEach(p=>{const s=document.createElement('span');s.textContent=p;row.appendChild(s);});
+    const blank=document.createElement('div'); blank.className='pattern-blank'; blank.textContent='?'; row.appendChild(blank);
+    area.appendChild(row);
+    let opts=new Set([answer]); while(opts.size<3) opts.add(pool[Math.floor(Math.random()*pool.length)]);
+    const btns=document.createElement('div'); btns.className='answer-buttons';
+    [...opts].sort(()=>Math.random()-0.5).forEach(o=>{
+      const btn=document.createElement('button'); btn.className='answer-btn'; btn.style.fontSize='28px'; btn.style.width='70px'; btn.style.height='70px'; btn.textContent=o;
+      btn.onclick=()=>{if(o===answer){blank.textContent=answer;blank.style.borderColor='#4ECDC4';round++;setTimeout(next,700);}else{btn.classList.add('wrong');setTimeout(()=>btn.classList.remove('wrong'),400);}};
+      btns.appendChild(btn);
+    });
+    area.appendChild(btns);
+  }
+  next();
+};
+
+// 10. 덧셈
+missionHandlers.math = (area, mission) => {
+  let round=0, total=3;
+  function next(){
+    if(round>=total){completeMission(mission);return;}
+    area.innerHTML='';
+    const a=1+Math.floor(Math.random()*5), b=1+Math.floor(Math.random()*5), ans=a+b;
+    area.innerHTML=`<div class="animal-display">${mission.animal}</div><div class="help-text">계산해주세요! (${round+1}/${total})</div>`;
+    const prob=document.createElement('div'); prob.className='math-problem'; prob.textContent=`${a} + ${b} = ?`; area.appendChild(prob);
+    let opts=new Set([ans]); while(opts.size<4) opts.add(1+Math.floor(Math.random()*10));
+    const btns=document.createElement('div'); btns.className='answer-buttons';
+    [...opts].sort(()=>Math.random()-0.5).forEach(n=>{
+      const btn=document.createElement('button'); btn.className='answer-btn'; btn.textContent=n;
+      btn.onclick=()=>{if(n===ans){btn.classList.add('correct');round++;setTimeout(next,700);}else{btn.classList.add('wrong');setTimeout(()=>btn.classList.remove('wrong'),400);}};
+      btns.appendChild(btn);
+    });
+    area.appendChild(btns);
+  }
+  next();
+};
+
+// 11. 방향 안내
+missionHandlers.direction = (area, mission) => {
+  // 화살표 시퀀스를 따라 누르기
+  const arrows=['⬆️','⬇️','⬅️','➡️'];
+  const seq=[]; for(let i=0;i<4;i++) seq.push(arrows[Math.floor(Math.random()*4)]);
+  let cur=0;
+  function render(){
+    area.innerHTML='';
+    area.innerHTML=`<div class="animal-display">${mission.animal}</div><div class="help-text">화살표 순서대로 눌러주세요!</div>`;
+    const target=document.createElement('div'); target.className='dir-target';
+    seq.forEach((a,i)=>{const s=document.createElement('span'); s.className=`dir-arrow ${i<cur?'dir-done':'dir-todo'}`; s.textContent=a; target.appendChild(s);});
+    area.appendChild(target);
+    const grid=document.createElement('div'); grid.className='direction-grid';
+    const layout=[null,'⬆️',null,'⬅️',null,'➡️',null,'⬇️',null];
+    layout.forEach(l=>{
+      const b=document.createElement('button'); b.className=`dir-btn ${l?'':'empty'}`;
+      if(l){b.textContent=l;b.onclick=()=>{if(l===seq[cur]){cur++;if(cur>=seq.length)setTimeout(()=>completeMission(mission),500);else render();}else{b.style.background='rgba(231,76,60,0.4)';setTimeout(()=>b.style.background='rgba(255,255,255,0.1)',300);}};}
+      grid.appendChild(b);
+    });
+    area.appendChild(grid);
+  }
+  render();
+};
+
+// 12. 먹이 주기
+missionHandlers.feeding = (area, mission) => {
+  let round=0;
+  const data=[
+    {animal:'🐰',name:'토끼',food:'🥕',foodName:'당근',wrongs:['🍖','🐟']},
+    {animal:'🐈',name:'고양이',food:'🐟',foodName:'생선',wrongs:['🥕','🌿']},
+    {animal:'🐶',name:'강아지',food:'🍖',foodName:'고기',wrongs:['🥕','🐟']},
+    {animal:'🐵',name:'원숭이',food:'🍌',foodName:'바나나',wrongs:['🍖','🐟']},
+    {animal:'🐘',name:'코끼리',food:'🌿',foodName:'풀',wrongs:['🍖','🍌']},
+  ].sort(()=>Math.random()-0.5);
+  const total=4;
+  function next(){
+    if(round>=total){completeMission(mission);return;}
+    const d=data[round%data.length]; area.innerHTML='';
+    area.innerHTML=`<div class="sort-animal">${d.animal}</div><div class="sort-label">${d.name}에게 줄 먹이는? (${round+1}/${total})</div>`;
+    let opts=[d.food,...d.wrongs].sort(()=>Math.random()-0.5);
+    const btns=document.createElement('div'); btns.className='sort-bins';
+    opts.forEach(f=>{
+      const b=document.createElement('div'); b.className='sort-bin';
+      b.innerHTML=`<div class="sort-bin-icon">${f}</div>`;
+      b.onclick=()=>{if(f===d.food){b.style.borderColor='#4ECDC4';b.style.background='rgba(78,205,196,0.2)';round++;setTimeout(next,500);}else{b.style.borderColor='#E74C3C';setTimeout(()=>{b.style.borderColor='rgba(255,255,255,0.4)';b.style.background='rgba(255,255,255,0.05)';},400);}};
+      btns.appendChild(b);
+    });
+    area.appendChild(btns);
+  }
+  next();
+};
+
+// ===== 미션 완료 (매번 코인 지급) =====
+function completeMission(mission) {
+  if (!gameState.completedMissions.includes(mission.id)) {
+    gameState.completedMissions.push(mission.id);
+    if (!gameState.rescuedAnimals.find(a => a.emoji === mission.animal)) {
+      gameState.rescuedAnimals.push({ emoji: mission.animal, name: mission.animalName });
+    }
+  }
+  // 매번 코인 지급!
+  gameState.coins += mission.reward;
+  saveGame();
+  document.getElementById('coinCount').textContent = gameState.coins;
+  document.getElementById('successAnimal').textContent = mission.animal;
+  document.getElementById('successText').textContent = `${mission.animalName}을(를) 구했어요!`;
+  document.getElementById('successCoins').textContent = `🪙 +${mission.reward} 옥토코인!`;
+  document.getElementById('successOverlay').classList.add('active');
+  createConfetti();
+}
+
+function closeSuccess() { document.getElementById('successOverlay').classList.remove('active'); goToMap(); }
+
+function createConfetti() {
+  const colors=['#E74C3C','#3498DB','#2ECC71','#F1C40F','#9B59B6','#FF6B9D','#FFD700'];
+  for(let i=0;i<25;i++){
+    const c=document.createElement('div');
+    c.style.cssText=`position:fixed;width:8px;height:8px;background:${colors[i%colors.length]};top:${30+Math.random()*20}%;left:${Math.random()*100}%;z-index:300;border-radius:${Math.random()>0.5?'50%':'2px'};pointer-events:none;`;
+    document.body.appendChild(c);
+    let x=parseFloat(c.style.left),y=parseFloat(c.style.top),frame=0;
+    const vx=(Math.random()-0.5)*600,vy=-200+Math.random()*100;
+    (function anim(){frame++;x+=vx*0.016;y+=vy*0.016+frame*0.35;c.style.left=x+'%';c.style.top=y+'%';c.style.opacity=Math.max(0,1-frame/70);if(frame<70)requestAnimationFrame(anim);else c.remove();})();
+  }
+}
+
+// ===== 상점 =====
+function openShop() {
+  showScreen('shop-screen');
+  let sel='youngseo';
+  function render(){
+    const tabs=document.getElementById('charTabs'); tabs.innerHTML='';
+    ['youngseo','youngwoo'].forEach(k=>{
+      const t=document.createElement('div'); t.className=`char-tab ${k===sel?'active':''}`;
+      t.textContent=gameState.characters[k].name;
+      t.onclick=()=>{sel=k;render();}; tabs.appendChild(t);
+    });
+    const items=document.getElementById('shopItems'); items.innerHTML='';
+    shopItems.forEach(item=>{
+      const owned=gameState.ownedItems.some(o=>o.id===item.id&&o.char===sel);
+      const equipped=gameState.characters[sel].equipment[item.slot]===item.id;
+      const d=document.createElement('div'); d.className=`shop-item ${owned?'owned':''} ${equipped?'equipped':''}`;
+      d.innerHTML=`<div class="shop-item-icon">${item.icon}</div><div class="shop-item-name">${item.name}</div><div class="shop-item-price">${owned?(equipped?'✨ 장착중':'👆 장착하기'):`🪙 ${item.price}`}</div>`;
+      d.onclick=()=>{
+        if(owned){if(equipped)delete gameState.characters[sel].equipment[item.slot];else gameState.characters[sel].equipment[item.slot]=item.id;saveGame();render();}
+        else if(gameState.coins>=item.price){gameState.coins-=item.price;gameState.ownedItems.push({id:item.id,char:sel});gameState.characters[sel].equipment[item.slot]=item.id;document.getElementById('coinCount').textContent=gameState.coins;saveGame();render();}
+      };
+      items.appendChild(d);
+    });
+  }
+  render();
+}
+
+// ===== 캐릭터 화면 =====
+function openChars() {
+  showScreen('char-screen');
+  const display=document.getElementById('charDisplay'); display.innerHTML='';
+  ['youngseo','youngwoo'].forEach(key=>{
+    const char=gameState.characters[key];
+    const box=document.createElement('div'); box.className='char-box';
+    const canvas=document.createElement('canvas'); canvas.className='char-canvas'; canvas.width=150; canvas.height=200;
+    const nameDiv=document.createElement('div'); nameDiv.className='char-name-label'; nameDiv.textContent=char.name;
+    const titleDiv=document.createElement('div'); titleDiv.className='char-title'; titleDiv.textContent='동물구조 영웅';
+    box.appendChild(canvas);
+    box.appendChild(nameDiv);
+    box.appendChild(titleDiv);
+    display.appendChild(box);
+    drawCharacter(canvas, key, 2);
+  });
+  const rescued=document.getElementById('rescuedAnimals'); rescued.innerHTML='';
+  if(gameState.rescuedAnimals.length===0) rescued.innerHTML='<div style="color:#87CEEB;font-size:15px;">아직 구조한 동물이 없어요!</div>';
+  else gameState.rescuedAnimals.forEach(a=>{const d=document.createElement('div');d.className='rescued-animal';d.textContent=a.emoji;rescued.appendChild(d);});
+}
+
+// 타이틀 캐릭터도 그리기
+function drawTitleChars() {
+  drawCharacter(document.getElementById('titleChar1'), 'youngseo', 1);
+  drawCharacter(document.getElementById('titleChar2'), 'youngwoo', 1);
+}
+drawTitleChars();
+</script>
+</body>
+</html>

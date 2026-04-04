@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kids Games</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+    color: #fff;
+  }
+  h1 {
+    font-size: 2.5em;
+    margin-bottom: 10px;
+    background: linear-gradient(90deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle { color: #aaa; margin-bottom: 40px; font-size: 1.1em; }
+  .games {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+    max-width: 960px;
+    width: 100%;
+  }
+  .game-card {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 16px;
+    padding: 28px 24px;
+    text-decoration: none;
+    color: #fff;
+    transition: all 0.3s;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .game-card:hover {
+    transform: translateY(-4px);
+    background: rgba(255,255,255,0.14);
+    border-color: rgba(255,255,255,0.3);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+  }
+  .game-icon { font-size: 2.4em; }
+  .game-title { font-size: 1.3em; font-weight: 700; }
+  .game-desc { color: #bbb; font-size: 0.95em; line-height: 1.5; }
+</style>
+</head>
+<body>
+  <h1>Kids Games</h1>
+  <p class="subtitle">tap a card to play!</p>
+  <div class="games">
+    <a class="game-card" href="block-game/">
+      <span class="game-icon">🧱</span>
+      <span class="game-title">Block Builder</span>
+      <span class="game-desc">Marvel x Minecraft style block building game</span>
+    </a>
+    <a class="game-card" href="octonaut-game/">
+      <span class="game-icon">🐙</span>
+      <span class="game-title">Octonaut Animal Rescue</span>
+      <span class="game-desc">Rescue sea creatures with the Octonauts crew</span>
+    </a>
+    <a class="game-card" href="minecraft-dodge/">
+      <span class="game-icon">⛏️</span>
+      <span class="game-title">Minecraft Block Dodge</span>
+      <span class="game-desc">Dodge falling blocks - Marvel Edition</span>
+    </a>
+    <a class="game-card" href="english-math-game/">
+      <span class="game-icon">⭐</span>
+      <span class="game-title">Star Adventure</span>
+      <span class="game-desc">Learn English & Math through space adventures</span>
+    </a>
+    <a class="game-card" href="minicar-race/">
+      <span class="game-icon">🏎️</span>
+      <span class="game-title">Mini Car Race</span>
+      <span class="game-desc">Build and race your own mini cars</span>
+    </a>
+  </div>
+</body>
+</html>

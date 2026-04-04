@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Minecraft Block Dodge - Marvel Edition</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a2e;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: 'Courier New', monospace;
+    overflow: hidden;
+  }
+  canvas { display: block; image-rendering: pixelated; }
+
+  /* Screens */
+  .screen {
+    display: none;
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: #fff;
+    z-index: 10;
+  }
+  .screen.active { display: block; }
+
+  h1 {
+    font-size: 36px;
+    color: #5dff5d;
+    text-shadow: 3px 3px 0 #2d7d2d;
+    margin-bottom: 10px;
+    letter-spacing: 2px;
+  }
+  h2 {
+    font-size: 20px;
+    color: #aaa;
+    margin-bottom: 30px;
+  }
+
+  .char-select {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    margin: 20px 0;
+  }
+  .char-card {
+    background: #2a2a4a;
+    border: 3px solid #444;
+    border-radius: 12px;
+    padding: 20px 16px;
+    width: 180px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .char-card:hover {
+    border-color: #5dff5d;
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(93, 255, 93, 0.3);
+  }
+  .char-card .icon {
+    font-size: 60px;
+    margin-bottom: 10px;
+    display: block;
+  }
+  .char-card .name {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 8px;
+  }
+  .char-card .stats {
+    font-size: 12px;
+    color: #aaa;
+    line-height: 1.6;
+  }
+  .char-card .stats .bar {
+    background: #333;
+    height: 8px;
+    border-radius: 4px;
+    margin: 2px 0 6px;
+    overflow: hidden;
+  }
+  .char-card .stats .bar-fill {
+    height: 100%;
+    border-radius: 4px;
+  }
+
+  .hulk-card .name { color: #5dff5d; }
+  .hulk-card:hover { border-color: #5dff5d; }
+  .spider-card .name { color: #ff4444; }
+  .spider-card:hover { border-color: #ff4444; }
+  .iron-card .name { color: #ffd700; }
+  .iron-card:hover { border-color: #ffd700; }
+
+  /* Game Over */
+  #gameOverScreen h1 { color: #ff4444; text-shadow: 3px 3px 0 #7d2d2d; }
+  .final-score {
+    font-size: 48px;
+    color: #ffd700;
+    margin: 10px 0;
+    text-shadow: 2px 2px 0 #7d6d00;
+  }
+  .btn {
+    background: #5dff5d;
+    color: #1a1a2e;
+    border: none;
+    padding: 12px 30px;
+    font-size: 18px;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    border-radius: 8px;
+    cursor: pointer;
+    margin: 8px;
+    transition: all 0.2s;
+  }
+  .btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 15px rgba(93, 255, 93, 0.4);
+  }
+  .btn-red {
+    background: #ff4444;
+    color: #fff;
+  }
+
+  /* Leaderboard */
+  .leaderboard {
+    margin: 20px auto;
+    max-width: 350px;
+  }
+  .leaderboard h3 {
+    color: #ffd700;
+    font-size: 22px;
+    margin-bottom: 12px;
+  }
+  .lb-entry {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 16px;
+    margin: 4px 0;
+    background: #2a2a4a;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+  .lb-entry .rank { color: #ffd700; width: 30px; }
+  .lb-entry .lb-name { flex: 1; text-align: left; }
+  .lb-entry .lb-score { color: #5dff5d; }
+  .lb-entry.highlight {
+    border: 1px solid #ffd700;
+    background: #3a3a5a;
+  }
+
+  /* HUD */
+  #hud {
+    display: none;
+    position: absolute;
+    top: 10px; left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    color: #fff;
+    font-size: 16px;
+    pointer-events: none;
+    width: 90%;
+    max-width: 600px;
+  }
+  .hud-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .health-bar-bg {
+    background: #333;
+    height: 20px;
+    border-radius: 10px;
+    flex: 1;
+    margin: 0 12px;
+    overflow: hidden;
+    border: 2px solid #555;
+  }
+  .health-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #ff4444, #5dff5d);
+    border-radius: 8px;
+    transition: width 0.3s;
+  }
+  .hud-char { font-size: 24px; }
+  .hud-score { font-size: 20px; color: #ffd700; font-weight: bold; }
+
+  /* Mobile controls hint */
+  .controls-hint {
+    color: #666;
+    font-size: 12px;
+    margin-top: 15px;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="hud-row">
+    <span class="hud-char" id="hudChar"></span>
+    <div class="health-bar-bg">
+      <div class="health-bar-fill" id="healthBar"></div>
+    </div>
+    <span class="hud-score" id="hudScore">0</span>
+  </div>
+</div>
+
+<!-- Title Screen -->
+<div class="screen active" id="titleScreen">
+  <h1>BLOCK DODGE</h1>
+  <h2>Minecraft x Marvel Edition</h2>
+  <div class="char-select">
+    <div class="char-card hulk-card" onclick="selectCharacter('hulk')">
+      <span class="icon">💚</span>
+      <div class="name">HULK</div>
+      <div class="stats">
+        체력 <div class="bar"><div class="bar-fill" style="width:100%;background:#5dff5d"></div></div>
+        속도 <div class="bar"><div class="bar-fill" style="width:35%;background:#ff8844"></div></div>
+        느리지만 체력이 많다!
+      </div>
+    </div>
+    <div class="char-card spider-card" onclick="selectCharacter('spider')">
+      <span class="icon">🕷️</span>
+      <div class="name">SPIDER-MAN</div>
+      <div class="stats">
+        체력 <div class="bar"><div class="bar-fill" style="width:60%;background:#ff4444"></div></div>
+        속도 <div class="bar"><div class="bar-fill" style="width:70%;background:#ff8844"></div></div>
+        균형잡힌 능력치!
+      </div>
+    </div>
+    <div class="char-card iron-card" onclick="selectCharacter('iron')">
+      <span class="icon">⚡</span>
+      <div class="name">IRON MAN</div>
+      <div class="stats">
+        체력 <div class="bar"><div class="bar-fill" style="width:30%;background:#ffd700"></div></div>
+        속도 <div class="bar"><div class="bar-fill" style="width:100%;background:#ff8844"></div></div>
+        빠르지만 체력이 적다!
+      </div>
+    </div>
+  </div>
+  <p class="controls-hint">방향키 또는 A/D 로 이동 | 모바일: 터치</p>
+</div>
+
+<!-- Game Over Screen -->
+<div class="screen" id="gameOverScreen">
+  <h1>GAME OVER</h1>
+  <div class="final-score" id="finalScore">0</div>
+  <div id="finalChar"></div>
+  <div class="leaderboard" id="leaderboard"></div>
+  <br>
+  <button class="btn" onclick="showTitle()">캐릭터 선택</button>
+  <button class="btn btn-red" onclick="restartSame()">다시 하기</button>
+</div>
+
+<script>
+// ── Canvas Setup ──
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+  canvas.width = Math.min(window.innerWidth, 700);
+  canvas.height = Math.min(window.innerHeight, 900);
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// ── Characters ──
+const CHARACTERS = {
+  hulk: {
+    name: 'HULK',
+    icon: '💚',
+    maxHealth: 200,
+    speed: 4,
+    width: 44,
+    height: 44,
+    color: '#5dff5d',
+    bodyColors: ['#2d7d2d', '#3a9a3a', '#5dff5d'],
+  },
+  spider: {
+    name: 'SPIDER-MAN',
+    icon: '🕷️',
+    maxHealth: 120,
+    speed: 6.5,
+    width: 36,
+    height: 38,
+    color: '#ff4444',
+    bodyColors: ['#991111', '#dd2222', '#ff4444'],
+  },
+  iron: {
+    name: 'IRON MAN',
+    icon: '⚡',
+    maxHealth: 80,
+    speed: 9,
+    width: 34,
+    height: 38,
+    color: '#ffd700',
+    bodyColors: ['#996600', '#cc9900', '#ffd700'],
+  },
+};
+
+// ── Block types (Minecraft style) ──
+const BLOCK_TYPES = [
+  { name: 'dirt',     colors: ['#8B6914', '#6B4F12', '#9B7924'] },
+  { name: 'stone',    colors: ['#888888', '#777777', '#999999'] },
+  { name: 'cobble',   colors: ['#777777', '#666666', '#888888'] },
+  { name: 'sand',     colors: ['#E8D5A3', '#D4C090', '#F0DFB0'] },
+  { name: 'obsidian', colors: ['#1a0a2e', '#2a1a3e', '#0f0520'] },
+  { name: 'redstone', colors: ['#aa2222', '#881111', '#cc3333'] },
+  { name: 'gold',     colors: ['#ddaa00', '#bb8800', '#ffcc22'] },
+  { name: 'diamond',  colors: ['#44dddd', '#22bbbb', '#66ffff'] },
+  { name: 'tnt',      colors: ['#cc2222', '#ffffff', '#333333'] },
+];
+
+// ── Game State ──
+let game = {
+  state: 'title', // title, playing, over
+  charKey: null,
+  char: null,
+  player: { x: 0, y: 0, health: 0, invincible: 0 },
+  blocks: [],
+  hearts: [],
+  stars: [],
+  particles: [],
+  score: 0,
+  time: 0,
+  difficulty: 1,
+  shakeTimer: 0,
+  shakeIntensity: 0,
+};
+
+let keys = {};
+let touchX = null;
+let animFrame = null;
+let lastTime = 0;
+
+// ── Leaderboard ──
+function getLeaderboard() {
+  try {
+    return JSON.parse(localStorage.getItem('blockdodge_lb') || '[]');
+  } catch { return []; }
+}
+function saveLeaderboard(lb) {
+  localStorage.setItem('blockdodge_lb', JSON.stringify(lb.slice(0, 10)));
+}
+function addScore(name, score, charKey) {
+  const lb = getLeaderboard();
+  lb.push({ name, score, char: charKey, date: Date.now() });
+  lb.sort((a, b) => b.score - a.score);
+  saveLeaderboard(lb.slice(0, 10));
+}
+
+// ── Input ──
+document.addEventListener('keydown', e => { keys[e.key] = true; });
+document.addEventListener('keyup', e => { keys[e.key] = false; });
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  touchX = e.touches[0].clientX;
+});
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  touchX = e.touches[0].clientX;
+});
+canvas.addEventListener('touchend', () => { touchX = null; });
+
+// ── Screens ──
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  if (id) document.getElementById(id).classList.add('active');
+}
+
+function showTitle() {
+  game.state = 'title';
+  document.getElementById('hud').style.display = 'none';
+  showScreen('titleScreen');
+}
+
+function selectCharacter(key) {
+  game.charKey = key;
+  startGame();
+}
+
+function restartSame() {
+  startGame();
+}
+
+function startGame() {
+  const ch = CHARACTERS[game.charKey];
+  game.char = ch;
+  game.player = {
+    x: canvas.width / 2,
+    y: canvas.height - 80,
+    health: ch.maxHealth,
+    invincible: 0,
+  };
+  game.blocks = [];
+  game.hearts = [];
+  game.stars = [];
+  game.particles = [];
+  game.score = 0;
+  game.time = 0;
+  game.difficulty = 1;
+  game.shakeTimer = 0;
+  game.state = 'playing';
+
+  showScreen(null);
+  document.getElementById('hud').style.display = 'block';
+  document.getElementById('hudChar').textContent = ch.icon;
+
+  lastTime = performance.now();
+  if (animFrame) cancelAnimationFrame(animFrame);
+  gameLoop(lastTime);
+}
+
+function gameOver() {
+  game.state = 'over';
+  document.getElementById('hud').style.display = 'none';
+
+  const charName = CHARACTERS[game.charKey].name;
+  addScore(charName, game.score, game.charKey);
+
+  document.getElementById('finalScore').textContent = game.score;
+  document.getElementById('finalChar').innerHTML =
+    `<span style="font-size:40px">${game.char.icon}</span><br>${game.char.name}`;
+
+  // Render leaderboard
+  const lb = getLeaderboard();
+  let html = '<h3>LEADERBOARD</h3>';
+  lb.forEach((entry, i) => {
+    const isNew = (entry.score === game.score && entry.char === game.charKey && i === lb.findIndex(e => e.score === game.score && e.char === game.charKey));
+    const charIcon = CHARACTERS[entry.char]?.icon || '?';
+    html += `<div class="lb-entry${isNew ? ' highlight' : ''}">
+      <span class="rank">#${i + 1}</span>
+      <span class="lb-name">${charIcon} ${entry.name}</span>
+      <span class="lb-score">${entry.score}</span>
+    </div>`;
+  });
+  document.getElementById('leaderboard').innerHTML = html;
+  showScreen('gameOverScreen');
+}
+
+// ── Spawn ──
+function spawnBlock() {
+  const size = 28 + Math.random() * 16;
+  const type = BLOCK_TYPES[Math.floor(Math.random() * BLOCK_TYPES.length)];
+  const speed = (2 + Math.random() * 2) * game.difficulty;
+  game.blocks.push({
+    x: Math.random() * (canvas.width - size),
+    y: -size,
+    w: size,
+    h: size,
+    speed,
+    type,
+    rot: Math.random() * 0.3 - 0.15,
+    angle: 0,
+    damage: type.name === 'tnt' ? 30 : type.name === 'obsidian' ? 25 : 15,
+  });
+}
+
+function spawnHeart() {
+  game.hearts.push({
+    x: Math.random() * (canvas.width - 24),
+    y: -24,
+    speed: 1.5 + Math.random(),
+    size: 22,
+    pulse: 0,
+  });
+}
+
+function spawnStar() {
+  game.stars.push({
+    x: Math.random() * (canvas.width - 24),
+    y: -24,
+    speed: 2 + Math.random(),
+    size: 20,
+    spin: 0,
+  });
+}
+
+function addParticles(x, y, color, count) {
+  for (let i = 0; i < count; i++) {
+    game.particles.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 6,
+      vy: (Math.random() - 0.5) * 6 - 2,
+      life: 30 + Math.random() * 20,
+      maxLife: 50,
+      color,
+      size: 3 + Math.random() * 4,
+    });
+  }
+}
+
+// ── Draw helpers ──
+function drawPixelBlock(x, y, w, h, colors, angle) {
+  ctx.save();
+  ctx.translate(x + w/2, y + h/2);
+  ctx.rotate(angle);
+
+  // Main block
+  ctx.fillStyle = colors[0];
+  ctx.fillRect(-w/2, -h/2, w, h);
+
+  // Top highlight
+  ctx.fillStyle = colors[2];
+  ctx.fillRect(-w/2, -h/2, w, h * 0.3);
+
+  // Grid lines (minecraft pixel look)
+  ctx.strokeStyle = colors[1];
+  ctx.lineWidth = 1;
+  const step = w / 4;
+  for (let i = 1; i < 4; i++) {
+    ctx.beginPath();
+    ctx.moveTo(-w/2 + i * step, -h/2);
+    ctx.lineTo(-w/2 + i * step, h/2);
+    ctx.stroke();
+  }
+  for (let i = 1; i < 4; i++) {
+    ctx.beginPath();
+    ctx.moveTo(-w/2, -h/2 + i * step);
+    ctx.lineTo(w/2, -h/2 + i * step);
+    ctx.stroke();
+  }
+
+  // Border
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(-w/2, -h/2, w, h);
+
+  ctx.restore();
+}
+
+function drawCharacter(x, y, ch, invincible) {
+  if (invincible > 0 && Math.floor(invincible * 10) % 2 === 0) return; // blink
+
+  const w = ch.width;
+  const h = ch.height;
+  const colors = ch.bodyColors;
+
+  ctx.save();
+  ctx.translate(x, y);
+
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.fillRect(-w/2 + 4, h/2 - 2, w - 2, 6);
+
+  // Body (pixel art style)
+  ctx.fillStyle = colors[1];
+  ctx.fillRect(-w/2, -h/2 + 10, w, h - 10);
+
+  // Head
+  ctx.fillStyle = colors[2];
+  ctx.fillRect(-w/3, -h/2, w * 0.66, h * 0.45);
+
+  // Eyes
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(-w/5, -h/2 + 8, 6, 6);
+  ctx.fillRect(w/5 - 6, -h/2 + 8, 6, 6);
+  ctx.fillStyle = '#111';
+  ctx.fillRect(-w/5 + 2, -h/2 + 10, 3, 3);
+  ctx.fillRect(w/5 - 4, -h/2 + 10, 3, 3);
+
+  // Details per character
+  if (game.charKey === 'hulk') {
+    // Big fists
+    ctx.fillStyle = colors[2];
+    ctx.fillRect(-w/2 - 8, 2, 12, 14);
+    ctx.fillRect(w/2 - 4, 2, 12, 14);
+    // Angry brow
+    ctx.fillStyle = colors[0];
+    ctx.fillRect(-w/4, -h/2 + 5, w/2, 3);
+  } else if (game.charKey === 'spider') {
+    // Web pattern on chest
+    ctx.strokeStyle = '#111';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, -h/2 + 20);
+    ctx.lineTo(-w/3, h/2);
+    ctx.moveTo(0, -h/2 + 20);
+    ctx.lineTo(w/3, h/2);
+    ctx.moveTo(0, -h/2 + 20);
+    ctx.lineTo(0, h/2);
+    ctx.stroke();
+    // Spider emblem
+    ctx.fillStyle = '#111';
+    ctx.fillRect(-3, -h/2 + 22, 6, 6);
+  } else if (game.charKey === 'iron') {
+    // Arc reactor
+    ctx.fillStyle = '#66ccff';
+    ctx.beginPath();
+    ctx.arc(0, -h/2 + 28, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#aaeeff';
+    ctx.beginPath();
+    ctx.arc(0, -h/2 + 28, 2, 0, Math.PI * 2);
+    ctx.fill();
+    // Helmet visor
+    ctx.fillStyle = '#66ccff';
+    ctx.fillRect(-w/5, -h/2 + 8, w * 0.4, 4);
+  }
+
+  // Legs
+  ctx.fillStyle = colors[0];
+  ctx.fillRect(-w/3, h/2 - 12, w * 0.25, 12);
+  ctx.fillRect(w/3 - w * 0.25 + 2, h/2 - 12, w * 0.25, 12);
+
+  // Border
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(-w/2, -h/2 + 10, w, h - 10);
+  ctx.strokeRect(-w/3, -h/2, w * 0.66, h * 0.45);
+
+  ctx.restore();
+}
+
+function drawHeart(x, y, size, pulse) {
+  const s = size + Math.sin(pulse) * 3;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = '#ff4466';
+  ctx.beginPath();
+  ctx.moveTo(0, s * 0.3);
+  ctx.bezierCurveTo(-s * 0.5, -s * 0.3, -s * 0.5, -s * 0.6, 0, -s * 0.2);
+  ctx.bezierCurveTo(s * 0.5, -s * 0.6, s * 0.5, -s * 0.3, 0, s * 0.3);
+  ctx.fill();
+  ctx.strokeStyle = '#cc1133';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  // Shine
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.fillRect(-s * 0.2, -s * 0.35, 4, 4);
+  ctx.restore();
+}
+
+function drawStar(x, y, size, spin) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(spin);
+  ctx.fillStyle = '#ffd700';
+  ctx.beginPath();
+  for (let i = 0; i < 5; i++) {
+    const angle = (i * 4 * Math.PI) / 5 - Math.PI / 2;
+    const r = i === 0 ? size : size;
+    ctx[i === 0 ? 'moveTo' : 'lineTo'](
+      Math.cos(angle) * size,
+      Math.sin(angle) * size
+    );
+    const inner = angle + (2 * Math.PI) / 10;
+    ctx.lineTo(
+      Math.cos(inner) * size * 0.4,
+      Math.sin(inner) * size * 0.4
+    );
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#cc9900';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  // Center glow
+  ctx.fillStyle = '#fff8cc';
+  ctx.beginPath();
+  ctx.arc(0, 0, size * 0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// ── Background ──
+function drawBackground() {
+  // Sky gradient
+  const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  grad.addColorStop(0, '#1a0a3e');
+  grad.addColorStop(0.5, '#2a1a5e');
+  grad.addColorStop(1, '#3a5a3a');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Ground (minecraft grass)
+  const groundY = canvas.height - 40;
+  ctx.fillStyle = '#5da845';
+  ctx.fillRect(0, groundY, canvas.width, 6);
+  ctx.fillStyle = '#8B6914';
+  ctx.fillRect(0, groundY + 6, canvas.width, 34);
+
+  // Pixel grid on ground
+  ctx.fillStyle = '#7a5a10';
+  for (let x = 0; x < canvas.width; x += 20) {
+    ctx.fillRect(x, groundY + 10, 1, 30);
+  }
+
+  // Stars in sky (static)
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  for (let i = 0; i < 30; i++) {
+    const sx = (i * 97 + 13) % canvas.width;
+    const sy = (i * 53 + 7) % (canvas.height * 0.4);
+    ctx.fillRect(sx, sy, 2, 2);
+  }
+}
+
+// ── Main Loop ──
+function gameLoop(timestamp) {
+  if (game.state !== 'playing') return;
+
+  const dt = Math.min((timestamp - lastTime) / 16.67, 3); // normalize to ~60fps
+  lastTime = timestamp;
+  game.time += dt;
+
+  // Difficulty ramps up
+  game.difficulty = 1 + game.time * 0.001;
+
+  // ── Input ──
+  const p = game.player;
+  const spd = game.char.speed * dt;
+
+  if (keys['ArrowLeft'] || keys['a'] || keys['A']) p.x -= spd;
+  if (keys['ArrowRight'] || keys['d'] || keys['D']) p.x += spd;
+
+  if (touchX !== null) {
+    const canvasRect = canvas.getBoundingClientRect();
+    const tx = (touchX - canvasRect.left) * (canvas.width / canvasRect.width);
+    const diff = tx - p.x;
+    if (Math.abs(diff) > 5) {
+      p.x += Math.sign(diff) * Math.min(spd * 1.2, Math.abs(diff));
+    }
+  }
+
+  // Clamp
+  p.x = Math.max(game.char.width / 2, Math.min(canvas.width - game.char.width / 2, p.x));
+
+  // Invincibility timer
+  if (p.invincible > 0) p.invincible -= dt * 0.03;
+
+  // ── Spawn ──
+  // Blocks: more frequent as difficulty increases
+  if (Math.random() < 0.03 * game.difficulty * dt) spawnBlock();
+  // Hearts: rare
+  if (Math.random() < 0.003 * dt) spawnHeart();
+  // Stars
+  if (Math.random() < 0.008 * dt) spawnStar();
+
+  // ── Update blocks ──
+  for (let i = game.blocks.length - 1; i >= 0; i--) {
+    const b = game.blocks[i];
+    b.y += b.speed * dt;
+    b.angle += b.rot * dt;
+
+    if (b.y > canvas.height + 50) {
+      game.blocks.splice(i, 1);
+      game.score += 1; // survive bonus
+      continue;
+    }
+
+    // Collision
+    if (p.invincible <= 0) {
+      const pw = game.char.width * 0.8;
+      const ph = game.char.height * 0.8;
+      if (
+        p.x - pw/2 < b.x + b.w &&
+        p.x + pw/2 > b.x &&
+        p.y - ph/2 < b.y + b.h &&
+        p.y + ph/2 > b.y
+      ) {
+        p.health -= b.damage;
+        p.invincible = 1.5;
+        game.shakeTimer = 10;
+        game.shakeIntensity = 8;
+        addParticles(p.x, p.y, game.char.color, 12);
+        addParticles(b.x + b.w/2, b.y + b.h/2, b.type.colors[0], 8);
+        game.blocks.splice(i, 1);
+
+        if (p.health <= 0) {
+          p.health = 0;
+          addParticles(p.x, p.y, '#ff4444', 30);
+          gameOver();
+          return;
+        }
+      }
+    }
+  }
+
+  // ── Update hearts ──
+  for (let i = game.hearts.length - 1; i >= 0; i--) {
+    const h = game.hearts[i];
+    h.y += h.speed * dt;
+    h.pulse += 0.1 * dt;
+
+    if (h.y > canvas.height + 30) {
+      game.hearts.splice(i, 1);
+      continue;
+    }
+
+    // Collect
+    const dx = p.x - h.x;
+    const dy = p.y - h.y;
+    if (Math.sqrt(dx*dx + dy*dy) < 28) {
+      p.health = Math.min(game.char.maxHealth, p.health + 30);
+      addParticles(h.x, h.y, '#ff4466', 10);
+      game.hearts.splice(i, 1);
+    }
+  }
+
+  // ── Update stars ──
+  for (let i = game.stars.length - 1; i >= 0; i--) {
+    const s = game.stars[i];
+    s.y += s.speed * dt;
+    s.spin += 0.05 * dt;
+
+    if (s.y > canvas.height + 30) {
+      game.stars.splice(i, 1);
+      continue;
+    }
+
+    // Collect
+    const dx = p.x - s.x;
+    const dy = p.y - s.y;
+    if (Math.sqrt(dx*dx + dy*dy) < 28) {
+      game.score += 50;
+      addParticles(s.x, s.y, '#ffd700', 15);
+      game.stars.splice(i, 1);
+    }
+  }
+
+  // ── Update particles ──
+  for (let i = game.particles.length - 1; i >= 0; i--) {
+    const pt = game.particles[i];
+    pt.x += pt.vx * dt;
+    pt.y += pt.vy * dt;
+    pt.vy += 0.15 * dt;
+    pt.life -= dt;
+    if (pt.life <= 0) game.particles.splice(i, 1);
+  }
+
+  // Score increases over time
+  if (game.time % 3 < dt) game.score += 1;
+
+  // Screen shake
+  if (game.shakeTimer > 0) game.shakeTimer -= dt;
+
+  // ── Draw ──
+  ctx.save();
+  if (game.shakeTimer > 0) {
+    const sx = (Math.random() - 0.5) * game.shakeIntensity;
+    const sy = (Math.random() - 0.5) * game.shakeIntensity;
+    ctx.translate(sx, sy);
+  }
+
+  drawBackground();
+
+  // Draw blocks
+  game.blocks.forEach(b => {
+    drawPixelBlock(b.x, b.y, b.w, b.h, b.type.colors, b.angle);
+  });
+
+  // Draw hearts
+  game.hearts.forEach(h => {
+    drawHeart(h.x, h.y, h.size, h.pulse);
+  });
+
+  // Draw stars
+  game.stars.forEach(s => {
+    drawStar(s.x, s.y, s.size, s.spin);
+  });
+
+  // Draw player
+  drawCharacter(p.x, p.y, game.char, p.invincible);
+
+  // Draw particles
+  game.particles.forEach(pt => {
+    const alpha = pt.life / pt.maxLife;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = pt.color;
+    ctx.fillRect(pt.x - pt.size/2, pt.y - pt.size/2, pt.size, pt.size);
+  });
+  ctx.globalAlpha = 1;
+
+  ctx.restore();
+
+  // ── HUD ──
+  const healthPct = (p.health / game.char.maxHealth) * 100;
+  document.getElementById('healthBar').style.width = healthPct + '%';
+  document.getElementById('healthBar').style.background =
+    healthPct > 50 ? 'linear-gradient(90deg, #44cc44, #5dff5d)' :
+    healthPct > 25 ? 'linear-gradient(90deg, #ccaa00, #ffdd00)' :
+    'linear-gradient(90deg, #cc2222, #ff4444)';
+  document.getElementById('hudScore').textContent = game.score;
+
+  animFrame = requestAnimationFrame(gameLoop);
+}
+
+// Start on title
+showTitle();
+</script>
+</body>
+</html>
