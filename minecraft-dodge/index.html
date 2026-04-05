@@ -21,13 +21,20 @@
   .screen {
     display: none;
     position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
+    top: 0; left: 0;
+    width: 100%;
+    min-height: 100vh;
     text-align: center;
     color: #fff;
     z-index: 10;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
   }
-  .screen.active { display: block; }
+  .screen.active { display: flex; }
 
   h1 {
     font-size: 36px;
@@ -200,23 +207,28 @@
 
   @media (max-width: 480px) {
     h1 { font-size: 24px; }
-    h2 { font-size: 16px; }
-    .char-card .icon { font-size: 40px; }
-    .char-card .name { font-size: 14px; }
-    .char-card .stats { font-size: 11px; }
-    .char-card { padding: 14px 10px; }
+    h2 { font-size: 16px; margin-bottom: 15px; }
+    .char-select { flex-direction: row; gap: 10px; }
+    .char-card { width: 28vw; padding: 10px 6px; }
+    .char-card .icon { font-size: 32px; margin-bottom: 6px; }
+    .char-card .name { font-size: 12px; margin-bottom: 4px; }
+    .char-card .stats { font-size: 10px; line-height: 1.4; }
+    .char-card .stats .bar { height: 6px; margin: 1px 0 4px; }
     .final-score { font-size: 32px; }
     .btn { font-size: 14px; padding: 10px 20px; }
     .leaderboard h3 { font-size: 18px; }
     .leaderboard { max-width: 90vw; }
     .hud-score { font-size: 16px; }
     .hud-char { font-size: 20px; }
+    .controls-hint { font-size: 11px; }
   }
 
   @media (max-width: 360px) {
-    .char-select { gap: 10px; }
-    .char-card { width: 42vw; padding: 10px 8px; }
-    .char-card .icon { font-size: 32px; }
+    h1 { font-size: 20px; }
+    .char-card { width: 27vw; padding: 8px 4px; }
+    .char-card .icon { font-size: 26px; }
+    .char-card .name { font-size: 11px; }
+    .char-card .stats { font-size: 9px; }
   }
 </style>
 </head>
