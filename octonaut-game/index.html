@@ -132,7 +132,7 @@ body { font-family: 'Arial', sans-serif; overflow: hidden; touch-action: manipul
 .math-problem { color: white; font-size: 48px; font-weight: bold; margin-bottom: 20px; text-shadow: 0 2px 8px rgba(0,0,0,0.4); }
 
 /* 방향 */
-.direction-grid { display: grid; grid-template-columns: repeat(3, 70px); grid-template-rows: repeat(3, 70px); gap: 8px; }
+.direction-grid { display: grid; grid-template-columns: repeat(3, min(70px, 18vw)); grid-template-rows: repeat(3, min(70px, 18vw)); gap: 8px; }
 .dir-btn { border-radius: 14px; border: 2px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: white; font-size: 30px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .dir-btn:active { background: rgba(255,255,255,0.3); }
 .dir-btn.empty { visibility: hidden; }
@@ -181,11 +181,43 @@ body { font-family: 'Arial', sans-serif; overflow: hidden; touch-action: manipul
 .rescued-animal { font-size: 32px; background: rgba(255,255,255,0.1); padding: 6px; border-radius: 10px; }
 
 @media (max-width: 400px) {
-  .title-logo { font-size: 36px; }
+  .title-logo { font-size: 32px; }
+  .title-sub { font-size: 18px; }
+  .title-char { width: 75px; height: 75px; }
+  .title-chars { gap: 20px; }
+  #start-btn { font-size: 22px; padding: 16px 36px; }
   .mission-grid { gap: 10px; padding: 8px 12px; }
   .mission-icon { font-size: 32px; }
   .match-card { width: 68px; height: 68px; font-size: 30px; }
-  .path-cell { width: 40px; height: 40px; font-size: 18px; }
+  .path-cell { width: 38px; height: 38px; font-size: 16px; }
+  .animal-display { font-size: 50px; }
+  .success-animal { font-size: 60px; }
+  .math-problem { font-size: 36px; }
+  .shadow-target { font-size: 50px; }
+  .shadow-opt { font-size: 36px; }
+  .sort-animal { font-size: 48px; }
+  .sort-bin { width: 90px; height: 90px; }
+  .sort-bin-icon { font-size: 28px; }
+  .color-target { width: 70px; height: 70px; }
+  .color-opt { width: 60px; height: 60px; }
+  .pattern-row { font-size: 30px; gap: 6px; }
+  .pattern-blank { width: 42px; height: 42px; font-size: 24px; }
+  .btn { font-size: 18px; padding: 12px 24px; }
+  .char-display { gap: 16px; }
+  .char-canvas { width: 110px; height: 150px; }
+  .dir-btn { font-size: 24px; }
+  .help-text { font-size: 15px; padding: 8px 14px; }
+  .bubble-area { height: 260px; }
+  .answer-btn { width: 55px; height: 55px; font-size: 22px; }
+}
+
+@media (max-width: 340px) {
+  .title-logo { font-size: 26px; }
+  .sort-bin { width: 75px; height: 75px; }
+  .sort-bins { gap: 10px; }
+  .path-cell { width: 34px; height: 34px; font-size: 14px; }
+  .match-card { width: 58px; height: 58px; font-size: 26px; }
+  .answer-btn { width: 48px; height: 48px; font-size: 20px; }
 }
 </style>
 </head>
@@ -655,7 +687,7 @@ missionHandlers.match = (area, mission) => {
   const cards = [...picked,...picked].sort(()=>Math.random()-0.5);
   let flipped=[], matched=0;
   area.innerHTML = `<div class="animal-display">${mission.animal}</div><div class="help-text">같은 동물 짝을 찾아주세요!</div>`;
-  const grid = document.createElement('div'); grid.className='match-grid'; grid.style.gridTemplateColumns='repeat(4,80px)';
+  const grid = document.createElement('div'); grid.className='match-grid'; const mcSize=Math.min(80,Math.floor((window.innerWidth-80)/4)); grid.style.gridTemplateColumns=`repeat(4,${mcSize}px)`;
   cards.forEach((a,i)=>{
     const c=document.createElement('div'); c.className='match-card'; c.dataset.animal=a; c.dataset.index=i;
     c.innerHTML=`<span class="card-front">${a}</span><span class="card-back">❓</span>`;
@@ -697,7 +729,7 @@ missionHandlers.maze = (area, mission) => {
   const maze=[[0,1,0,0,0,0],[0,1,0,1,1,0],[0,0,0,0,1,0],[0,1,1,0,0,0],[0,0,1,0,1,0],[1,0,0,0,1,0]];
   let pos={r:0,c:0}; const goal={r:5,c:5};
   area.innerHTML = `<div class="help-text">🚢 배를 터치해서 🐙 문어에게 가세요!</div>`;
-  const grid=document.createElement('div'); grid.className='path-grid'; grid.style.gridTemplateColumns='repeat(6,46px)';
+  const grid=document.createElement('div'); grid.className='path-grid'; const pcSize=Math.min(46,Math.floor((window.innerWidth-60)/6)); grid.style.gridTemplateColumns=`repeat(6,${pcSize}px)`;
   function render(){
     grid.innerHTML='';
     for(let r=0;r<6;r++) for(let c=0;c<6;c++){
@@ -797,7 +829,7 @@ missionHandlers.pattern = (area, mission) => {
     let opts=new Set([answer]); while(opts.size<3) opts.add(pool[Math.floor(Math.random()*pool.length)]);
     const btns=document.createElement('div'); btns.className='answer-buttons';
     [...opts].sort(()=>Math.random()-0.5).forEach(o=>{
-      const btn=document.createElement('button'); btn.className='answer-btn'; btn.style.fontSize='28px'; btn.style.width='70px'; btn.style.height='70px'; btn.textContent=o;
+      const btn=document.createElement('button'); btn.className='answer-btn'; const abSize=Math.min(70,Math.floor((window.innerWidth-80)/5)); btn.style.fontSize=abSize>55?'28px':'22px'; btn.style.width=abSize+'px'; btn.style.height=abSize+'px'; btn.textContent=o;
       btn.onclick=()=>{if(o===answer){blank.textContent=answer;blank.style.borderColor='#4ECDC4';round++;setTimeout(next,700);}else{btn.classList.add('wrong');setTimeout(()=>btn.classList.remove('wrong'),400);}};
       btns.appendChild(btn);
     });

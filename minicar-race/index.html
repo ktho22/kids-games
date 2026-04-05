@@ -281,6 +281,34 @@ h1, h2, h3, .btn {
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 .levelup-title { font-size: 2em; margin: 12px 0; }
 .levelup-unlocks { background: rgba(255,255,255,0.5); border-radius: 12px; padding: 12px; margin: 12px 0; }
+
+@media (max-width: 480px) {
+  .game-title { font-size: 2em; }
+  .menu-car { font-size: 4em; }
+  .game-subtitle { font-size: 1em; }
+  .top-bar { padding: 8px 14px; font-size: 0.9em; border-radius: 14px; }
+  .btn { padding: 12px 22px; font-size: 1em; }
+  .card { padding: 14px; }
+  .car-preview { width: 150px; height: 90px; font-size: 3.5em; }
+  .track-card { width: min(200px, 42vw); padding: 12px; }
+  .standing-card { min-width: 120px; padding: 6px 10px; font-size: 0.9em; }
+  .result-card { padding: 24px; }
+  .result-trophy { font-size: 3em; }
+  .result-title { font-size: 1.4em; }
+  .stat-label { width: 70px; font-size: 0.8em; }
+  .shop-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .levelup-card { padding: 24px; }
+  .levelup-star { font-size: 3.5em; }
+  .levelup-title { font-size: 1.5em; }
+}
+
+@media (max-width: 360px) {
+  .game-title { font-size: 1.6em; }
+  .menu-car { font-size: 3em; }
+  .top-bar { padding: 6px 10px; font-size: 0.8em; gap: 4px; }
+  .btn { padding: 10px 16px; font-size: 0.9em; }
+  .track-card { width: 44vw; }
+}
 </style>
 </head>
 <body>
@@ -357,7 +385,7 @@ h1, h2, h3, .btn {
     <span id="raceLap">Lap 1/3</span>
     <span id="raceTimer">0:00</span>
   </div>
-  <canvas id="raceCanvas" width="800" height="500"></canvas>
+  <canvas id="raceCanvas"></canvas>
   <div class="race-standings" id="raceStandings"></div>
 </div>
 
@@ -794,6 +822,11 @@ function startRace(track) {
   const canvas = document.getElementById('raceCanvas');
   const ctx = canvas.getContext('2d');
 
+  // Responsive canvas sizing
+  const maxW = Math.min(800, window.innerWidth - 40);
+  canvas.width = maxW;
+  canvas.height = Math.round(maxW * 0.625);
+
   // Generate track path
   const trackPath = generateTrackPath(track, canvas.width, canvas.height);
 
@@ -894,7 +927,7 @@ function raceCountdown(ctx, canvas) {
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = 'white';
-    ctx.font = 'bold 120px Fredoka One, sans-serif';
+    ctx.font = `bold ${Math.min(120, canvas.width * 0.15)}px Fredoka One, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(count > 0 ? count : 'GO!', canvas.width / 2, canvas.height / 2);

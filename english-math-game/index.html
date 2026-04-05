@@ -19,7 +19,7 @@ body {
 }
 
 /* ===== SCREENS ===== */
-.screen { display: none; width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; }
+.screen { display: none; width: 100%; height: 100vh; position: absolute; top: 0; left: 0; }
 .screen.active { display: flex; }
 
 /* ===== TITLE SCREEN ===== */
@@ -92,8 +92,8 @@ body {
   display: flex; justify-content: center; width: 100%;
   position: relative;
 }
-.stage-row:nth-child(odd) { padding-left: 60px; }
-.stage-row:nth-child(even) { padding-right: 60px; }
+.stage-row:nth-child(odd) { padding-left: min(60px, 15vw); }
+.stage-row:nth-child(even) { padding-right: min(60px, 15vw); }
 
 .stage-btn {
   width: 80px; height: 80px; border-radius: 50%;
@@ -300,10 +300,30 @@ body {
 /* ===== RESPONSIVE ===== */
 @media (max-width: 480px) {
   .game-title { font-size: 36px; }
+  .game-subtitle { font-size: 18px; }
   .btn-play { font-size: 24px; padding: 14px 45px; }
+  .character-title { font-size: 70px; }
+  .title-stars { font-size: 40px; }
   .question-text { font-size: 24px; }
+  .question-image { font-size: 48px; }
   .answer-btn { font-size: 18px; padding: 12px 8px; }
   .stage-btn { width: 65px; height: 65px; font-size: 22px; }
+  .game-content { padding: 28px 18px; }
+  .map-title { font-size: 18px; }
+  .total-stars { font-size: 18px; }
+  .result-title { font-size: 28px; }
+  .result-stars { font-size: 44px; }
+  .feedback-popup { font-size: 56px; }
+}
+
+@media (max-width: 360px) {
+  .game-title { font-size: 28px; }
+  .btn-play { font-size: 20px; padding: 12px 36px; }
+  .stage-btn { width: 55px; height: 55px; font-size: 18px; }
+  .game-content { padding: 20px 12px; }
+  .answer-btn { font-size: 16px; padding: 10px 6px; }
+  .question-text { font-size: 20px; }
+  .map-header { padding: 10px 12px; }
 }
 </style>
 </head>

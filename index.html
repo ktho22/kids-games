@@ -52,6 +52,14 @@
   .game-icon { font-size: 2.4em; }
   .game-title { font-size: 1.3em; font-weight: 700; }
   .game-desc { color: #bbb; font-size: 0.95em; line-height: 1.5; }
+
+  @media (max-width: 480px) {
+    body { padding: 24px 12px; }
+    h1 { font-size: 1.8em; }
+    .subtitle { font-size: 0.95em; margin-bottom: 24px; }
+    .games { grid-template-columns: 1fr; gap: 16px; }
+    .game-card { padding: 20px 16px; }
+  }
 </style>
 </head>
 <body>
