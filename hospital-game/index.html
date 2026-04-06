@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>동물 병원 놀이</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Jua&display=swap');
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family:'Jua','Noto Sans KR',sans-serif;
+  overflow:hidden;
+  touch-action:none;
+  user-select:none;
+  -webkit-user-select:none;
+  width:100vw; height:100vh;
+}
+.screen { display:none; width:100%; height:100%; position:absolute; top:0; left:0; flex-direction:column; align-items:center; justify-content:center; }
+.screen.active { display:flex; }
+
+/* ===== TITLE ===== */
+#title-screen {
+  background: linear-gradient(180deg, #e0f7fa 0%, #fff9c4 50%, #f8bbd0 100%);
+}
+.hospital-building {
+  width:260px; height:220px; background:#fff; border-radius:30px; position:relative;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.1); margin-bottom:20px; border:4px solid #f48fb1;
+}
+.hospital-cross {
+  position:absolute; top:20px; left:50%; transform:translateX(-50%);
+  width:60px; height:60px; background:#ef5350; border-radius:12px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:40px; color:#fff; font-weight:bold;
+  box-shadow: 0 4px 10px rgba(239,83,80,0.4);
+}
+.hospital-windows {
+  position:absolute; top:100px; left:50%; transform:translateX(-50%);
+  display:flex; gap:20px;
+}
+.hospital-window {
+  width:50px; height:50px; background:#81d4fa; border-radius:10px;
+  border:3px solid #4fc3f7;
+}
+.hospital-door {
+  position:absolute; bottom:0; left:50%; transform:translateX(-50%);
+  width:60px; height:70px; background:#f48fb1; border-radius:14px 14px 0 0;
+  border:3px solid #f06292;
+}
+.title-animals {
+  display:flex; gap:10px; margin-bottom:10px; font-size:50px;
+  animation: bounceIn 1s ease;
+}
+.title-text {
+  font-size:42px; color:#e91e63; text-shadow: 2px 2px 0 #fff;
+  margin-bottom:5px; animation: bounceIn 0.8s ease;
+}
+.title-sub {
+  font-size:18px; color:#ad1457; margin-bottom:30px;
+}
+.btn-play {
+  padding:18px 60px; font-size:28px; font-family:'Jua',sans-serif;
+  background: linear-gradient(135deg, #ff6f91, #ff9671); color:#fff;
+  border:none; border-radius:50px; cursor:pointer;
+  box-shadow: 0 6px 20px rgba(255,111,145,0.5);
+  animation: pulse 2s infinite;
+  transition: transform 0.2s;
+}
+.btn-play:active { transform:scale(0.95); }
+
+/* ===== MISSION SELECT ===== */
+#mission-screen {
+  background: linear-gradient(180deg, #e8f5e9 0%, #fff3e0 50%, #fce4ec 100%);
+  padding:20px; overflow-y:auto;
+}
+.mission-title {
+  font-size:32px; color:#2e7d32; margin:10px 0 5px;
+}
+.mission-sub { font-size:16px; color:#666; margin-bottom:15px; }
+.mission-grid {
+  display:grid; grid-template-columns: repeat(2,1fr);
+  gap:14px; width:100%; max-width:400px; padding:0 10px;
+}
+.mission-card {
+  background:#fff; border-radius:24px; padding:16px 10px;
+  display:flex; flex-direction:column; align-items:center; gap:6px;
+  cursor:pointer; transition: all 0.3s; position:relative;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+  border: 3px solid transparent;
+}
+.mission-card:active { transform:scale(0.95); }
+.mission-card[data-unlocked="true"] { border-color:#a5d6a7; }
+.mission-card[data-unlocked="true"]:hover { border-color:#66bb6a; transform:translateY(-3px); }
+.mission-card[data-unlocked="false"] { opacity:0.5; filter:grayscale(0.5); pointer-events:none; }
+.mission-animal { font-size:56px; line-height:1; }
+.mission-name { font-size:16px; font-weight:bold; color:#333; }
+.mission-symptom { font-size:12px; color:#888; }
+.mission-badge {
+  position:absolute; top:8px; right:8px;
+  width:28px; height:28px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; font-size:16px;
+}
+.badge-done { background:#a5d6a7; }
+.badge-locked { background:#e0e0e0; }
+.star-count {
+  font-size:18px; color:#ff9800; margin-top:5px;
+}
+.btn-back {
+  margin-top:15px; padding:12px 40px; font-size:20px; font-family:'Jua',sans-serif;
+  background:#fff; color:#e91e63; border:3px solid #f48fb1;
+  border-radius:30px; cursor:pointer;
+}
+
+/* ===== GAME SCREEN ===== */
+#game-screen {
+  background: linear-gradient(180deg, #e3f2fd 0%, #f3e5f5 100%);
+  padding:15px; overflow:hidden;
+}
+.game-header {
+  width:100%; max-width:420px; display:flex; justify-content:space-between;
+  align-items:center; margin-bottom:10px;
+}
+.game-mission-label {
+  font-size:18px; color:#7b1fa2; background:rgba(255,255,255,0.8);
+  padding:6px 16px; border-radius:20px;
+}
+.game-hearts {
+  display:flex; gap:4px; font-size:22px;
+}
+.game-area {
+  width:100%; max-width:420px; flex:1; background:#fff;
+  border-radius:30px; position:relative; overflow:hidden;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  display:flex; flex-direction:column; align-items:center;
+  padding:15px;
+}
+.patient-area {
+  flex:1; display:flex; flex-direction:column; align-items:center;
+  justify-content:center; gap:8px; width:100%;
+}
+.patient-emoji {
+  font-size:100px; line-height:1; transition: all 0.5s;
+}
+.patient-emoji.sick { filter: hue-rotate(80deg) saturate(0.7); }
+.patient-emoji.happy { animation: celebrate 0.5s ease 3; }
+.patient-name { font-size:22px; color:#333; }
+.patient-says {
+  background:#fff3e0; padding:10px 18px; border-radius:20px;
+  font-size:16px; color:#e65100; max-width:90%;
+  text-align:center; position:relative; border:2px solid #ffe0b2;
+}
+.patient-says::after {
+  content:''; position:absolute; bottom:-10px; left:50%;
+  transform:translateX(-50%); width:0; height:0;
+  border-left:10px solid transparent; border-right:10px solid transparent;
+  border-top:10px solid #ffe0b2;
+}
+.health-bar-container {
+  width:80%; max-width:250px; height:20px; background:#ffcdd2;
+  border-radius:10px; overflow:hidden; border:2px solid #ef9a9a;
+}
+.health-bar {
+  height:100%; background: linear-gradient(90deg, #66bb6a, #a5d6a7);
+  border-radius:10px; transition: width 0.5s ease;
+}
+.phase-label {
+  font-size:20px; color:#7b1fa2; margin:8px 0 5px;
+}
+.tools-area {
+  width:100%; display:flex; flex-wrap:wrap; justify-content:center;
+  gap:10px; padding:10px 0;
+}
+.tool-btn {
+  width:72px; height:72px; border-radius:20px; border:3px solid #e0e0e0;
+  background:#fff; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:2px;
+  cursor:pointer; transition:all 0.2s; font-size:32px;
+}
+.tool-btn span { font-size:10px; color:#666; }
+.tool-btn:active { transform:scale(0.9); }
+.tool-btn.correct { border-color:#66bb6a; background:#e8f5e9; animation:pop 0.4s ease; }
+.tool-btn.wrong { border-color:#ef5350; background:#ffebee; animation:shake 0.4s ease; }
+.tool-btn.highlight { border-color:#ff9800; background:#fff8e1; animation:glow 1s infinite; }
+
+/* ===== RESULT SCREEN ===== */
+#result-screen {
+  background: linear-gradient(180deg, #fff9c4 0%, #f8bbd0 50%, #e1bee7 100%);
+}
+.result-animal { font-size:120px; animation: celebrate 0.6s ease 5; }
+.result-text { font-size:32px; color:#2e7d32; margin:10px 0; }
+.result-stars { font-size:50px; margin:10px 0; }
+.result-msg { font-size:18px; color:#555; margin-bottom:20px; text-align:center; padding:0 20px; }
+.btn-next {
+  padding:14px 50px; font-size:24px; font-family:'Jua',sans-serif;
+  background:linear-gradient(135deg,#66bb6a,#a5d6a7); color:#fff;
+  border:none; border-radius:40px; cursor:pointer;
+  box-shadow: 0 4px 15px rgba(102,187,106,0.4); margin:5px;
+}
+.btn-retry {
+  padding:14px 50px; font-size:24px; font-family:'Jua',sans-serif;
+  background:linear-gradient(135deg,#ff9800,#ffb74d); color:#fff;
+  border:none; border-radius:40px; cursor:pointer;
+  box-shadow: 0 4px 15px rgba(255,152,0,0.4); margin:5px;
+}
+
+/* ===== ANIMATIONS ===== */
+@keyframes bounceIn {
+  0% { transform:scale(0); opacity:0; }
+  60% { transform:scale(1.15); }
+  100% { transform:scale(1); opacity:1; }
+}
+@keyframes pulse {
+  0%,100% { transform:scale(1); }
+  50% { transform:scale(1.06); }
+}
+@keyframes celebrate {
+  0%,100% { transform:rotate(0deg) scale(1); }
+  25% { transform:rotate(-10deg) scale(1.1); }
+  75% { transform:rotate(10deg) scale(1.1); }
+}
+@keyframes pop {
+  0% { transform:scale(1); }
+  50% { transform:scale(1.2); }
+  100% { transform:scale(1); }
+}
+@keyframes shake {
+  0%,100% { transform:translateX(0); }
+  25% { transform:translateX(-6px); }
+  75% { transform:translateX(6px); }
+}
+@keyframes glow {
+  0%,100% { box-shadow: 0 0 5px rgba(255,152,0,0.3); }
+  50% { box-shadow: 0 0 20px rgba(255,152,0,0.6); }
+}
+@keyframes float {
+  0%,100% { transform:translateY(0); }
+  50% { transform:translateY(-10px); }
+}
+@keyframes confettiFall {
+  0% { transform:translateY(-10px) rotate(0deg); opacity:1; }
+  100% { transform:translateY(100vh) rotate(720deg); opacity:0; }
+}
+.confetti {
+  position:fixed; top:0; font-size:24px; z-index:999;
+  animation: confettiFall 3s ease-in forwards;
+}
+.floating { animation: float 2s ease-in-out infinite; }
+</style>
+</head>
+<body>
+
+<!-- TITLE SCREEN -->
+<div id="title-screen" class="screen active">
+  <div class="title-animals">
+    <span class="floating" style="animation-delay:0s">🐻</span>
+    <span class="floating" style="animation-delay:0.3s">🐰</span>
+    <span class="floating" style="animation-delay:0.6s">🐱</span>
+    <span class="floating" style="animation-delay:0.9s">🐶</span>
+    <span class="floating" style="animation-delay:1.2s">🐸</span>
+  </div>
+  <div class="hospital-building">
+    <div class="hospital-cross">+</div>
+    <div class="hospital-windows">
+      <div class="hospital-window"></div>
+      <div class="hospital-window"></div>
+    </div>
+    <div class="hospital-door"></div>
+  </div>
+  <div class="title-text">동물 병원 놀이</div>
+  <div class="title-sub">아픈 동물 친구들을 치료해주세요!</div>
+  <button class="btn-play" onclick="showScreen('mission-screen'); renderMissions();">시작하기</button>
+</div>
+
+<!-- MISSION SELECT -->
+<div id="mission-screen" class="screen">
+  <div class="mission-title">환자를 골라주세요!</div>
+  <div class="mission-sub">아픈 동물 친구들이 기다리고 있어요</div>
+  <div class="mission-grid" id="mission-grid"></div>
+  <button class="btn-back" onclick="showScreen('title-screen')">뒤로가기</button>
+</div>
+
+<!-- GAME SCREEN -->
+<div id="game-screen" class="screen">
+  <div class="game-header">
+    <div class="game-mission-label" id="game-label"></div>
+    <div class="game-hearts" id="game-hearts"></div>
+  </div>
+  <div class="game-area" id="game-area">
+    <div class="patient-area" id="patient-area"></div>
+    <div class="phase-label" id="phase-label"></div>
+    <div class="tools-area" id="tools-area"></div>
+  </div>
+</div>
+
+<!-- RESULT SCREEN -->
+<div id="result-screen" class="screen">
+  <div class="result-animal" id="result-animal"></div>
+  <div class="result-text" id="result-text"></div>
+  <div class="result-stars" id="result-stars"></div>
+  <div class="result-msg" id="result-msg"></div>
+  <div>
+    <button class="btn-next" id="btn-next-mission" onclick="nextMission()">다음 환자</button>
+    <button class="btn-retry" onclick="retryMission()">다시 하기</button>
+  </div>
+  <button class="btn-back" onclick="showScreen('mission-screen'); renderMissions();" style="margin-top:10px;">미션 선택</button>
+</div>
+
+<script>
+// ===== GAME DATA =====
+const missions = [
+  {
+    id:0, animal:'🐻', name:'곰돌이', color:'#8d6e63',
+    symptom:'열이 나요', sickMsg:'으으... 머리가 뜨거워요... 🤒',
+    phases:[
+      { label:'진찰하기', instruction:'체온을 재볼까요?',
+        tools:[
+          {emoji:'🌡️',name:'체온계',correct:true},
+          {emoji:'🔦',name:'불빛',correct:false},
+          {emoji:'🩺',name:'청진기',correct:false},
+        ],
+        response:'앗! 38.5도! 열이 높아요!' },
+      { label:'치료하기', instruction:'열을 낮춰줄 약을 줄까요?',
+        tools:[
+          {emoji:'💊',name:'해열제',correct:true},
+          {emoji:'🩹',name:'반창고',correct:false},
+          {emoji:'💉',name:'주사',correct:false},
+        ],
+        response:'약을 먹었어요! 조금 나아지는 것 같아요!' },
+      { label:'마무리', instruction:'이마를 시원하게 해줘요!',
+        tools:[
+          {emoji:'🧊',name:'얼음팩',correct:true},
+          {emoji:'🧤',name:'장갑',correct:false},
+          {emoji:'🧣',name:'목도리',correct:false},
+        ],
+        response:'시원해요~ 고마워요 선생님!' }
+    ],
+    curedMsg:'곰돌이가 완전히 나았어요! 🎉'
+  },
+  {
+    id:1, animal:'🐰', name:'토끼', color:'#ef9a9a',
+    symptom:'발을 다쳤어요', sickMsg:'깡총깡총 뛰다가 발을 삐었어요... 🦶',
+    phases:[
+      { label:'진찰하기', instruction:'어디가 아픈지 살펴볼까요?',
+        tools:[
+          {emoji:'🔍',name:'돋보기',correct:true},
+          {emoji:'🌡️',name:'체온계',correct:false},
+          {emoji:'💊',name:'알약',correct:false},
+        ],
+        response:'앗! 발목이 많이 부었어요!' },
+      { label:'치료하기', instruction:'부은 곳에 뭘 발라줄까요?',
+        tools:[
+          {emoji:'🧴',name:'연고',correct:true},
+          {emoji:'🧊',name:'얼음팩',correct:false},
+          {emoji:'💉',name:'주사',correct:false},
+        ],
+        response:'연고를 발랐어요! 시원해요~' },
+      { label:'마무리', instruction:'발을 감싸줘요!',
+        tools:[
+          {emoji:'🩹',name:'붕대',correct:true},
+          {emoji:'🧤',name:'장갑',correct:false},
+          {emoji:'🧦',name:'양말',correct:false},
+        ],
+        response:'붕대를 감았어요! 이제 괜찮아요!' }
+    ],
+    curedMsg:'토끼가 다시 깡총깡총 뛸 수 있어요! 🥕'
+  },
+  {
+    id:2, animal:'🐱', name:'고양이', color:'#ffcc80',
+    symptom:'배가 아파요', sickMsg:'야옹... 배가 너무 아파요... 😿',
+    phases:[
+      { label:'진찰하기', instruction:'배 소리를 들어볼까요?',
+        tools:[
+          {emoji:'🩺',name:'청진기',correct:true},
+          {emoji:'🔦',name:'불빛',correct:false},
+          {emoji:'🔍',name:'돋보기',correct:false},
+        ],
+        response:'꾸르륵~ 배에서 이상한 소리가 나요!' },
+      { label:'치료하기', instruction:'배 아픈 약을 줄까요?',
+        tools:[
+          {emoji:'💊',name:'소화제',correct:true},
+          {emoji:'🩹',name:'반창고',correct:false},
+          {emoji:'🧴',name:'연고',correct:false},
+        ],
+        response:'약을 먹었더니 배가 편해졌어요!' },
+      { label:'마무리', instruction:'따뜻하게 해줘요!',
+        tools:[
+          {emoji:'🧸',name:'핫팩',correct:true},
+          {emoji:'🧊',name:'얼음팩',correct:false},
+          {emoji:'💉',name:'주사',correct:false},
+        ],
+        response:'따뜻해요~ 배가 안 아파요!' }
+    ],
+    curedMsg:'고양이가 기분 좋게 야옹~ 하고 있어요! 😺'
+  },
+  {
+    id:3, animal:'🐶', name:'강아지', color:'#a1887f',
+    symptom:'기침을 해요', sickMsg:'멍멍! 콜록콜록... 목이 아파요 🤧',
+    phases:[
+      { label:'진찰하기', instruction:'목 안을 살펴볼까요?',
+        tools:[
+          {emoji:'🔦',name:'불빛',correct:true},
+          {emoji:'🌡️',name:'체온계',correct:false},
+          {emoji:'🩺',name:'청진기',correct:false},
+        ],
+        response:'목이 빨갛게 부어있어요!' },
+      { label:'치료하기', instruction:'목에 좋은 시럽을 줄까요?',
+        tools:[
+          {emoji:'🧃',name:'시럽',correct:true},
+          {emoji:'💊',name:'알약',correct:false},
+          {emoji:'🧴',name:'연고',correct:false},
+        ],
+        response:'달콤한 시럽! 목이 편해졌어요!' },
+      { label:'마무리', instruction:'목을 따뜻하게 감싸줘요!',
+        tools:[
+          {emoji:'🧣',name:'목도리',correct:true},
+          {emoji:'🧤',name:'장갑',correct:false},
+          {emoji:'🩹',name:'반창고',correct:false},
+        ],
+        response:'따뜻해요~ 기침이 멈췄어요!' }
+    ],
+    curedMsg:'강아지가 신나게 꼬리를 흔들고 있어요! 🐕'
+  },
+  {
+    id:4, animal:'🐸', name:'개구리', color:'#a5d6a7',
+    symptom:'감기에 걸렸어요', sickMsg:'개굴... 에취! 콧물이 줄줄... 🤧',
+    phases:[
+      { label:'진찰하기', instruction:'체온을 재볼까요?',
+        tools:[
+          {emoji:'🌡️',name:'체온계',correct:true},
+          {emoji:'🔍',name:'돋보기',correct:false},
+          {emoji:'🔦',name:'불빛',correct:false},
+        ],
+        response:'37.8도! 미열이 있어요!' },
+      { label:'치료하기', instruction:'감기약을 줄까요?',
+        tools:[
+          {emoji:'💊',name:'감기약',correct:true},
+          {emoji:'🧴',name:'연고',correct:false},
+          {emoji:'🩹',name:'반창고',correct:false},
+        ],
+        response:'약을 먹었어요! 에취가 줄었어요!' },
+      { label:'마무리', instruction:'따뜻한 담요를 덮어줘요!',
+        tools:[
+          {emoji:'🛏️',name:'담요',correct:true},
+          {emoji:'🧊',name:'얼음팩',correct:false},
+          {emoji:'🧤',name:'장갑',correct:false},
+        ],
+        response:'포근해요~ 감기가 다 나았어요!' }
+    ],
+    curedMsg:'개구리가 신나게 개굴개굴 노래해요! 🎵'
+  },
+  {
+    id:5, animal:'🐧', name:'펭귄', color:'#90a4ae',
+    symptom:'날개를 다쳤어요', sickMsg:'뒤뚱뒤뚱... 날개가 아파요... 😢',
+    phases:[
+      { label:'진찰하기', instruction:'날개를 살펴볼까요?',
+        tools:[
+          {emoji:'🔍',name:'돋보기',correct:true},
+          {emoji:'🌡️',name:'체온계',correct:false},
+          {emoji:'🩺',name:'청진기',correct:false},
+        ],
+        response:'날개에 작은 상처가 있어요!' },
+      { label:'치료하기', instruction:'상처를 깨끗이 해줘요!',
+        tools:[
+          {emoji:'🧴',name:'소독약',correct:true},
+          {emoji:'💊',name:'알약',correct:false},
+          {emoji:'🧃',name:'시럽',correct:false},
+        ],
+        response:'소독했어요! 따끔했지만 괜찮아요!' },
+      { label:'마무리', instruction:'반창고를 붙여줘요!',
+        tools:[
+          {emoji:'🩹',name:'반창고',correct:true},
+          {emoji:'🧣',name:'목도리',correct:false},
+          {emoji:'🛏️',name:'담요',correct:false},
+        ],
+        response:'반창고를 붙였어요! 다 나았어요!' }
+    ],
+    curedMsg:'펭귄이 신나게 뒤뚱뒤뚱 춤을 춰요! 💃'
+  }
+];
+
+// ===== STATE =====
+let state = {
+  currentMission: 0,
+  currentPhase: 0,
+  hearts: 3,
+  mistakes: 0,
+  completed: JSON.parse(localStorage.getItem('hospital-completed') || '[]'),
+  stars: JSON.parse(localStorage.getItem('hospital-stars') || '{}'),
+};
+
+// ===== SCREENS =====
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ===== MISSIONS =====
+function renderMissions() {
+  const grid = document.getElementById('mission-grid');
+  grid.innerHTML = '';
+  missions.forEach((m, i) => {
+    const unlocked = i === 0 || state.completed.includes(i - 1);
+    const done = state.completed.includes(i);
+    const card = document.createElement('div');
+    card.className = 'mission-card';
+    card.dataset.unlocked = unlocked;
+    card.innerHTML = `
+      <div class="mission-badge ${done ? 'badge-done' : 'badge-locked'}">${done ? '⭐' : '🔒'}</div>
+      <div class="mission-animal">${m.animal}</div>
+      <div class="mission-name">${m.name}</div>
+      <div class="mission-symptom">${m.symptom}</div>
+      ${state.stars[i] ? '<div class="star-count">' + '⭐'.repeat(state.stars[i]) + '</div>' : ''}
+    `;
+    if (unlocked) {
+      card.onclick = () => startMission(i);
+      if (!done) card.dataset.unlocked = 'true';
+    }
+    grid.appendChild(card);
+  });
+}
+
+// ===== START MISSION =====
+function startMission(idx) {
+  state.currentMission = idx;
+  state.currentPhase = 0;
+  state.hearts = 3;
+  state.mistakes = 0;
+  showScreen('game-screen');
+  renderGame();
+}
+
+function renderGame() {
+  const m = missions[state.currentMission];
+  const phase = m.phases[state.currentPhase];
+
+  document.getElementById('game-label').textContent = m.name + ' 치료';
+  document.getElementById('game-hearts').innerHTML = '❤️'.repeat(state.hearts) + '🖤'.repeat(3 - state.hearts);
+
+  const isSick = state.currentPhase < m.phases.length;
+  const patientArea = document.getElementById('patient-area');
+  patientArea.innerHTML = `
+    <div class="patient-emoji ${isSick ? 'sick floating' : 'happy'}">${m.animal}</div>
+    <div class="patient-name">${m.name}</div>
+    <div class="health-bar-container">
+      <div class="health-bar" style="width:${Math.round((state.currentPhase / m.phases.length) * 100)}%"></div>
+    </div>
+    <div class="patient-says">${state.currentPhase === 0 ? m.sickMsg : phase.instruction}</div>
+  `;
+
+  document.getElementById('phase-label').textContent =
+    phase.label + ' (' + (state.currentPhase + 1) + '/' + m.phases.length + ')';
+
+  const toolsArea = document.getElementById('tools-area');
+  const shuffled = [...phase.tools].sort(() => Math.random() - 0.5);
+  toolsArea.innerHTML = '';
+  shuffled.forEach(t => {
+    const btn = document.createElement('div');
+    btn.className = 'tool-btn';
+    btn.innerHTML = `${t.emoji}<span>${t.name}</span>`;
+    btn.onclick = () => selectTool(btn, t);
+    toolsArea.appendChild(btn);
+  });
+
+  // Hint: highlight correct after 5 seconds
+  setTimeout(() => {
+    const btns = toolsArea.querySelectorAll('.tool-btn');
+    btns.forEach(b => {
+      const name = b.querySelector('span').textContent;
+      const tool = phase.tools.find(t => t.name === name);
+      if (tool && tool.correct && !b.classList.contains('correct') && !b.classList.contains('wrong')) {
+        b.classList.add('highlight');
+      }
+    });
+  }, 5000);
+}
+
+function selectTool(btn, tool) {
+  if (btn.classList.contains('correct') || btn.classList.contains('wrong')) return;
+
+  const m = missions[state.currentMission];
+  const phase = m.phases[state.currentPhase];
+
+  if (tool.correct) {
+    btn.classList.add('correct');
+    // Show response
+    const says = document.querySelector('.patient-says');
+    if (says) says.textContent = phase.response;
+
+    // Disable all buttons
+    document.querySelectorAll('.tool-btn').forEach(b => b.style.pointerEvents = 'none');
+
+    // Next phase after delay
+    setTimeout(() => {
+      state.currentPhase++;
+      if (state.currentPhase >= m.phases.length) {
+        finishMission();
+      } else {
+        renderGame();
+      }
+    }, 1500);
+  } else {
+    btn.classList.add('wrong');
+    state.mistakes++;
+    state.hearts = Math.max(0, 3 - state.mistakes);
+    document.getElementById('game-hearts').innerHTML = '❤️'.repeat(state.hearts) + '🖤'.repeat(3 - state.hearts);
+
+    if (state.hearts <= 0) {
+      setTimeout(() => failMission(), 800);
+    }
+  }
+}
+
+// ===== FINISH =====
+function finishMission() {
+  const m = missions[state.currentMission];
+  const stars = state.hearts; // stars = remaining hearts
+
+  if (!state.completed.includes(state.currentMission)) {
+    state.completed.push(state.currentMission);
+  }
+  state.stars[state.currentMission] = Math.max(state.stars[state.currentMission] || 0, stars);
+
+  localStorage.setItem('hospital-completed', JSON.stringify(state.completed));
+  localStorage.setItem('hospital-stars', JSON.stringify(state.stars));
+
+  showScreen('result-screen');
+  document.getElementById('result-animal').textContent = m.animal;
+  document.getElementById('result-text').textContent = '치료 완료!';
+  document.getElementById('result-stars').textContent = '⭐'.repeat(stars) + '☆'.repeat(3 - stars);
+  document.getElementById('result-msg').textContent = m.curedMsg;
+  document.getElementById('btn-next-mission').style.display =
+    state.currentMission < missions.length - 1 ? 'inline-block' : 'none';
+
+  spawnConfetti();
+}
+
+function failMission() {
+  const m = missions[state.currentMission];
+  showScreen('result-screen');
+  document.getElementById('result-animal').textContent = m.animal;
+  document.getElementById('result-text').textContent = '다시 해볼까요?';
+  document.getElementById('result-stars').textContent = '😢';
+  document.getElementById('result-msg').textContent = m.name + '가 아직 아파요... 다시 치료해주세요!';
+  document.getElementById('btn-next-mission').style.display = 'none';
+}
+
+function nextMission() {
+  if (state.currentMission < missions.length - 1) {
+    startMission(state.currentMission + 1);
+  }
+}
+
+function retryMission() {
+  startMission(state.currentMission);
+}
+
+// ===== CONFETTI =====
+function spawnConfetti() {
+  const emojis = ['🎉','🌟','⭐','💖','🎀','🌈','✨','🎊'];
+  for (let i = 0; i < 20; i++) {
+    setTimeout(() => {
+      const c = document.createElement('div');
+      c.className = 'confetti';
+      c.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+      c.style.left = Math.random() * 100 + 'vw';
+      c.style.animationDuration = (2 + Math.random() * 2) + 's';
+      c.style.animationDelay = '0s';
+      document.body.appendChild(c);
+      setTimeout(() => c.remove(), 4000);
+    }, i * 100);
+  }
+}
+</script>
+</body>
+</html>
