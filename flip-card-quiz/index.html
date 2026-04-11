@@ -1,14 +1,14 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>플립카드 퀴즈</title>
+<title>Flip Card Quiz</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Jua&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&display=swap');
 * { margin:0; padding:0; box-sizing:border-box; }
 html, body {
-  font-family:'Jua','Noto Sans KR',sans-serif;
+  font-family:'Fredoka','Segoe UI',sans-serif;
   overflow:hidden;
   touch-action:manipulation;
   user-select:none;
@@ -141,7 +141,7 @@ h1 {
   filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));
 }
 .card-question {
-  font-size:1.4em;
+  font-size:1.35em;
   text-align:center;
   line-height:1.45;
   color:#4a4a4a;
@@ -156,7 +156,7 @@ h1 {
   font-size:2.2em;
   text-align:center;
   color:#2d7a46;
-  font-weight:bold;
+  font-weight:600;
 }
 .tap-hint {
   position:absolute;
@@ -194,7 +194,7 @@ h1 {
 
 @media (max-width: 480px) {
   h1 { font-size:1.4em; }
-  .card-question { font-size:1.2em; }
+  .card-question { font-size:1.15em; }
   .card-answer { font-size:1.9em; }
   .card-icon { font-size:3.8em; }
   .card-answer-emoji { font-size:4.8em; }
@@ -251,15 +251,15 @@ h1 {
 </head>
 <body>
   <header>
-    <a class="back" href="../">← 뒤로</a>
-    <h1>플립카드 퀴즈</h1>
+    <a class="back" href="../">← Back</a>
+    <h1>Flip Card Quiz</h1>
     <div class="spacer"></div>
   </header>
 
   <div class="progress-wrap">
     <div class="progress-text">
       <span id="progress-label">1 / 50</span>
-      <span id="seen-label">본 카드 0</span>
+      <span id="seen-label">Seen 0</span>
     </div>
     <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
   </div>
@@ -269,85 +269,85 @@ h1 {
       <div class="face front">
         <div class="card-label">QUIZ</div>
         <div class="card-icon" id="front-icon">❓</div>
-        <div class="card-question" id="question-text">문제를 불러오는 중...</div>
-        <div class="tap-hint">카드를 탭해서 정답 확인!</div>
+        <div class="card-question" id="question-text">Loading question...</div>
+        <div class="tap-hint">Tap the card to see the answer!</div>
       </div>
       <div class="face back">
-        <div class="card-label">정답</div>
+        <div class="card-label">ANSWER</div>
         <div class="card-answer-emoji" id="answer-emoji">🎉</div>
-        <div class="card-answer" id="answer-text">정답</div>
-        <div class="tap-hint">탭하면 다시 문제로!</div>
+        <div class="card-answer" id="answer-text">Answer</div>
+        <div class="tap-hint">Tap to flip back!</div>
       </div>
     </div>
   </div>
 
   <div class="controls">
-    <button class="btn prev" id="btn-prev">◀ 이전</button>
-    <button class="btn shuffle" id="btn-shuffle">🔀 섞기</button>
-    <button class="btn next" id="btn-next">다음 ▶</button>
+    <button class="btn prev" id="btn-prev">◀ Prev</button>
+    <button class="btn shuffle" id="btn-shuffle">🔀 Shuffle</button>
+    <button class="btn next" id="btn-next">Next ▶</button>
   </div>
 
   <div class="done-overlay" id="done-overlay">
     <div class="done-card">
       <div class="emoji">🏆</div>
-      <h2>모두 풀었어요!</h2>
-      <p>50개 퀴즈를 모두 확인했어요.<br>다시 도전해볼까요?</p>
-      <button id="btn-restart">다시 시작</button>
+      <h2>All Done!</h2>
+      <p>You've gone through all 50 cards.<br>Want to try again?</p>
+      <button id="btn-restart">Play Again</button>
     </div>
   </div>
 
 <script>
 const QUIZZES = [
-  { q: "나는 동굴에 살고 거꾸로 매달려 있어요. 나는 누구일까요?", a: "박쥐", emoji: "🦇" },
-  { q: "나는 바다 깊은 곳에 살고 밝게 빛을 내요. 나는 누구일까요?", a: "아귀", emoji: "🐠" },
-  { q: "나는 목이 아주 길어서 높은 나뭇잎을 먹을 수 있어요. 나는 누구일까요?", a: "기린", emoji: "🦒" },
-  { q: "나는 긴 코로 물을 뿜고 커다란 귀를 가졌어요. 나는 누구일까요?", a: "코끼리", emoji: "🐘" },
-  { q: "나는 오렌지색 털에 검은 줄무늬가 있어요. 나는 누구일까요?", a: "호랑이", emoji: "🐯" },
-  { q: "나는 멋진 갈기를 가진 초원의 왕이에요. 나는 누구일까요?", a: "사자", emoji: "🦁" },
-  { q: "나는 단단한 집을 등에 지고 느리게 걸어요. 나는 누구일까요?", a: "거북이", emoji: "🐢" },
-  { q: "나는 깡충깡충 뛰고 배에 아기 주머니가 있어요. 나는 누구일까요?", a: "캥거루", emoji: "🦘" },
-  { q: "나는 대나무를 가장 좋아하는 흑백 곰이에요. 나는 누구일까요?", a: "판다", emoji: "🐼" },
-  { q: "나는 윙윙 소리를 내며 꽃에서 꿀을 모아요. 나는 누구일까요?", a: "꿀벌", emoji: "🐝" },
-  { q: "나는 거미줄을 짜서 먹이를 잡아요. 나는 누구일까요?", a: "거미", emoji: "🕷️" },
-  { q: "나는 꼬리를 흔들며 멍멍 짖는 사람의 가장 친한 친구예요. 나는 누구일까요?", a: "강아지", emoji: "🐶" },
-  { q: "나는 야옹 하고 울며 생선을 좋아해요. 나는 누구일까요?", a: "고양이", emoji: "🐱" },
-  { q: "나는 긴 귀를 가지고 당근을 좋아해요. 나는 누구일까요?", a: "토끼", emoji: "🐰" },
-  { q: "나는 꿀꿀 소리 내는 분홍색 농장 친구예요. 나는 누구일까요?", a: "돼지", emoji: "🐷" },
-  { q: "나는 음매 하고 울며 우유를 만들어 줘요. 나는 누구일까요?", a: "젖소", emoji: "🐮" },
-  { q: "나는 아침마다 꼬끼오 하고 울어요. 나는 누구일까요?", a: "수탉", emoji: "🐔" },
-  { q: "나는 연못에서 개굴개굴 노래해요. 나는 누구일까요?", a: "개구리", emoji: "🐸" },
-  { q: "나는 물 위에서 꽥꽥 거리며 헤엄쳐요. 나는 누구일까요?", a: "오리", emoji: "🦆" },
-  { q: "나는 여덟 개의 다리로 헤엄치고 먹물을 뿜어요. 나는 누구일까요?", a: "문어", emoji: "🐙" },
-  { q: "나는 날카로운 이빨을 가진 바다의 사냥꾼이에요. 나는 누구일까요?", a: "상어", emoji: "🦈" },
-  { q: "나는 바다에서 가장 큰 동물이에요. 나는 누구일까요?", a: "고래", emoji: "🐋" },
-  { q: "나는 빨간 집게로 옆걸음질을 쳐요. 나는 누구일까요?", a: "게", emoji: "🦀" },
-  { q: "나는 혹을 가지고 사막을 걸어 다녀요. 나는 누구일까요?", a: "낙타", emoji: "🐫" },
-  { q: "나는 북극에 사는 하얀 곰이에요. 나는 누구일까요?", a: "북극곰", emoji: "🐻‍❄️" },
-  { q: "나는 남극에 살고 턱시도를 입은 것처럼 보여요. 나는 누구일까요?", a: "펭귄", emoji: "🐧" },
-  { q: "나는 나무를 잘 타고 바나나를 정말 좋아해요. 나는 누구일까요?", a: "원숭이", emoji: "🐵" },
-  { q: "나는 밤에 활동하며 부엉부엉 울어요. 나는 누구일까요?", a: "부엉이", emoji: "🦉" },
-  { q: "나는 빨간 몸에 검은 점이 있는 작은 곤충이에요. 나는 누구일까요?", a: "무당벌레", emoji: "🐞" },
-  { q: "나는 알록달록한 날개로 꽃에서 꽃으로 날아다녀요. 나는 누구일까요?", a: "나비", emoji: "🦋" },
-  { q: "나는 도토리를 모으고 풍성한 꼬리를 가졌어요. 나는 누구일까요?", a: "다람쥐", emoji: "🐿️" },
-  { q: "나는 뿔이 있고 산타 할아버지의 썰매를 끌어요. 나는 누구일까요?", a: "순록", emoji: "🦌" },
-  { q: "나는 검은색과 흰색 줄무늬가 있는 말처럼 생겼어요. 나는 누구일까요?", a: "얼룩말", emoji: "🦓" },
-  { q: "나는 온몸이 뾰족한 가시로 덮여 있어요. 나는 누구일까요?", a: "고슴도치", emoji: "🦔" },
-  { q: "나는 다리 없이 배로 기어 다녀요. 나는 누구일까요?", a: "뱀", emoji: "🐍" },
-  { q: "나는 큰 날개를 펼쳐 하늘 높이 나는 용감한 새예요. 나는 누구일까요?", a: "독수리", emoji: "🦅" },
-  { q: "나는 하얀 깃털과 긴 목을 가진 우아한 새예요. 나는 누구일까요?", a: "백조", emoji: "🦢" },
-  { q: "나는 눈이 작고 땅속에 굴을 파며 살아요. 나는 누구일까요?", a: "두더지", emoji: "🐁" },
-  { q: "나는 바다에 사는 다섯 갈래의 별 모양이에요. 나는 누구일까요?", a: "불가사리", emoji: "⭐" },
-  { q: "나는 알록달록한 깃털로 사람의 말을 따라 해요. 나는 누구일까요?", a: "앵무새", emoji: "🦜" },
-  { q: "나는 세상에서 가장 빠르게 달리는 고양이과 동물이에요. 나는 누구일까요?", a: "치타", emoji: "🐆" },
-  { q: "나는 항상 웃고 있는 바다의 똑똑한 친구예요. 나는 누구일까요?", a: "돌고래", emoji: "🐬" },
-  { q: "나는 볼이 빵빵한 작고 귀여운 설치류예요. 나는 누구일까요?", a: "햄스터", emoji: "🐹" },
-  { q: "나는 두꺼운 회색 피부와 커다란 뿔을 가졌어요. 나는 누구일까요?", a: "코뿔소", emoji: "🦏" },
-  { q: "나는 진흙을 좋아하고 입을 아주 크게 벌려요. 나는 누구일까요?", a: "하마", emoji: "🦛" },
-  { q: "나는 나무에 거꾸로 매달려 아주 느리게 움직여요. 나는 누구일까요?", a: "나무늘보", emoji: "🦥" },
-  { q: "나는 호주에 살며 유칼립투스 잎을 먹어요. 나는 누구일까요?", a: "코알라", emoji: "🐨" },
-  { q: "나는 바다에 살며 수염이 있고 헤엄을 아주 잘 쳐요. 나는 누구일까요?", a: "바다표범", emoji: "🦭" },
-  { q: "나는 커다란 앞니로 나무를 갉아 댐을 만들어요. 나는 누구일까요?", a: "비버", emoji: "🦫" },
-  { q: "나는 물속에 살고 긴 촉수와 투명한 몸을 가졌어요. 나는 누구일까요?", a: "해파리", emoji: "🪼" }
+  { q: "I live in a cave and hang upside down. Who am I?", a: "Bat", emoji: "🦇" },
+  { q: "I live deep in the sea and shine with a bright light. Who am I?", a: "Anglerfish", emoji: "🐠" },
+  { q: "I have a very long neck so I can eat leaves from tall trees. Who am I?", a: "Giraffe", emoji: "🦒" },
+  { q: "I spray water with my long trunk and have huge ears. Who am I?", a: "Elephant", emoji: "🐘" },
+  { q: "I have orange fur with black stripes. Who am I?", a: "Tiger", emoji: "🐯" },
+  { q: "I am the king of the savanna with a splendid mane. Who am I?", a: "Lion", emoji: "🦁" },
+  { q: "I walk slowly carrying a hard shell on my back. Who am I?", a: "Turtle", emoji: "🐢" },
+  { q: "I hop around and carry my baby in a pouch. Who am I?", a: "Kangaroo", emoji: "🦘" },
+  { q: "I'm a black-and-white bear who loves to munch on bamboo. Who am I?", a: "Panda", emoji: "🐼" },
+  { q: "I buzz around flowers and gather honey. Who am I?", a: "Bee", emoji: "🐝" },
+  { q: "I weave a web to catch my food. Who am I?", a: "Spider", emoji: "🕷️" },
+  { q: "I wag my tail, bark, and am a person's best friend. Who am I?", a: "Dog", emoji: "🐶" },
+  { q: "I say meow and love to eat fish. Who am I?", a: "Cat", emoji: "🐱" },
+  { q: "I have long ears and love to munch on carrots. Who am I?", a: "Rabbit", emoji: "🐰" },
+  { q: "I'm a pink farm animal who says oink. Who am I?", a: "Pig", emoji: "🐷" },
+  { q: "I say moo and give you milk. Who am I?", a: "Cow", emoji: "🐮" },
+  { q: "I crow every morning when the sun comes up. Who am I?", a: "Rooster", emoji: "🐔" },
+  { q: "I sing ribbit-ribbit in the pond. Who am I?", a: "Frog", emoji: "🐸" },
+  { q: "I quack and swim on the water. Who am I?", a: "Duck", emoji: "🦆" },
+  { q: "I swim with eight arms and squirt ink. Who am I?", a: "Octopus", emoji: "🐙" },
+  { q: "I'm a hunter of the sea with rows of sharp teeth. Who am I?", a: "Shark", emoji: "🦈" },
+  { q: "I'm the biggest animal in the ocean. Who am I?", a: "Whale", emoji: "🐋" },
+  { q: "I walk sideways with my red claws. Who am I?", a: "Crab", emoji: "🦀" },
+  { q: "I cross the desert with humps on my back. Who am I?", a: "Camel", emoji: "🐫" },
+  { q: "I'm a white bear who lives in the Arctic. Who am I?", a: "Polar Bear", emoji: "🐻‍❄️" },
+  { q: "I live in Antarctica and look like I'm wearing a tuxedo. Who am I?", a: "Penguin", emoji: "🐧" },
+  { q: "I climb trees really well and love bananas. Who am I?", a: "Monkey", emoji: "🐵" },
+  { q: "I'm active at night and hoot in the dark. Who am I?", a: "Owl", emoji: "🦉" },
+  { q: "I'm a tiny insect with a red body and black dots. Who am I?", a: "Ladybug", emoji: "🐞" },
+  { q: "I flutter from flower to flower with colorful wings. Who am I?", a: "Butterfly", emoji: "🦋" },
+  { q: "I gather acorns and have a big bushy tail. Who am I?", a: "Squirrel", emoji: "🐿️" },
+  { q: "I have antlers and pull Santa's sleigh. Who am I?", a: "Reindeer", emoji: "🦌" },
+  { q: "I look like a horse with black and white stripes. Who am I?", a: "Zebra", emoji: "🦓" },
+  { q: "My whole body is covered with sharp spines. Who am I?", a: "Hedgehog", emoji: "🦔" },
+  { q: "I have no legs and slither on my belly. Who am I?", a: "Snake", emoji: "🐍" },
+  { q: "I spread my huge wings and soar high in the sky. Who am I?", a: "Eagle", emoji: "🦅" },
+  { q: "I'm an elegant bird with white feathers and a long neck. Who am I?", a: "Swan", emoji: "🦢" },
+  { q: "I have tiny eyes and dig tunnels underground. Who am I?", a: "Mole", emoji: "🐁" },
+  { q: "I live in the sea and I'm shaped like a five-pointed star. Who am I?", a: "Starfish", emoji: "⭐" },
+  { q: "I have colorful feathers and can copy human speech. Who am I?", a: "Parrot", emoji: "🦜" },
+  { q: "I'm the fastest running cat in the world. Who am I?", a: "Cheetah", emoji: "🐆" },
+  { q: "I'm a clever ocean friend who always looks like I'm smiling. Who am I?", a: "Dolphin", emoji: "🐬" },
+  { q: "I'm a tiny cute rodent with puffy cheeks. Who am I?", a: "Hamster", emoji: "🐹" },
+  { q: "I have thick gray skin and a big pointy horn. Who am I?", a: "Rhinoceros", emoji: "🦏" },
+  { q: "I love mud and open my mouth super wide. Who am I?", a: "Hippopotamus", emoji: "🦛" },
+  { q: "I hang upside down from trees and move very slowly. Who am I?", a: "Sloth", emoji: "🦥" },
+  { q: "I live in Australia and eat eucalyptus leaves. Who am I?", a: "Koala", emoji: "🐨" },
+  { q: "I live in the sea, have whiskers, and swim really well. Who am I?", a: "Seal", emoji: "🦭" },
+  { q: "I chew down trees with my big front teeth to build dams. Who am I?", a: "Beaver", emoji: "🦫" },
+  { q: "I drift in the water with long tentacles and a see-through body. Who am I?", a: "Jellyfish", emoji: "🪼" }
 ];
 
 let order = [];
@@ -398,7 +398,7 @@ function showCard(animate = true) {
 
 function updateProgress() {
   progressLabel.textContent = `${idx + 1} / ${QUIZZES.length}`;
-  seenLabel.textContent = `본 카드 ${seen.size}`;
+  seenLabel.textContent = `Seen ${seen.size}`;
   const pct = ((idx + 1) / QUIZZES.length) * 100;
   progressFill.style.width = pct + '%';
 }
