@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>플립카드 퀴즈</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Jua&display=swap');
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body {
+  font-family:'Jua','Noto Sans KR',sans-serif;
+  overflow:hidden;
+  touch-action:manipulation;
+  user-select:none;
+  -webkit-user-select:none;
+  width:100vw; height:100vh;
+}
+body {
+  background: linear-gradient(135deg, #fceabb 0%, #f8b6d2 50%, #a1c4fd 100%);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  color:#333;
+  padding:16px;
+}
+
+header {
+  width:100%;
+  max-width:640px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:12px;
+}
+header a.back {
+  text-decoration:none;
+  background:rgba(255,255,255,0.7);
+  padding:8px 14px;
+  border-radius:20px;
+  color:#444;
+  font-size:0.95em;
+  border:2px solid rgba(255,255,255,0.9);
+  box-shadow:0 2px 6px rgba(0,0,0,0.1);
+}
+h1 {
+  font-size:1.8em;
+  background: linear-gradient(90deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-align:center;
+  flex:1;
+}
+.spacer { width:70px; }
+
+.progress-wrap {
+  width:100%;
+  max-width:640px;
+  margin-bottom:14px;
+}
+.progress-text {
+  display:flex;
+  justify-content:space-between;
+  font-size:0.95em;
+  color:#555;
+  margin-bottom:6px;
+  padding:0 4px;
+}
+.progress-bar {
+  width:100%;
+  height:10px;
+  background:rgba(255,255,255,0.6);
+  border-radius:10px;
+  overflow:hidden;
+  box-shadow:inset 0 2px 4px rgba(0,0,0,0.1);
+}
+.progress-fill {
+  height:100%;
+  background:linear-gradient(90deg, #ff9ff3, #feca57, #48dbfb);
+  border-radius:10px;
+  transition:width 0.4s ease;
+  width:2%;
+}
+
+.card-area {
+  flex:1;
+  width:100%;
+  max-width:640px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  perspective:1500px;
+  padding:10px 0;
+}
+
+.card {
+  width:100%;
+  max-width:440px;
+  aspect-ratio: 3 / 4;
+  position:relative;
+  transform-style:preserve-3d;
+  transition:transform 0.7s cubic-bezier(0.4, 0.0, 0.2, 1);
+  cursor:pointer;
+}
+.card.flipped { transform: rotateY(180deg); }
+
+.face {
+  position:absolute;
+  inset:0;
+  border-radius:28px;
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:28px 24px;
+  box-shadow:0 14px 40px rgba(0,0,0,0.2);
+  border:5px solid #fff;
+}
+
+.face.front {
+  background: linear-gradient(160deg, #ffecd2 0%, #fcb69f 100%);
+}
+.face.back {
+  background: linear-gradient(160deg, #a1ffce 0%, #faffd1 100%);
+  transform: rotateY(180deg);
+}
+
+.card-label {
+  font-size:1em;
+  background:rgba(255,255,255,0.8);
+  padding:6px 16px;
+  border-radius:20px;
+  color:#555;
+  margin-bottom:18px;
+  letter-spacing:1px;
+}
+.card-icon {
+  font-size:4.5em;
+  margin-bottom:12px;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));
+}
+.card-question {
+  font-size:1.4em;
+  text-align:center;
+  line-height:1.45;
+  color:#4a4a4a;
+  padding:0 6px;
+}
+.card-answer-emoji {
+  font-size:5.5em;
+  margin-bottom:10px;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
+}
+.card-answer {
+  font-size:2.2em;
+  text-align:center;
+  color:#2d7a46;
+  font-weight:bold;
+}
+.tap-hint {
+  position:absolute;
+  bottom:18px;
+  font-size:0.9em;
+  color:rgba(0,0,0,0.45);
+}
+
+.controls {
+  width:100%;
+  max-width:640px;
+  display:flex;
+  justify-content:center;
+  gap:14px;
+  padding:14px 0 6px;
+}
+.btn {
+  flex:1;
+  max-width:180px;
+  padding:14px 10px;
+  border:none;
+  border-radius:18px;
+  font-family:inherit;
+  font-size:1.1em;
+  cursor:pointer;
+  box-shadow:0 4px 12px rgba(0,0,0,0.15);
+  transition:transform 0.15s ease, box-shadow 0.15s ease;
+  color:#fff;
+}
+.btn:active { transform: translateY(2px); box-shadow:0 2px 6px rgba(0,0,0,0.15); }
+.btn.prev { background:linear-gradient(135deg, #a1c4fd, #c2e9fb); color:#33557a;}
+.btn.shuffle { background:linear-gradient(135deg, #f6d365, #fda085); }
+.btn.next { background:linear-gradient(135deg, #84fab0, #8fd3f4); color:#135b3a;}
+.btn:disabled { opacity:0.45; cursor:not-allowed; }
+
+@media (max-width: 480px) {
+  h1 { font-size:1.4em; }
+  .card-question { font-size:1.2em; }
+  .card-answer { font-size:1.9em; }
+  .card-icon { font-size:3.8em; }
+  .card-answer-emoji { font-size:4.8em; }
+  .btn { font-size:1em; padding:12px 8px; }
+  header a.back { padding:6px 10px; font-size:0.85em; }
+  .spacer { width:56px; }
+}
+
+/* Completion overlay */
+.done-overlay {
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.55);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:50;
+  padding:20px;
+}
+.done-overlay.active { display:flex; }
+.done-card {
+  background:linear-gradient(160deg, #fff1eb, #ace0f9);
+  border-radius:28px;
+  padding:36px 28px;
+  max-width:360px;
+  width:100%;
+  text-align:center;
+  border:5px solid #fff;
+  box-shadow:0 14px 40px rgba(0,0,0,0.3);
+}
+.done-card h2 {
+  font-size:1.8em;
+  margin-bottom:10px;
+  color:#ff6b6b;
+}
+.done-card p {
+  font-size:1.1em;
+  color:#555;
+  margin-bottom:22px;
+}
+.done-card .emoji { font-size:4em; margin-bottom:8px; }
+.done-card button {
+  background:linear-gradient(135deg, #84fab0, #8fd3f4);
+  border:none;
+  color:#135b3a;
+  padding:14px 28px;
+  border-radius:18px;
+  font-family:inherit;
+  font-size:1.1em;
+  cursor:pointer;
+  box-shadow:0 4px 12px rgba(0,0,0,0.2);
+}
+</style>
+</head>
+<body>
+  <header>
+    <a class="back" href="../">← 뒤로</a>
+    <h1>플립카드 퀴즈</h1>
+    <div class="spacer"></div>
+  </header>
+
+  <div class="progress-wrap">
+    <div class="progress-text">
+      <span id="progress-label">1 / 50</span>
+      <span id="seen-label">본 카드 0</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+  </div>
+
+  <div class="card-area">
+    <div class="card" id="card">
+      <div class="face front">
+        <div class="card-label">QUIZ</div>
+        <div class="card-icon" id="front-icon">❓</div>
+        <div class="card-question" id="question-text">문제를 불러오는 중...</div>
+        <div class="tap-hint">카드를 탭해서 정답 확인!</div>
+      </div>
+      <div class="face back">
+        <div class="card-label">정답</div>
+        <div class="card-answer-emoji" id="answer-emoji">🎉</div>
+        <div class="card-answer" id="answer-text">정답</div>
+        <div class="tap-hint">탭하면 다시 문제로!</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn prev" id="btn-prev">◀ 이전</button>
+    <button class="btn shuffle" id="btn-shuffle">🔀 섞기</button>
+    <button class="btn next" id="btn-next">다음 ▶</button>
+  </div>
+
+  <div class="done-overlay" id="done-overlay">
+    <div class="done-card">
+      <div class="emoji">🏆</div>
+      <h2>모두 풀었어요!</h2>
+      <p>50개 퀴즈를 모두 확인했어요.<br>다시 도전해볼까요?</p>
+      <button id="btn-restart">다시 시작</button>
+    </div>
+  </div>
+
+<script>
+const QUIZZES = [
+  { q: "나는 동굴에 살고 거꾸로 매달려 있어요. 나는 누구일까요?", a: "박쥐", emoji: "🦇" },
+  { q: "나는 바다 깊은 곳에 살고 밝게 빛을 내요. 나는 누구일까요?", a: "아귀", emoji: "🐠" },
+  { q: "나는 목이 아주 길어서 높은 나뭇잎을 먹을 수 있어요. 나는 누구일까요?", a: "기린", emoji: "🦒" },
+  { q: "나는 긴 코로 물을 뿜고 커다란 귀를 가졌어요. 나는 누구일까요?", a: "코끼리", emoji: "🐘" },
+  { q: "나는 오렌지색 털에 검은 줄무늬가 있어요. 나는 누구일까요?", a: "호랑이", emoji: "🐯" },
+  { q: "나는 멋진 갈기를 가진 초원의 왕이에요. 나는 누구일까요?", a: "사자", emoji: "🦁" },
+  { q: "나는 단단한 집을 등에 지고 느리게 걸어요. 나는 누구일까요?", a: "거북이", emoji: "🐢" },
+  { q: "나는 깡충깡충 뛰고 배에 아기 주머니가 있어요. 나는 누구일까요?", a: "캥거루", emoji: "🦘" },
+  { q: "나는 대나무를 가장 좋아하는 흑백 곰이에요. 나는 누구일까요?", a: "판다", emoji: "🐼" },
+  { q: "나는 윙윙 소리를 내며 꽃에서 꿀을 모아요. 나는 누구일까요?", a: "꿀벌", emoji: "🐝" },
+  { q: "나는 거미줄을 짜서 먹이를 잡아요. 나는 누구일까요?", a: "거미", emoji: "🕷️" },
+  { q: "나는 꼬리를 흔들며 멍멍 짖는 사람의 가장 친한 친구예요. 나는 누구일까요?", a: "강아지", emoji: "🐶" },
+  { q: "나는 야옹 하고 울며 생선을 좋아해요. 나는 누구일까요?", a: "고양이", emoji: "🐱" },
+  { q: "나는 긴 귀를 가지고 당근을 좋아해요. 나는 누구일까요?", a: "토끼", emoji: "🐰" },
+  { q: "나는 꿀꿀 소리 내는 분홍색 농장 친구예요. 나는 누구일까요?", a: "돼지", emoji: "🐷" },
+  { q: "나는 음매 하고 울며 우유를 만들어 줘요. 나는 누구일까요?", a: "젖소", emoji: "🐮" },
+  { q: "나는 아침마다 꼬끼오 하고 울어요. 나는 누구일까요?", a: "수탉", emoji: "🐔" },
+  { q: "나는 연못에서 개굴개굴 노래해요. 나는 누구일까요?", a: "개구리", emoji: "🐸" },
+  { q: "나는 물 위에서 꽥꽥 거리며 헤엄쳐요. 나는 누구일까요?", a: "오리", emoji: "🦆" },
+  { q: "나는 여덟 개의 다리로 헤엄치고 먹물을 뿜어요. 나는 누구일까요?", a: "문어", emoji: "🐙" },
+  { q: "나는 날카로운 이빨을 가진 바다의 사냥꾼이에요. 나는 누구일까요?", a: "상어", emoji: "🦈" },
+  { q: "나는 바다에서 가장 큰 동물이에요. 나는 누구일까요?", a: "고래", emoji: "🐋" },
+  { q: "나는 빨간 집게로 옆걸음질을 쳐요. 나는 누구일까요?", a: "게", emoji: "🦀" },
+  { q: "나는 혹을 가지고 사막을 걸어 다녀요. 나는 누구일까요?", a: "낙타", emoji: "🐫" },
+  { q: "나는 북극에 사는 하얀 곰이에요. 나는 누구일까요?", a: "북극곰", emoji: "🐻‍❄️" },
+  { q: "나는 남극에 살고 턱시도를 입은 것처럼 보여요. 나는 누구일까요?", a: "펭귄", emoji: "🐧" },
+  { q: "나는 나무를 잘 타고 바나나를 정말 좋아해요. 나는 누구일까요?", a: "원숭이", emoji: "🐵" },
+  { q: "나는 밤에 활동하며 부엉부엉 울어요. 나는 누구일까요?", a: "부엉이", emoji: "🦉" },
+  { q: "나는 빨간 몸에 검은 점이 있는 작은 곤충이에요. 나는 누구일까요?", a: "무당벌레", emoji: "🐞" },
+  { q: "나는 알록달록한 날개로 꽃에서 꽃으로 날아다녀요. 나는 누구일까요?", a: "나비", emoji: "🦋" },
+  { q: "나는 도토리를 모으고 풍성한 꼬리를 가졌어요. 나는 누구일까요?", a: "다람쥐", emoji: "🐿️" },
+  { q: "나는 뿔이 있고 산타 할아버지의 썰매를 끌어요. 나는 누구일까요?", a: "순록", emoji: "🦌" },
+  { q: "나는 검은색과 흰색 줄무늬가 있는 말처럼 생겼어요. 나는 누구일까요?", a: "얼룩말", emoji: "🦓" },
+  { q: "나는 온몸이 뾰족한 가시로 덮여 있어요. 나는 누구일까요?", a: "고슴도치", emoji: "🦔" },
+  { q: "나는 다리 없이 배로 기어 다녀요. 나는 누구일까요?", a: "뱀", emoji: "🐍" },
+  { q: "나는 큰 날개를 펼쳐 하늘 높이 나는 용감한 새예요. 나는 누구일까요?", a: "독수리", emoji: "🦅" },
+  { q: "나는 하얀 깃털과 긴 목을 가진 우아한 새예요. 나는 누구일까요?", a: "백조", emoji: "🦢" },
+  { q: "나는 눈이 작고 땅속에 굴을 파며 살아요. 나는 누구일까요?", a: "두더지", emoji: "🐁" },
+  { q: "나는 바다에 사는 다섯 갈래의 별 모양이에요. 나는 누구일까요?", a: "불가사리", emoji: "⭐" },
+  { q: "나는 알록달록한 깃털로 사람의 말을 따라 해요. 나는 누구일까요?", a: "앵무새", emoji: "🦜" },
+  { q: "나는 세상에서 가장 빠르게 달리는 고양이과 동물이에요. 나는 누구일까요?", a: "치타", emoji: "🐆" },
+  { q: "나는 항상 웃고 있는 바다의 똑똑한 친구예요. 나는 누구일까요?", a: "돌고래", emoji: "🐬" },
+  { q: "나는 볼이 빵빵한 작고 귀여운 설치류예요. 나는 누구일까요?", a: "햄스터", emoji: "🐹" },
+  { q: "나는 두꺼운 회색 피부와 커다란 뿔을 가졌어요. 나는 누구일까요?", a: "코뿔소", emoji: "🦏" },
+  { q: "나는 진흙을 좋아하고 입을 아주 크게 벌려요. 나는 누구일까요?", a: "하마", emoji: "🦛" },
+  { q: "나는 나무에 거꾸로 매달려 아주 느리게 움직여요. 나는 누구일까요?", a: "나무늘보", emoji: "🦥" },
+  { q: "나는 호주에 살며 유칼립투스 잎을 먹어요. 나는 누구일까요?", a: "코알라", emoji: "🐨" },
+  { q: "나는 바다에 살며 수염이 있고 헤엄을 아주 잘 쳐요. 나는 누구일까요?", a: "바다표범", emoji: "🦭" },
+  { q: "나는 커다란 앞니로 나무를 갉아 댐을 만들어요. 나는 누구일까요?", a: "비버", emoji: "🦫" },
+  { q: "나는 물속에 살고 긴 촉수와 투명한 몸을 가졌어요. 나는 누구일까요?", a: "해파리", emoji: "🪼" }
+];
+
+let order = [];
+let idx = 0;
+let seen = new Set();
+
+const card = document.getElementById('card');
+const questionText = document.getElementById('question-text');
+const answerText = document.getElementById('answer-text');
+const answerEmoji = document.getElementById('answer-emoji');
+const progressLabel = document.getElementById('progress-label');
+const seenLabel = document.getElementById('seen-label');
+const progressFill = document.getElementById('progress-fill');
+const btnPrev = document.getElementById('btn-prev');
+const btnNext = document.getElementById('btn-next');
+const btnShuffle = document.getElementById('btn-shuffle');
+const doneOverlay = document.getElementById('done-overlay');
+const btnRestart = document.getElementById('btn-restart');
+
+function buildOrder(shuffle = false) {
+  order = QUIZZES.map((_, i) => i);
+  if (shuffle) {
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+  }
+}
+
+function showCard(animate = true) {
+  card.classList.remove('flipped');
+  const quiz = QUIZZES[order[idx]];
+  // slight delay so the unflip animation finishes before content changes
+  const update = () => {
+    questionText.textContent = quiz.q;
+    answerText.textContent = quiz.a;
+    answerEmoji.textContent = quiz.emoji;
+  };
+  if (animate) {
+    setTimeout(update, 250);
+  } else {
+    update();
+  }
+  seen.add(order[idx]);
+  updateProgress();
+  btnPrev.disabled = idx === 0;
+}
+
+function updateProgress() {
+  progressLabel.textContent = `${idx + 1} / ${QUIZZES.length}`;
+  seenLabel.textContent = `본 카드 ${seen.size}`;
+  const pct = ((idx + 1) / QUIZZES.length) * 100;
+  progressFill.style.width = pct + '%';
+}
+
+card.addEventListener('click', () => {
+  card.classList.toggle('flipped');
+});
+
+btnNext.addEventListener('click', () => {
+  if (idx < QUIZZES.length - 1) {
+    idx++;
+    showCard();
+  } else {
+    // last card - show completion
+    doneOverlay.classList.add('active');
+  }
+});
+
+btnPrev.addEventListener('click', () => {
+  if (idx > 0) {
+    idx--;
+    showCard();
+  }
+});
+
+btnShuffle.addEventListener('click', () => {
+  buildOrder(true);
+  idx = 0;
+  seen.clear();
+  showCard();
+});
+
+btnRestart.addEventListener('click', () => {
+  doneOverlay.classList.remove('active');
+  buildOrder(true);
+  idx = 0;
+  seen.clear();
+  showCard();
+});
+
+// Swipe support
+let touchStartX = null;
+card.addEventListener('touchstart', (e) => {
+  touchStartX = e.touches[0].clientX;
+}, { passive: true });
+card.addEventListener('touchend', (e) => {
+  if (touchStartX === null) return;
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  if (Math.abs(dx) > 60) {
+    // prevent the tap-to-flip that also fires
+    if (dx < 0 && idx < QUIZZES.length - 1) {
+      idx++;
+      showCard();
+    } else if (dx > 0 && idx > 0) {
+      idx--;
+      showCard();
+    }
+    // cancel click flip
+    card.classList.remove('flipped');
+    setTimeout(() => { touchStartX = null; }, 0);
+    // stop the click event that follows
+    const stop = (ev) => { ev.stopPropagation(); ev.preventDefault(); card.removeEventListener('click', stop, true); };
+    card.addEventListener('click', stop, true);
+  }
+  touchStartX = null;
+});
+
+// Keyboard support
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') btnNext.click();
+  else if (e.key === 'ArrowLeft') btnPrev.click();
+  else if (e.key === ' ' || e.key === 'Enter') {
+    e.preventDefault();
+    card.classList.toggle('flipped');
+  }
+});
+
+// init
+buildOrder(false);
+showCard(false);
+</script>
+</body>
+</html>
