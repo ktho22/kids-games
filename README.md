@@ -6,6 +6,7 @@
 
 | 게임 | 폴더 | 설명 |
 |------|------|------|
+| 🔴 Pocket Mini Adventure | `pocket-mini-adventure/` | 포켓몬을 잡고 진화시켜 동굴 5개를 깨고 메가뮤츠X를 잡는 미니 게임 |
 | ⚡ 피카츄 미로 탈출 | `pikachu-maze/` | 방향키로 피카츄를 움직여 집까지 탈출하는 미로 게임 (스테이지마다 미로가 커짐) |
 | 🏗️ Block Builder v2 | `block-game-v2/` | 동물, 장식, 미션, 세이브 슬롯이 추가된 블록 빌더 |
 | 🧱 Block Builder | `block-game/` | Marvel x Minecraft 스타일 블록 빌딩 게임 |
