@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>피카츄 미로 탈출!</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: "Comic Sans MS", "Baloo 2", "Jua", sans-serif;
+    background: linear-gradient(180deg, #aee7ff 0%, #d8f7c9 70%, #b7ecab 100%);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* 떠다니는 구름 */
+  .cloud {
+    position: fixed;
+    font-size: 60px;
+    opacity: 0.8;
+    animation: drift linear infinite;
+    pointer-events: none;
+    z-index: 0;
+  }
+  @keyframes drift {
+    from { transform: translateX(-120px); }
+    to   { transform: translateX(110vw); }
+  }
+
+  header {
+    z-index: 2;
+    margin-top: 14px;
+    text-align: center;
+  }
+  h1 {
+    font-size: clamp(24px, 4vw, 40px);
+    color: #ff9500;
+    text-shadow: 2px 2px 0 #fff, 4px 4px 0 rgba(255,149,0,.25);
+    letter-spacing: 1px;
+  }
+
+  .hud {
+    z-index: 2;
+    display: flex;
+    gap: 12px;
+    margin: 10px 0;
+    align-items: center;
+  }
+  .badge {
+    background: #fff;
+    border: 3px solid #ffd23f;
+    border-radius: 999px;
+    padding: 6px 18px;
+    font-size: 20px;
+    font-weight: bold;
+    color: #ff7b00;
+    box-shadow: 0 4px 0 rgba(0,0,0,.08);
+  }
+  .badge.star { color: #ffb300; border-color: #ffe08a; }
+
+  #gameWrap {
+    z-index: 2;
+    position: relative;
+    background: #fffef5;
+    border: 6px solid #ffd23f;
+    border-radius: 24px;
+    padding: 10px;
+    box-shadow: 0 10px 24px rgba(80,120,40,.25);
+  }
+  canvas { display: block; border-radius: 14px; }
+
+  /* 클리어 오버레이 */
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 240, 180, .55);
+    z-index: 10;
+  }
+  #overlay.show { display: flex; }
+  .popup {
+    background: #fff;
+    border: 6px solid #ffd23f;
+    border-radius: 30px;
+    padding: 34px 50px;
+    text-align: center;
+    animation: pop .5s cubic-bezier(.2,1.6,.4,1);
+    box-shadow: 0 16px 40px rgba(0,0,0,.18);
+  }
+  @keyframes pop {
+    from { transform: scale(.3) rotate(-8deg); opacity: 0; }
+    to   { transform: scale(1) rotate(0); opacity: 1; }
+  }
+  .popup .big { font-size: 64px; }
+  .popup h2 { color: #ff9500; font-size: 34px; margin: 8px 0; }
+  .popup p { font-size: 20px; color: #7a6a3a; margin-bottom: 18px; }
+  .popup button {
+    font-family: inherit;
+    font-size: 24px;
+    font-weight: bold;
+    color: #fff;
+    background: linear-gradient(180deg, #ffc93f, #ff9500);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 40px;
+    cursor: pointer;
+    box-shadow: 0 6px 0 #d97b00;
+    transition: transform .1s;
+  }
+  .popup button:active { transform: translateY(4px); box-shadow: 0 2px 0 #d97b00; }
+
+  /* 모바일/터치 방향 버튼 */
+  #pad {
+    z-index: 2;
+    display: grid;
+    grid-template-columns: repeat(3, 64px);
+    grid-template-rows: repeat(2, 56px);
+    gap: 6px;
+    margin: 12px 0 18px;
+  }
+  #pad button {
+    font-size: 26px;
+    border: 3px solid #ffd23f;
+    background: #fff;
+    border-radius: 16px;
+    cursor: pointer;
+    box-shadow: 0 4px 0 rgba(0,0,0,.1);
+    transition: transform .05s;
+  }
+  #pad button:active { transform: translateY(3px); box-shadow: none; background: #fff3c9; }
+  #pad .up    { grid-column: 2; grid-row: 1; }
+  #pad .left  { grid-column: 1; grid-row: 2; }
+  #pad .down  { grid-column: 2; grid-row: 2; }
+  #pad .right { grid-column: 3; grid-row: 2; }
+
+  .hint { z-index: 2; color: #6a8a4a; font-size: 15px; margin-bottom: 6px; }
+
+  a.back {
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    z-index: 3;
+    text-decoration: none;
+    background: #fff;
+    border: 3px solid #ffd23f;
+    border-radius: 999px;
+    padding: 8px 18px;
+    font-size: 17px;
+    font-weight: bold;
+    color: #ff7b00;
+    box-shadow: 0 4px 0 rgba(0,0,0,.08);
+  }
+  a.back:active { transform: translateY(3px); box-shadow: none; }
+</style>
+</head>
+<body>
+
+<div class="cloud" style="top:6%;  animation-duration: 55s;">☁️</div>
+<div class="cloud" style="top:18%; animation-duration: 75s; animation-delay:-30s; font-size:44px;">☁️</div>
+<div class="cloud" style="top:30%; animation-duration: 95s; animation-delay:-60s; font-size:80px;">☁️</div>
+
+<a class="back" href="../">🏠 게임 목록</a>
+
+<header><h1>⚡ 피카츄 미로 탈출! ⚡</h1></header>
+
+<div class="hud">
+  <div class="badge">스테이지 <span id="stageNum">1</span></div>
+  <div class="badge star">⭐ <span id="starNum">0</span></div>
+</div>
+
+<div id="gameWrap"><canvas id="game"></canvas></div>
+
+<div class="hint">⌨️ 방향키로 피카츄를 움직여서 🏠 집까지 데려다 주세요!</div>
+
+<div id="pad">
+  <button class="up"    data-dir="up">⬆️</button>
+  <button class="left"  data-dir="left">⬅️</button>
+  <button class="down"  data-dir="down">⬇️</button>
+  <button class="right" data-dir="right">➡️</button>
+</div>
+
+<div id="overlay">
+  <div class="popup">
+    <div class="big" id="popEmoji">🎉</div>
+    <h2 id="popTitle">참 잘했어요!</h2>
+    <p id="popText">피카츄가 집에 도착했어요!</p>
+    <button id="nextBtn">다음 스테이지 ➜</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ================= 사운드 (Web Audio 간단 효과음) ================= */
+let audioCtx = null;
+function beep(freq, dur, type, vol, when) {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const t = audioCtx.currentTime + (when || 0);
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = type || "sine";
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(vol || 0.15, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(g).connect(audioCtx.destination);
+    o.start(t);
+    o.stop(t + dur);
+  } catch (e) { /* 소리 없어도 게임은 계속 */ }
+}
+const sfxStep  = () => beep(500 + Math.random() * 200, 0.07, "square", 0.05);
+const sfxBump  = () => beep(140, 0.12, "sawtooth", 0.06);
+const sfxStar  = () => { beep(880, 0.1, "sine", 0.12); beep(1320, 0.15, "sine", 0.12, 0.08); };
+const sfxWin   = () => { [523, 659, 784, 1047].forEach((f, i) => beep(f, 0.22, "triangle", 0.14, i * 0.13)); };
+
+/* ================= 미로 생성 (재귀적 백트래커) ================= */
+function generateMaze(cols, rows) {
+  // 각 칸: {top, right, bottom, left} 벽 존재 여부
+  const cells = [];
+  for (let y = 0; y < rows; y++) {
+    const row = [];
+    for (let x = 0; x < cols; x++) row.push({ top: true, right: true, bottom: true, left: true, visited: false });
+    cells.push(row);
+  }
+  const stack = [];
+  let cx = Math.floor(cols / 2), cy = Math.floor(rows / 2); // 가운데에서 시작해 파냄
+  cells[cy][cx].visited = true;
+  stack.push([cx, cy]);
+
+  const dirs = [
+    { dx: 0, dy: -1, wall: "top",    opp: "bottom" },
+    { dx: 1, dy: 0,  wall: "right",  opp: "left"   },
+    { dx: 0, dy: 1,  wall: "bottom", opp: "top"    },
+    { dx: -1, dy: 0, wall: "left",   opp: "right"  },
+  ];
+
+  while (stack.length) {
+    const [x, y] = stack[stack.length - 1];
+    const options = dirs.filter(d => {
+      const nx = x + d.dx, ny = y + d.dy;
+      return nx >= 0 && ny >= 0 && nx < cols && ny < rows && !cells[ny][nx].visited;
+    });
+    if (!options.length) { stack.pop(); continue; }
+    const d = options[Math.floor(Math.random() * options.length)];
+    const nx = x + d.dx, ny = y + d.dy;
+    cells[y][x][d.wall] = false;
+    cells[ny][nx][d.opp] = false;
+    cells[ny][nx].visited = true;
+    stack.push([nx, ny]);
+  }
+  return cells;
+}
+
+/* BFS로 시작점에서 가장 먼 가장자리 칸을 출구로 선정 */
+function findExit(cells, sx, sy) {
+  const rows = cells.length, cols = cells[0].length;
+  const dist = Array.from({ length: rows }, () => Array(cols).fill(-1));
+  dist[sy][sx] = 0;
+  const q = [[sx, sy]];
+  while (q.length) {
+    const [x, y] = q.shift();
+    const c = cells[y][x];
+    const moves = [
+      [!c.top, x, y - 1], [!c.right, x + 1, y], [!c.bottom, x, y + 1], [!c.left, x - 1, y],
+    ];
+    for (const [open, nx, ny] of moves) {
+      if (open && nx >= 0 && ny >= 0 && nx < cols && ny < rows && dist[ny][nx] === -1) {
+        dist[ny][nx] = dist[y][x] + 1;
+        q.push([nx, ny]);
+      }
+    }
+  }
+  let best = null, bestD = -1;
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+    const edge = x === 0 || y === 0 || x === cols - 1 || y === rows - 1;
+    if (edge && dist[y][x] > bestD) { bestD = dist[y][x]; best = { x, y }; }
+  }
+  return best;
+}
+
+/* ================= 게임 상태 ================= */
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+let stage = 1;
+let stars = 0;
+let maze, cols, rows, cellSize;
+let player = { x: 0, y: 0, px: 0, py: 0, face: 1, hop: 0 }; // px,py = 부드러운 이동용 픽셀 좌표
+let exit = { x: 0, y: 0 };
+let starItems = []; // 미로 안 별 아이템
+let cleared = false;
+let confetti = [];
+
+function stageConfig(n) {
+  // 5살 눈높이: 5x5부터 두 스테이지마다 한 단계씩 커짐, 최대 15x15
+  const size = Math.min(5 + Math.ceil((n - 1) / 2) * 2, 15);
+  return { cols: size, rows: size, stars: Math.min(1 + Math.floor(n / 2), 4) };
+}
+
+function setupStage() {
+  const cfg = stageConfig(stage);
+  cols = cfg.cols; rows = cfg.rows;
+
+  const maxBoard = Math.min(window.innerWidth - 60, window.innerHeight - 300, 560);
+  cellSize = Math.floor(maxBoard / cols);
+  canvas.width = cols * cellSize;
+  canvas.height = rows * cellSize;
+
+  maze = generateMaze(cols, rows);
+  player.x = Math.floor(cols / 2);
+  player.y = Math.floor(rows / 2);
+  player.px = player.x * cellSize;
+  player.py = player.y * cellSize;
+  exit = findExit(maze, player.x, player.y);
+
+  // 별 아이템 배치 (시작/출구 제외 랜덤 칸)
+  starItems = [];
+  let guard = 0;
+  while (starItems.length < cfg.stars && guard++ < 200) {
+    const x = Math.floor(Math.random() * cols), y = Math.floor(Math.random() * rows);
+    if ((x === player.x && y === player.y) || (x === exit.x && y === exit.y)) continue;
+    if (starItems.some(s => s.x === x && s.y === y)) continue;
+    starItems.push({ x, y, t: Math.random() * Math.PI * 2 });
+  }
+
+  cleared = false;
+  confetti = [];
+  document.getElementById("stageNum").textContent = stage;
+  document.getElementById("starNum").textContent = stars;
+}
+
+/* ================= 이동 ================= */
+function tryMove(dir) {
+  if (cleared) return;
+  const c = maze[player.y][player.x];
+  let nx = player.x, ny = player.y;
+  if (dir === "up"    && !c.top)    ny--;
+  else if (dir === "down"  && !c.bottom) ny++;
+  else if (dir === "left"  && !c.left)   { nx--; player.face = -1; }
+  else if (dir === "right" && !c.right)  { nx++; player.face = 1; }
+  else {
+    if (dir === "left") player.face = -1;
+    if (dir === "right") player.face = 1;
+    sfxBump();
+    player.hop = 1; // 벽에 콩! 하는 느낌으로 살짝 흔들기
+    return;
+  }
+  player.x = nx; player.y = ny;
+  player.hop = 1;
+  sfxStep();
+  collectAndCheck();
+}
+
+function collectAndCheck() {
+  for (let i = starItems.length - 1; i >= 0; i--) {
+    if (starItems[i].x === player.x && starItems[i].y === player.y) {
+      starItems.splice(i, 1);
+      stars++;
+      document.getElementById("starNum").textContent = stars;
+      sfxStar();
+      burstConfetti(player.x * cellSize + cellSize / 2, player.y * cellSize + cellSize / 2, 12, ["#ffd23f", "#ffec8a"]);
+    }
+  }
+  if (player.x === exit.x && player.y === exit.y && !cleared) {
+    cleared = true;
+    sfxWin();
+    burstConfetti(canvas.width / 2, canvas.height / 2, 80);
+    setTimeout(showClear, 550);
+  }
+}
+
+/* ================= 색종이 ================= */
+function burstConfetti(x, y, n, palette) {
+  const colors = palette || ["#ff6b6b", "#ffd23f", "#6bcB77", "#4d96ff", "#ff9ff3"];
+  for (let i = 0; i < n; i++) {
+    confetti.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 7,
+      vy: -Math.random() * 7 - 2,
+      c: colors[Math.floor(Math.random() * colors.length)],
+      s: 4 + Math.random() * 5,
+      life: 70 + Math.random() * 40,
+      r: Math.random() * Math.PI,
+    });
+  }
+}
+
+/* ================= 그리기 ================= */
+function drawPikachu(cx, cy, size, face, hop) {
+  ctx.save();
+  ctx.translate(cx, cy - hop * size * 0.12);
+  ctx.scale(face * size / 100, size / 100); // 100 기준 좌표계, face로 좌우 반전
+
+  // 귀
+  ctx.fillStyle = "#ffd23f";
+  ctx.strokeStyle = "#c98f00";
+  ctx.lineWidth = 3;
+  for (const side of [-1, 1]) {
+    ctx.save();
+    ctx.rotate(side * 0.35);
+    ctx.beginPath();
+    ctx.ellipse(side * 16, -34, 8, 22, 0, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+    // 귀 끝 검정
+    ctx.fillStyle = "#3a2b16";
+    ctx.beginPath();
+    ctx.ellipse(side * 16, -48, 7, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#ffd23f";
+    ctx.restore();
+  }
+
+  // 몸통(둥근 얼굴 위주 - 꼬마 캐릭터 느낌)
+  ctx.beginPath();
+  ctx.ellipse(0, 4, 30, 28, 0, 0, Math.PI * 2);
+  ctx.fill(); ctx.stroke();
+
+  // 볼(빨간 동그라미)
+  ctx.fillStyle = "#ff6b6b";
+  ctx.beginPath(); ctx.arc(-18, 12, 6.5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(18, 12, 6.5, 0, Math.PI * 2); ctx.fill();
+
+  // 눈
+  ctx.fillStyle = "#2b2b2b";
+  ctx.beginPath(); ctx.arc(-10, 0, 4.5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(10, 0, 4.5, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#fff";
+  ctx.beginPath(); ctx.arc(-8.5, -1.5, 1.8, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(11.5, -1.5, 1.8, 0, Math.PI * 2); ctx.fill();
+
+  // 코 + 입
+  ctx.fillStyle = "#2b2b2b";
+  ctx.beginPath(); ctx.arc(0, 7, 1.6, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = "#8a5a00";
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.arc(-4, 11, 4.5, 0.15 * Math.PI, 0.85 * Math.PI);
+  ctx.arc(4, 11, 4.5, 0.15 * Math.PI, 0.85 * Math.PI);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawHouse(cx, cy, size) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  const s = size / 100;
+  ctx.scale(s, s);
+  // 지붕
+  ctx.fillStyle = "#ff8a5c";
+  ctx.strokeStyle = "#d05a2b";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(-38, 0); ctx.lineTo(0, -36); ctx.lineTo(38, 0); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  // 벽
+  ctx.fillStyle = "#fff3d6";
+  ctx.strokeStyle = "#caa96a";
+  ctx.fillRect(-28, 0, 56, 34);
+  ctx.strokeRect(-28, 0, 56, 34);
+  // 문
+  ctx.fillStyle = "#a5714a";
+  ctx.beginPath();
+  ctx.arc(0, 16, 11, Math.PI, 0);
+  ctx.rect(-11, 16, 22, 18);
+  ctx.fill();
+  ctx.restore();
+}
+
+let lastTime = 0;
+function loop(t) {
+  const dt = Math.min((t - lastTime) / 16.7, 3);
+  lastTime = t;
+
+  // 부드러운 이동 보간
+  const tx = player.x * cellSize, ty = player.y * cellSize;
+  const speed = 0.28 * dt;
+  player.px += (tx - player.px) * speed * 1.6;
+  player.py += (ty - player.py) * speed * 1.6;
+  if (Math.abs(tx - player.px) < 1 && Math.abs(ty - player.py) < 1) {
+    player.px = tx; player.py = ty;
+  }
+  if (player.hop > 0) player.hop = Math.max(0, player.hop - 0.08 * dt);
+
+  /* --- 배경 --- */
+  ctx.fillStyle = "#f2ffd9";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // 잔디 도트
+  ctx.fillStyle = "rgba(140, 200, 90, .25)";
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+    if ((x + y) % 2 === 0) ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+  }
+
+  // 출구 칸 하이라이트
+  ctx.fillStyle = "rgba(255, 200, 120, .45)";
+  ctx.fillRect(exit.x * cellSize, exit.y * cellSize, cellSize, cellSize);
+
+  /* --- 벽 (둥근 초록 울타리 느낌) --- */
+  ctx.strokeStyle = "#58b84d";
+  ctx.lineCap = "round";
+  ctx.lineWidth = Math.max(4, cellSize * 0.14);
+  ctx.beginPath();
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const c = maze[y][x];
+      const x0 = x * cellSize, y0 = y * cellSize;
+      if (c.top)    { ctx.moveTo(x0, y0); ctx.lineTo(x0 + cellSize, y0); }
+      if (c.left)   { ctx.moveTo(x0, y0); ctx.lineTo(x0, y0 + cellSize); }
+      if (y === rows - 1 && c.bottom) { ctx.moveTo(x0, y0 + cellSize); ctx.lineTo(x0 + cellSize, y0 + cellSize); }
+      if (x === cols - 1 && c.right)  { ctx.moveTo(x0 + cellSize, y0); ctx.lineTo(x0 + cellSize, y0 + cellSize); }
+    }
+  }
+  ctx.stroke();
+
+  /* --- 별 아이템 --- */
+  const now = t / 1000;
+  ctx.font = `${Math.floor(cellSize * 0.5)}px serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  for (const s of starItems) {
+    const bob = Math.sin(now * 3 + s.t) * cellSize * 0.06;
+    ctx.save();
+    ctx.translate(s.x * cellSize + cellSize / 2, s.y * cellSize + cellSize / 2 + bob);
+    ctx.rotate(Math.sin(now * 2 + s.t) * 0.15);
+    ctx.fillText("⭐", 0, 0);
+    ctx.restore();
+  }
+
+  /* --- 집(출구) --- */
+  drawHouse(exit.x * cellSize + cellSize / 2, exit.y * cellSize + cellSize / 2, cellSize * 0.8);
+
+  /* --- 피카츄 --- */
+  const bounce = Math.sin(now * 4) * 0.05 + player.hop;
+  drawPikachu(player.px + cellSize / 2, player.py + cellSize / 2 + cellSize * 0.05, cellSize * 0.85, player.face, bounce);
+
+  /* --- 색종이 --- */
+  for (let i = confetti.length - 1; i >= 0; i--) {
+    const p = confetti[i];
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    p.vy += 0.18 * dt;
+    p.r += 0.1 * dt;
+    p.life -= dt;
+    if (p.life <= 0) { confetti.splice(i, 1); continue; }
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.r);
+    ctx.fillStyle = p.c;
+    ctx.globalAlpha = Math.min(1, p.life / 30);
+    ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s);
+    ctx.restore();
+  }
+
+  requestAnimationFrame(loop);
+}
+
+/* ================= 클리어 팝업 ================= */
+const overlay = document.getElementById("overlay");
+const cheers = [
+  ["🎉", "참 잘했어요!"], ["🌟", "우와, 대단해요!"], ["⚡", "피카피카~!"],
+  ["🏆", "미로 박사님!"], ["💛", "최고예요!"],
+];
+function showClear() {
+  const [emo, title] = cheers[Math.floor(Math.random() * cheers.length)];
+  document.getElementById("popEmoji").textContent = emo;
+  document.getElementById("popTitle").textContent = title;
+  document.getElementById("popText").textContent = `스테이지 ${stage} 클리어! 피카츄가 집에 도착했어요!`;
+  overlay.classList.add("show");
+  document.getElementById("nextBtn").focus();
+}
+document.getElementById("nextBtn").addEventListener("click", () => {
+  overlay.classList.remove("show");
+  stage++;
+  setupStage();
+});
+
+/* ================= 입력 ================= */
+const keyMap = {
+  ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right",
+  w: "up", s: "down", a: "left", d: "right",
+};
+const keyCodeMap = { 37: "left", 38: "up", 39: "right", 40: "down" };
+window.addEventListener("keydown", (e) => {
+  if (overlay.classList.contains("show")) {
+    if (e.key === "Enter" || e.key === " ") document.getElementById("nextBtn").click();
+    return;
+  }
+  const dir = keyMap[e.key] || keyCodeMap[e.keyCode];
+  if (dir) { e.preventDefault(); tryMove(dir); }
+});
+
+document.querySelectorAll("#pad button").forEach(btn => {
+  const go = (e) => { e.preventDefault(); tryMove(btn.dataset.dir); };
+  btn.addEventListener("pointerdown", go);
+});
+
+window.addEventListener("resize", () => {
+  // 진행 중 위치를 유지한 채 크기만 다시 계산
+  const maxBoard = Math.min(window.innerWidth - 60, window.innerHeight - 300, 560);
+  cellSize = Math.floor(maxBoard / cols);
+  canvas.width = cols * cellSize;
+  canvas.height = rows * cellSize;
+  player.px = player.x * cellSize;
+  player.py = player.y * cellSize;
+});
+
+setupStage();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

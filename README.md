@@ -6,12 +6,15 @@
 
 | 게임 | 폴더 | 설명 |
 |------|------|------|
+| ⚡ 피카츄 미로 탈출 | `pikachu-maze/` | 방향키로 피카츄를 움직여 집까지 탈출하는 미로 게임 (스테이지마다 미로가 커짐) |
 | 🏗️ Block Builder v2 | `block-game-v2/` | 동물, 장식, 미션, 세이브 슬롯이 추가된 블록 빌더 |
 | 🧱 Block Builder | `block-game/` | Marvel x Minecraft 스타일 블록 빌딩 게임 |
 | 🐙 Octonaut Animal Rescue | `octonaut-game/` | 옥토넛 크루와 함께 바다 동물을 구조하는 게임 |
 | ⛏️ Minecraft Block Dodge | `minecraft-dodge/` | 떨어지는 블록을 피하는 마인크래프트 마블 에디션 |
 | ⭐ Star Adventure | `english-math-game/` | 우주 모험을 통해 영어와 수학을 배우는 학습 게임 |
 | 🏎️ Mini Car Race | `minicar-race/` | 나만의 미니카를 만들고 레이싱하는 게임 |
+| 🏥 동물 병원 놀이 | `hospital-game/` | 아픈 동물 친구들을 진찰하고 치료해주는 놀이 |
+| 🃏 Flip Card Quiz | `flip-card-quiz/` | 카드를 뒤집어 50가지 동물 수수께끼를 푸는 퀴즈 |
 
 ## 실행 방법
 
