@@ -78,6 +78,12 @@
   .evo-stage{font-size:80px; text-align:center; margin:20px 0;}
   .dex-cell{background:#fff; border:2px solid var(--ink); border-radius:12px; padding:6px 2px; text-align:center;}
   .dex-cell .dn{font-size:10px; font-weight:800; margin-top:2px;}
+  .dex-family{display:flex; align-items:center; gap:4px; background:#fff; border:2px solid var(--ink); border-radius:12px; padding:6px 8px; flex-wrap:wrap;}
+  .dex-node{text-align:center; min-width:54px;}
+  .dex-node .dn{font-size:9px; font-weight:800; margin-top:1px;}
+  .dex-branch{display:flex; flex-direction:column; gap:2px;}
+  .dex-mega{border:2px dashed var(--purple); border-radius:10px; padding:2px 4px; background:#f6f0ff;}
+  .dex-arrow{font-weight:800; font-size:16px; color:#6b7a99;}
   .fx-particle{position:fixed; font-size:26px; z-index:50; pointer-events:none; line-height:1;}
   .fx-ring{position:fixed; width:60px; height:60px; border:4px solid #fff; border-radius:50%; z-index:49; pointer-events:none;}
   .confetti{position:fixed; top:-20px; font-size:22px; animation:fall linear forwards; z-index:5; pointer-events:none;}
@@ -107,17 +113,18 @@
 <script>
 /* ============ DATA ============ */
 const TYPES = {
-  'Fire':    {beats:'Grass',  fx:'🔥'},
-  'Water':   {beats:'Fire',   fx:'💧'},
-  'Grass':   {beats:'Water',  fx:'🍃'},
-  'Electric':{beats:'Water',  fx:'⚡'},
-  'Normal':  {beats:null,     fx:'💫'},
-  'Flying':  {beats:'Grass',  fx:'🪶'},
-  'Psychic': {beats:null,     fx:'🔮'},
-  'Rock':    {beats:'Flying', fx:'🪨'},
-  'Ghost':   {beats:'Psychic',fx:'🟣'},
-  'Dragon':  {beats:null,     fx:'🌀'},
-  'Fighting':{beats:'Normal', fx:'👊'},
+  /* matchups based on the classic games: strong=1.5x, weak=0.7x, barely=0.4x */
+  'Fire':    {fx:'🔥', strong:['Grass'],            weak:['Water','Rock','Dragon','Fire']},
+  'Water':   {fx:'💧', strong:['Fire','Rock'],      weak:['Water','Grass','Dragon']},
+  'Grass':   {fx:'🍃', strong:['Water','Rock'],     weak:['Fire','Grass','Flying','Dragon']},
+  'Electric':{fx:'⚡', strong:['Water','Flying'],   weak:['Grass','Electric','Dragon'], barely:['Rock']},
+  'Normal':  {fx:'💫', strong:[],                   weak:['Rock'], barely:['Ghost']},
+  'Flying':  {fx:'🪶', strong:['Grass','Fighting'], weak:['Electric','Rock']},
+  'Psychic': {fx:'🔮', strong:['Fighting'],         weak:['Psychic']},
+  'Rock':    {fx:'🪨', strong:['Fire','Flying'],    weak:['Fighting']},
+  'Ghost':   {fx:'🟣', strong:['Ghost','Psychic'],  weak:[], barely:['Normal']},
+  'Dragon':  {fx:'🌀', strong:['Dragon'],           weak:[]},
+  'Fighting':{fx:'👊', strong:['Normal','Rock'],    weak:['Flying','Psychic'], barely:['Ghost']},
 };
 
 /* move library: every Pokémon gets its own two moves */
@@ -607,19 +614,55 @@ window.toTitle = function(){ sfx.tap(); BGM.stop(); renderTitle(); };
 /* ============ SCREEN: POKEDEX ============ */
 window.renderDex = function(){
   sfx.tap();
+  const targets = new Set();
+  Object.values(SPECIES).forEach(s=>{
+    if(s.evolveTo) (Array.isArray(s.evolveTo)?s.evolveTo:[s.evolveTo]).forEach(t=>targets.add(t));
+  });
+  const node = (id, small) => {
+    const got = G.dex.includes(id);
+    const s = SPECIES[id];
+    return `<div class="dex-node">
+      ${got ? spriteImg(id, small?38:44) : `<span class="silhouette">${spriteImg(id, small?38:44)}</span>`}
+      <div class="dn" style="${got?'':'color:#9aa5bb;'}">${got ? s.name : '???'}</div>
+    </div>`;
+  };
+  const megaNode = (id) => {
+    const got = G.dex.includes(id);
+    const m = MEGA[id];
+    return `<div class="dex-node dex-mega">
+      ${got ? spriteImg(m.sprite, 44) : `<span class="silhouette">${spriteImg(m.sprite, 44)}</span>`}
+      <div class="dn" style="color:var(--purple);">${got ? m.name : '???'}</div>
+    </div>`;
+  };
+  const arrow = t => `<span class="dex-arrow">${t||'➜'}</span>`;
+  const families = [], solos = [];
+  Object.keys(SPECIES).forEach(base=>{
+    if(targets.has(base)) return;
+    const stages = [[base]];
+    let cur = base;
+    while(true){
+      const to = SPECIES[cur].evolveTo;
+      if(!to) break;
+      if(Array.isArray(to)){ stages.push(to); break; }
+      stages.push([to]); cur = to;
+    }
+    const finalIds = stages[stages.length-1];
+    const megaId = finalIds.find(id=>MEGA[id]);
+    if(stages.length===1 && !megaId){ solos.push(base); return; }
+    let row = stages.map(stage =>
+      stage.length===1 ? node(stage[0]) : `<div class="dex-branch">${stage.map(id=>node(id,true)).join('')}</div>`
+    ).join(arrow());
+    if(megaId) row += arrow('💠') + megaNode(megaId);
+    families.push(`<div class="dex-family">${row}</div>`);
+  });
   app.innerHTML = `
   <div class="card fadein">
     <h2>📖 Pokédex <small style="color:#6b7a99">(${G.dex.length}/${TOTAL_KINDS})</small></h2>
-    <p class="sub" style="text-align:left;">Catch or evolve Pokémon to fill the pages!</p>
+    <p class="sub" style="text-align:left;">➜ shows who they grow into! 💠 is the special MEGA battle form!</p>
+    <div class="stack" style="gap:8px;">${families.join('')}</div>
+    <h2 style="margin-top:16px;">⭐ One-of-a-kind</h2>
     <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px;">
-      ${Object.keys(SPECIES).map(id=>{
-        const got = G.dex.includes(id);
-        const s = SPECIES[id];
-        return `<div class="dex-cell">
-          ${got ? spriteImg(id,44) : `<span class="silhouette">${spriteImg(id,44)}</span>`}
-          <div class="dn" style="${got?'':'color:#9aa5bb;'}">${got ? s.name : '???'}</div>
-        </div>`;
-      }).join('')}
+      ${solos.map(id=>`<div class="dex-cell">${G.dex.includes(id) ? spriteImg(id,44) : `<span class="silhouette">${spriteImg(id,44)}</span>`}<div class="dn" style="${G.dex.includes(id)?'':'color:#9aa5bb;'}">${G.dex.includes(id) ? SPECIES[id].name : '???'}</div></div>`).join('')}
     </div>
     <div style="margin-top:14px;"><button class="big" onclick="backTown()">⬅ Back to Town</button></div>
   </div>`;
@@ -628,19 +671,22 @@ window.renderDex = function(){
 /* ============ SCREEN: TYPE CHART ============ */
 window.renderTypeChart = function(){
   sfx.tap();
-  const rows = Object.entries(TYPES).filter(([,v])=>v.beats).map(([t,v])=>`
-    <div class="row" style="background:#fff; border:2px solid var(--ink); border-radius:12px; padding:8px 12px; font-weight:800;">
-      <span>${v.fx} ${t}</span>
-      <span class="spacer"></span>
-      <span style="color:var(--red);">💥 SUPER vs</span>
-      <span>${TYPES[v.beats].fx} ${v.beats}</span>
+  const icons = t => t.map(x=>TYPES[x].fx).join(' ');
+  const rows = Object.entries(TYPES).map(([t,v])=>`
+    <div style="background:#fff; border:2px solid var(--ink); border-radius:12px; padding:8px 12px; font-weight:800;">
+      <div>${v.fx} ${t}</div>
+      <div style="font-size:13px; margin-top:3px; line-height:1.6;">
+        ${v.strong.length ? `<span style="color:var(--red);">💥 SUPER vs ${icons(v.strong)}</span>` : `<span style="color:#6b7a99;">fair and square vs everyone</span>`}
+        ${v.weak && v.weak.length ? `<br><span style="color:#6b7a99;">😅 weak vs ${icons(v.weak)}</span>` : ''}
+        ${v.barely && v.barely.length ? `<br><span style="color:#9aa5bb;">🙈 barely works vs ${icons(v.barely)}</span>` : ''}
+      </div>
     </div>`).join('');
   app.innerHTML = `
   <div class="card fadein">
     <h2>⚔️ Type Chart</h2>
-    <p class="sub" style="text-align:left;">💥 SUPER means extra damage! The other way around does less. Pick smart moves!</p>
+    <p class="sub" style="text-align:left;">💥 SUPER = extra damage! 😅 weak = less. 🙈 barely = almost nothing. Pick smart moves!</p>
+    <div class="progress-note" style="margin-bottom:10px;">🔥Fire 💧Water 🍃Grass ⚡Electric 💫Normal 🪶Flying 🔮Psychic 🪨Rock 🟣Ghost 🌀Dragon 👊Fighting</div>
     <div class="stack" style="gap:8px;">${rows}</div>
-    <p class="progress-note" style="margin-top:10px;">💫 Normal, 🔮 Psychic and 🌀 Dragon moves are fair vs everyone — but 👊 Fighting beats 💫 Normal, and 🟣 Ghost beats 🔮 Psychic!</p>
     <div style="margin-top:14px;"><button class="big" onclick="backTown()">⬅ Back to Town</button></div>
   </div>`;
 };
@@ -831,8 +877,10 @@ function movesOf(m){
   return SPECIES[m.id].mv.map(n => Object.assign({name:n}, MOVES[n]));
 }
 function typeMult(moveType, defType){
-  if(TYPES[moveType].beats === defType) return 1.5;
-  if(TYPES[defType].beats === moveType) return 0.7;
+  const t = TYPES[moveType];
+  if(t.barely && t.barely.includes(defType)) return 0.4;
+  if(t.strong.includes(defType)) return 1.5;
+  if(t.weak.includes(defType)) return 0.7;
   return 1;
 }
 
@@ -1027,7 +1075,7 @@ window.useMove = async function(i){
   // Mega Mewtwo X can't be knocked out on the first try — you have to catch it!
   if(isCatchPhase() && e.hp < 1) e.hp = 1;
   sfx.hit(); shake('enemy-sprite');
-  renderBattle(mult>1 ? `SUPER hit! 💥 ${dmg} damage!` : mult<1 ? `Hmm, not so good... ${dmg} damage` : `Pow! ${dmg} damage!`);
+  renderBattle(mult>1 ? `SUPER hit! 💥 ${dmg} damage!` : mult<0.5 ? `It barely works on ${SPECIES[e.id].type} Pokémon... ${dmg} damage 🙈` : mult<1 ? `Hmm, not so good... ${dmg} damage` : `Pow! ${dmg} damage!`);
   setBtns(false);
   await sleep(900);
   if(isCatchPhase() && e.hp===1){
@@ -1072,7 +1120,7 @@ async function enemyTurn(){
   const mult = typeMult(emv.t, SPECIES[my.id].type);
   burst('my-sprite','💥', mult>1);
   if(mult>1) shakeScreen();
-  const factor = B.trainer ? (B.legend ? 0.95 : 1.0) : 0.7;
+  const factor = B.trainer ? (B.legend ? 0.65 : 0.75) : 0.65; // tuned: enemies now use real moves with power multipliers
   let dmg = Math.max(1, Math.round((atkOf(e)*factor*emv.pow + rand(3)) * mult));
   my.hp = Math.max(0, my.hp - dmg);
   sfx.hit(); shake('my-sprite');
