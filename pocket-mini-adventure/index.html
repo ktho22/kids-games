@@ -81,6 +81,7 @@
   .dex-family{display:flex; align-items:center; gap:4px; background:#fff; border:2px solid var(--ink); border-radius:12px; padding:6px 8px; flex-wrap:wrap;}
   .dex-node{text-align:center; min-width:54px;}
   .dex-node .dn{font-size:9px; font-weight:800; margin-top:1px;}
+  .dnum{font-size:9px; font-weight:800; color:#9aa5bb; font-variant-numeric:tabular-nums; line-height:1.2;}
   .dex-branch{display:flex; flex-direction:column; gap:2px;}
   .dex-mega{border:2px dashed var(--purple); border-radius:10px; padding:2px 4px; background:#f6f0ff;}
   .dex-arrow{font-weight:800; font-size:16px; color:#6b7a99;}
@@ -129,55 +130,55 @@ const TYPES = {
 
 /* move library: every Pokémon gets its own two moves */
 const MOVES = {
-  'Tackle':       {t:'Normal',  pow:1.0, acc:1.0},
-  'Scratch':      {t:'Normal',  pow:1.0, acc:1.0},
-  'Quick Attack': {t:'Normal',  pow:1.1, acc:1.0},
-  'Bite':         {t:'Normal',  pow:1.2, acc:0.95},
-  'Headbutt':     {t:'Normal',  pow:1.3, acc:0.95},
-  'Slash':        {t:'Normal',  pow:1.4, acc:0.95},
-  'Vice Grip':    {t:'Normal',  pow:1.4, acc:0.95},
-  'Body Slam':    {t:'Normal',  pow:1.5, acc:0.9},
-  'Hyper Fang':   {t:'Normal',  pow:1.7, acc:0.85},
-  'Mega Punch':   {t:'Normal',  pow:1.7, acc:0.85},
-  'Hyper Beam':   {t:'Normal',  pow:2.0, acc:0.7},
-  'Splash':       {t:'Normal',  pow:0.1, acc:1.0},
-  'Ember':        {t:'Fire',    pow:1.2, acc:1.0},
-  'Fire Spin':    {t:'Fire',    pow:1.6, acc:0.9},
-  'Flamethrower': {t:'Fire',    pow:1.8, acc:0.85},
-  'Fire Blast':   {t:'Fire',    pow:2.0, acc:0.75},
-  'Bubble':       {t:'Water',   pow:1.2, acc:1.0},
-  'Water Gun':    {t:'Water',   pow:1.6, acc:0.9},
-  'Surf':         {t:'Water',   pow:1.8, acc:0.85},
-  'Crabhammer':   {t:'Water',   pow:1.8, acc:0.85},
-  'Hydro Pump':   {t:'Water',   pow:2.0, acc:0.75},
-  'Absorb':       {t:'Grass',   pow:1.2, acc:1.0},
-  'Bug Bite':     {t:'Grass',   pow:1.3, acc:0.95},
-  'Vine Whip':    {t:'Grass',   pow:1.6, acc:0.9},
-  'Razor Leaf':   {t:'Grass',   pow:1.8, acc:0.85},
-  'Solar Beam':   {t:'Grass',   pow:2.0, acc:0.75},
-  'Thunder Shock':{t:'Electric',pow:1.2, acc:1.0},
-  'Thunderbolt':  {t:'Electric',pow:1.8, acc:0.85},
-  'Thunder':      {t:'Electric',pow:2.0, acc:0.75},
-  'Peck':         {t:'Flying',  pow:1.2, acc:1.0},
-  'Gust':         {t:'Flying',  pow:1.3, acc:0.95},
-  'Wing Attack':  {t:'Flying',  pow:1.5, acc:0.9},
-  'Drill Peck':   {t:'Flying',  pow:1.8, acc:0.85},
-  'Confusion':    {t:'Psychic', pow:1.4, acc:0.95},
-  'Psybeam':      {t:'Psychic', pow:1.6, acc:0.9},
-  'Psychic':      {t:'Psychic', pow:1.9, acc:0.8},
-  'Rock Throw':   {t:'Rock',    pow:1.5, acc:0.9},
-  'Rock Slide':   {t:'Rock',    pow:1.8, acc:0.85},
-  'Earthquake':   {t:'Rock',    pow:1.9, acc:0.8},
-  'Bone Club':    {t:'Rock',    pow:1.5, acc:0.9},
-  'Bonemerang':   {t:'Rock',    pow:1.8, acc:0.85},
-  'Lick':         {t:'Ghost',   pow:1.2, acc:1.0},
-  'Shadow Ball':  {t:'Ghost',   pow:1.8, acc:0.85},
-  'Twister':      {t:'Dragon',  pow:1.4, acc:0.95},
-  'Dragon Breath':{t:'Dragon',  pow:1.6, acc:0.9},
-  'Dragon Rush':  {t:'Dragon',  pow:1.9, acc:0.8},
-  'Karate Chop':  {t:'Fighting',pow:1.4, acc:0.95},
-  'Low Kick':     {t:'Fighting',pow:1.5, acc:0.9},
-  'Cross Chop':   {t:'Fighting',pow:1.8, acc:0.85},
+  'Tackle':       {t:'Normal',  pow:1.0, acc:1},
+  'Scratch':      {t:'Normal',  pow:1.0, acc:1},
+  'Quick Attack': {t:'Normal',  pow:1.1, acc:1},
+  'Bite':         {t:'Normal',  pow:1.2, acc:1},
+  'Headbutt':     {t:'Normal',  pow:1.3, acc:1},
+  'Slash':        {t:'Normal',  pow:1.4, acc:1},
+  'Vice Grip':    {t:'Normal',  pow:1.4, acc:1},
+  'Body Slam':    {t:'Normal',  pow:1.5, acc:1},
+  'Hyper Fang':   {t:'Normal',  pow:1.7, acc:0.95},
+  'Mega Punch':   {t:'Normal',  pow:1.7, acc:0.95},
+  'Hyper Beam':   {t:'Normal',  pow:2.0, acc:0.85},
+  'Splash':       {t:'Normal',  pow:0.1, acc:1},
+  'Ember':        {t:'Fire',    pow:1.2, acc:1},
+  'Fire Spin':    {t:'Fire',    pow:1.6, acc:1},
+  'Flamethrower': {t:'Fire',    pow:1.8, acc:0.95},
+  'Fire Blast':   {t:'Fire',    pow:2.0, acc:0.9},
+  'Bubble':       {t:'Water',   pow:1.2, acc:1},
+  'Water Gun':    {t:'Water',   pow:1.6, acc:1},
+  'Surf':         {t:'Water',   pow:1.8, acc:0.95},
+  'Crabhammer':   {t:'Water',   pow:1.8, acc:0.95},
+  'Hydro Pump':   {t:'Water',   pow:2.0, acc:0.9},
+  'Absorb':       {t:'Grass',   pow:1.2, acc:1},
+  'Bug Bite':     {t:'Grass',   pow:1.3, acc:1},
+  'Vine Whip':    {t:'Grass',   pow:1.6, acc:1},
+  'Razor Leaf':   {t:'Grass',   pow:1.8, acc:0.95},
+  'Solar Beam':   {t:'Grass',   pow:2.0, acc:0.9},
+  'Thunder Shock':{t:'Electric',pow:1.2, acc:1},
+  'Thunderbolt':  {t:'Electric',pow:1.8, acc:0.95},
+  'Thunder':      {t:'Electric',pow:2.0, acc:0.9},
+  'Peck':         {t:'Flying',  pow:1.2, acc:1},
+  'Gust':         {t:'Flying',  pow:1.3, acc:1},
+  'Wing Attack':  {t:'Flying',  pow:1.5, acc:1},
+  'Drill Peck':   {t:'Flying',  pow:1.8, acc:0.95},
+  'Confusion':    {t:'Psychic', pow:1.4, acc:1},
+  'Psybeam':      {t:'Psychic', pow:1.6, acc:1},
+  'Psychic':      {t:'Psychic', pow:1.9, acc:0.95},
+  'Rock Throw':   {t:'Rock',    pow:1.5, acc:1},
+  'Rock Slide':   {t:'Rock',    pow:1.8, acc:0.95},
+  'Earthquake':   {t:'Rock',    pow:1.9, acc:0.95},
+  'Bone Club':    {t:'Rock',    pow:1.5, acc:1},
+  'Bonemerang':   {t:'Rock',    pow:1.8, acc:0.95},
+  'Lick':         {t:'Ghost',   pow:1.2, acc:1},
+  'Shadow Ball':  {t:'Ghost',   pow:1.8, acc:0.95},
+  'Twister':      {t:'Dragon',  pow:1.4, acc:1},
+  'Dragon Breath':{t:'Dragon',  pow:1.6, acc:1},
+  'Dragon Rush':  {t:'Dragon',  pow:1.9, acc:0.95},
+  'Karate Chop':  {t:'Fighting',pow:1.4, acc:1},
+  'Low Kick':     {t:'Fighting',pow:1.5, acc:1},
+  'Cross Chop':   {t:'Fighting',pow:1.8, acc:0.95},
 };
 
 const SPECIES = {
@@ -383,6 +384,10 @@ const SPECIES = {
   "mewtwoX": {"name":"Mega Mewtwo X","emoji":"💜👾","type":"Psychic","hp":60,"atk":18,"evolveLv":null,"mv":["Psychic","Shadow Ball"]},
 };
 const TOTAL_KINDS = Object.keys(SPECIES).length;
+/* Pokédex numbers, in national-dex order */
+const DEX_NO = {};
+Object.keys(SPECIES).forEach((k,i)=>{ DEX_NO[k] = i+1; });
+const dexNum = k => '#' + String(DEX_NO[k]||0).padStart(3,'0');
 
 /* Mega Evolution forms (unlocked with the Mega Bracelet at 3 badges) */
 const MEGA = {
@@ -800,6 +805,7 @@ window.renderDex = function(){
     const got = G.dex.includes(id);
     const s = SPECIES[id];
     return `<div class="dex-node">
+      <div class="dnum">${dexNum(id)}</div>
       ${got ? spriteImg(id, small?38:44) : `<span class="silhouette">${spriteImg(id, small?38:44)}</span>`}
       <div class="dn" style="${got?'':'color:#9aa5bb;'}">${got ? s.name : '???'}</div>
     </div>`;
@@ -808,6 +814,7 @@ window.renderDex = function(){
     const got = G.dex.includes(id);
     const m = MEGA[id];
     return `<div class="dex-node dex-mega">
+      <div class="dnum" style="color:var(--purple);">${dexNum(id)}💠</div>
       ${got ? spriteImg(m.sprite, 44) : `<span class="silhouette">${spriteImg(m.sprite, 44)}</span>`}
       <div class="dn" style="color:var(--purple);">${got ? m.name : '???'}</div>
     </div>`;
@@ -840,7 +847,7 @@ window.renderDex = function(){
     <div class="stack" style="gap:8px;">${families.join('')}</div>
     <h2 style="margin-top:16px;">⭐ One-of-a-kind</h2>
     <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px;">
-      ${solos.map(id=>`<div class="dex-cell">${G.dex.includes(id) ? spriteImg(id,44) : `<span class="silhouette">${spriteImg(id,44)}</span>`}<div class="dn" style="${G.dex.includes(id)?'':'color:#9aa5bb;'}">${G.dex.includes(id) ? SPECIES[id].name : '???'}</div></div>`).join('')}
+      ${solos.map(id=>`<div class="dex-cell"><div class="dnum">${dexNum(id)}</div>${G.dex.includes(id) ? spriteImg(id,44) : `<span class="silhouette">${spriteImg(id,44)}</span>`}<div class="dn" style="${G.dex.includes(id)?'':'color:#9aa5bb;'}">${G.dex.includes(id) ? SPECIES[id].name : '???'}</div></div>`).join('')}
     </div>
     <div style="margin-top:14px;"><button class="big" onclick="backTown()">⬅ Back to Town</button></div>
   </div>`;
@@ -921,7 +928,7 @@ window.renderParty = function(msg){
         <div class="party-item ${i===0?'active-mon':''}" onclick="setLeader(${i})" style="cursor:pointer;">
           ${spriteImg(m.id,56)}
           <div class="info">
-            <div class="nm">${s.name} <span class="tag">${s.type}</span> ${MEGA[m.id]?'💠':''} ${m.hp===0?'😵':''}</div>
+            <div class="nm"><span class="dnum">${dexNum(m.id)}</span> ${s.name} <span class="tag">${s.type}</span> ${MEGA[m.id]?'💠':''} ${m.hp===0?'😵':''}</div>
             <div class="lv">Lv.${m.lv} · ⭐ ${m.exp}/${expNeed(m)} · ${s.mv.join(' / ')}</div>
             <div class="hpbar"><div class="hpfill" style="width:${pct}%;background:${hpColor(pct)}"></div></div>
           </div>
