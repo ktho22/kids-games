@@ -58,6 +58,13 @@
   .hpbar{height:14px; background:#e3e0d2; border:2px solid var(--ink); border-radius:99px; overflow:hidden;}
   .hpfill{height:100%; border-radius:99px; transition:width .4s;}
   .tag{display:inline-block; font-size:12px; font-weight:800; padding:2px 9px; border-radius:99px; border:2px solid var(--ink); background:var(--soft);}
+  .st-tag{background:#ffd9d9; padding:2px 7px; font-size:11px;}
+  /* move names can be long once the ⏩ / status hints are added — keep them on one line */
+  .move-btn{font-size:15px; padding:13px 6px; line-height:1.2;}
+  .gaugebar{height:10px; background:#e3e0d2; border:2px solid var(--ink); border-radius:99px; overflow:hidden; flex:1;}
+  .gaugefill{height:100%; border-radius:99px; transition:width .35s;}
+  .gauge-full{animation:gaugepulse 1s ease-in-out infinite;}
+  @keyframes gaugepulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.5)}}
   .trainer-line{font-size:13px; font-weight:800; color:#6b7a99;}
   .msgbox{
     background:#fff; border:3px solid var(--ink); border-radius:14px;
@@ -94,7 +101,7 @@
   .fadein{animation:fadein .35s;}
   @keyframes fadein{from{opacity:0; transform:translateY(8px)}to{opacity:1; transform:none}}
   @media (prefers-reduced-motion: reduce){
-    .bounce,.shakeit,.flashit,.confetti,.fadein{animation:none !important;}
+    .bounce,.shakeit,.flashit,.confetti,.fadein,.gauge-full{animation:none !important;}
   }
   /* tablets (iPad): scale the whole game up so it fills the screen */
   @media (min-width: 700px){
@@ -128,24 +135,25 @@ const TYPES = {
   'Fighting':{fx:'👊', strong:['Normal','Rock'],    weak:['Flying','Psychic'], barely:['Ghost']},
 };
 
-/* move library: every Pokémon gets its own two moves */
+/* move library: every Pokémon gets its own two moves
+   pri = priority (always goes first), st/stc = status condition + its chance */
 const MOVES = {
   'Tackle':       {t:'Normal',  pow:1.0, acc:1},
   'Scratch':      {t:'Normal',  pow:1.0, acc:1},
-  'Quick Attack': {t:'Normal',  pow:1.1, acc:1},
+  'Quick Attack': {t:'Normal',  pow:1.1, acc:1, pri:1},
   'Bite':         {t:'Normal',  pow:1.2, acc:1},
   'Headbutt':     {t:'Normal',  pow:1.3, acc:1},
   'Slash':        {t:'Normal',  pow:1.4, acc:1},
   'Vice Grip':    {t:'Normal',  pow:1.4, acc:1},
-  'Body Slam':    {t:'Normal',  pow:1.5, acc:1},
+  'Body Slam':    {t:'Normal',  pow:1.5, acc:1, st:'par', stc:0.15},
   'Hyper Fang':   {t:'Normal',  pow:1.7, acc:0.95},
   'Mega Punch':   {t:'Normal',  pow:1.7, acc:0.95},
   'Hyper Beam':   {t:'Normal',  pow:2.0, acc:0.85},
   'Splash':       {t:'Normal',  pow:0.1, acc:1},
-  'Ember':        {t:'Fire',    pow:1.2, acc:1},
-  'Fire Spin':    {t:'Fire',    pow:1.6, acc:1},
-  'Flamethrower': {t:'Fire',    pow:1.8, acc:0.95},
-  'Fire Blast':   {t:'Fire',    pow:2.0, acc:0.9},
+  'Ember':        {t:'Fire',    pow:1.2, acc:1,    st:'brn', stc:0.20},
+  'Fire Spin':    {t:'Fire',    pow:1.6, acc:1,    st:'brn', stc:0.20},
+  'Flamethrower': {t:'Fire',    pow:1.8, acc:0.95, st:'brn', stc:0.25},
+  'Fire Blast':   {t:'Fire',    pow:2.0, acc:0.9,  st:'brn', stc:0.30},
   'Bubble':       {t:'Water',   pow:1.2, acc:1},
   'Water Gun':    {t:'Water',   pow:1.6, acc:1},
   'Surf':         {t:'Water',   pow:1.8, acc:0.95},
@@ -156,9 +164,9 @@ const MOVES = {
   'Vine Whip':    {t:'Grass',   pow:1.6, acc:1},
   'Razor Leaf':   {t:'Grass',   pow:1.8, acc:0.95},
   'Solar Beam':   {t:'Grass',   pow:2.0, acc:0.9},
-  'Thunder Shock':{t:'Electric',pow:1.2, acc:1},
-  'Thunderbolt':  {t:'Electric',pow:1.8, acc:0.95},
-  'Thunder':      {t:'Electric',pow:2.0, acc:0.9},
+  'Thunder Shock':{t:'Electric',pow:1.2, acc:1,    st:'par', stc:0.20},
+  'Thunderbolt':  {t:'Electric',pow:1.8, acc:0.95, st:'par', stc:0.25},
+  'Thunder':      {t:'Electric',pow:2.0, acc:0.9,  st:'par', stc:0.30},
   'Peck':         {t:'Flying',  pow:1.2, acc:1},
   'Gust':         {t:'Flying',  pow:1.3, acc:1},
   'Wing Attack':  {t:'Flying',  pow:1.5, acc:1},
@@ -179,6 +187,10 @@ const MOVES = {
   'Karate Chop':  {t:'Fighting',pow:1.4, acc:1},
   'Low Kick':     {t:'Fighting',pow:1.5, acc:1},
   'Cross Chop':   {t:'Fighting',pow:1.8, acc:0.95},
+  /* status specialists — weak hits, but they leave a nasty souvenir */
+  'Hypnosis':     {t:'Psychic', pow:0.4, acc:0.9, st:'slp', stc:0.70},
+  'Sleep Powder': {t:'Grass',   pow:0.4, acc:0.9, st:'slp', stc:0.70},
+  'Poison Sting': {t:'Grass',   pow:1.1, acc:1,   st:'psn', stc:0.35},
 };
 
 const SPECIES = {
@@ -383,6 +395,81 @@ const SPECIES = {
   "lucario": {"name":"Lucario","emoji":"👊","type":"Fighting","hp":35,"atk":15,"evolveLv":null,"evolveTo":null,"mv":["Headbutt","Cross Chop"]},
   "mewtwoX": {"name":"Mega Mewtwo X","emoji":"💜👾","type":"Psychic","hp":60,"atk":18,"evolveLv":null,"mv":["Psychic","Shadow Ball"]},
 };
+
+/* ============ DERIVED STATS: def (defence) + spd (speed) ============
+   Every species gets these computed from its hp/atk, so the species table above
+   never has to be hand-edited. Famous Pokémon then get a multiplier tweak so
+   they *feel* right: Snorlax slow & sturdy, Alakazam fast & papery, Onix a wall. */
+const STAT_TWEAKS = {
+  /* walls: lots of defence, not much hurry */
+  onix:{def:2.00,spd:0.85}, geodude:{def:1.50,spd:0.60}, graveler:{def:1.50,spd:0.60},
+  golem:{def:1.45,spd:0.60}, cloyster:{def:1.90,spd:0.95}, shellder:{def:1.25,spd:0.80},
+  aron:{def:1.50,spd:0.60}, lairon:{def:1.60,spd:0.60}, aggron:{def:1.80,spd:0.60},
+  rhyhorn:{def:1.40,spd:0.60}, rhydon:{def:1.50,spd:0.60}, marowak:{def:1.50,spd:0.70},
+  cubone:{def:1.45,spd:0.70}, omanyte:{def:1.50,spd:0.60}, omastar:{def:1.50,spd:0.70},
+  kabuto:{def:1.30,spd:0.90}, krabby:{def:1.35,spd:0.90}, kingler:{def:1.40,spd:0.95},
+  metapod:{def:1.60,spd:0.40}, kakuna:{def:1.55,spd:0.40}, koffing:{def:1.40,spd:0.70},
+  weezing:{def:1.50,spd:0.80}, magnemite:{def:1.40,spd:0.90}, magneton:{def:1.40,spd:0.95},
+  larvitar:{def:1.30,spd:0.70}, pupitar:{def:1.30,spd:0.70}, tyranitar:{def:1.30,spd:0.75},
+  slowbro:{def:1.35,spd:0.30}, slowpoke:{def:1.10,spd:0.25}, umbreon:{def:1.45,spd:0.75},
+  snorlax:{def:1.30,spd:0.40}, sandshrew:{def:1.30,spd:0.95}, sandslash:{def:1.30,spd:0.95},
+  exeggcute:{def:1.10,spd:0.50}, exeggutor:{def:1.05,spd:0.50}, tangela:{def:1.10,spd:0.80},
+  swampert:{def:1.20,spd:0.75}, meganium:{def:1.15,spd:0.90}, dragonite:{def:1.15,spd:0.95},
+  lapras:{def:1.05,spd:0.70}, dewgong:{def:1.05,spd:0.80}, seel:{def:1.05,spd:0.80},
+  horsea:{def:1.20,spd:1.10}, seadra:{def:1.15,spd:1.10}, ampharos:{def:1.10,spd:0.70},
+  heracross:{def:1.05,spd:1.15}, garchomp:{def:1.05,spd:1.30}, garados:{def:1.05,spd:1.05},
+  /* glass cannons: hit hard, fold fast */
+  alakazam:{def:0.55,spd:1.60}, kadabra:{def:0.65,spd:1.45}, abra:{def:0.70,spd:1.50},
+  gengar:{def:0.70,spd:1.50}, haunter:{def:0.70,spd:1.45}, gastly:{def:0.60,spd:1.40},
+  chansey:{def:0.35,spd:0.60}, jigglypuff:{def:0.45,spd:0.60}, wigglytuff:{def:0.45,spd:0.60},
+  jynx:{def:0.70,spd:1.25}, espeon:{def:0.75,spd:1.30}, hitmonlee:{def:0.70,spd:1.20},
+  muk:{def:0.80,spd:0.60}, grimer:{def:0.80,spd:0.60}, yeongking:{def:0.70,spd:1.30},
+  diglett:{def:0.60,spd:1.50}, dugtrio:{def:0.70,spd:1.60}, voltorb:{def:0.80,spd:1.50},
+  electrode:{def:0.85,spd:1.65}, jolteon:{def:0.80,spd:1.55}, aerodactyl:{def:0.80,spd:1.50},
+  ponyta:{def:0.80,spd:1.35}, rapidash:{def:0.80,spd:1.45}, scyther:{def:0.85,spd:1.40},
+  ninetales:{def:0.85,spd:1.30}, tentacruel:{def:0.85,spd:1.35}, vaporeon:{def:0.85,spd:0.90},
+  gardevoir:{def:0.85,spd:1.15}, mewtwoX:{def:1.00,spd:1.50},
+  /* speedsters (defence stays normal) */
+  pikachu:{spd:1.35}, raichu:{spd:1.30}, meowth:{spd:1.40}, persian:{spd:1.40},
+  kkoret:{spd:1.35}, retra:{spd:1.35}, spearow:{spd:1.30}, fearow:{spd:1.35},
+  gugu:{spd:1.15}, pijyon:{spd:1.20}, pidgeot:{spd:1.30}, doduo:{spd:1.35}, dodrio:{spd:1.50},
+  zubat:{spd:1.30}, golbat:{spd:1.30}, butterfree:{spd:1.20}, beedrill:{spd:1.20},
+  starmie:{spd:1.45}, staryu:{spd:1.30}, tauros:{spd:1.35}, sceptile:{spd:1.35},
+  primeape:{spd:1.30}, mankey:{spd:1.25}, kabutops:{spd:1.20}, arcanine:{spd:1.20},
+  magmar:{spd:1.20}, electabuzz:{spd:1.20}, typhlosion:{spd:1.20}, blaziken:{spd:1.10},
+  lucario:{spd:1.20}, salamence:{spd:1.20}, rayquaza:{spd:1.20}, mew:{spd:1.30},
+  articuno:{spd:1.20}, zapdos:{spd:1.20}, moltres:{spd:1.20}, latios:{spd:1.35},
+  machop:{spd:0.75}, machoke:{spd:0.70}, machamp:{spd:0.75}, lickitung:{spd:0.50},
+  clefairy:{spd:0.70}, clefable:{spd:0.70}, porygon:{spd:0.70}, caterpie:{spd:0.60},
+  weedle:{spd:0.60}, kangaskhan:{spd:1.10}, farfetchd:{spd:1.10}, 'mr-mime':{spd:1.10},
+};
+Object.keys(SPECIES).forEach(id=>{
+  const s = SPECIES[id], t = STAT_TWEAKS[id] || {};
+  s.def = Math.max(1, Math.round(s.hp * 0.42 * (t.def || 1)));
+  s.spd = Math.max(1, Math.round((s.atk * 1.15 + s.hp * 0.16) * (t.spd || 1)));
+});
+/* damage is normalised against the average defence, so an average Pokémon
+   takes exactly the same damage it always did — only the extremes change */
+const AVG_DEF = Object.keys(SPECIES).reduce((a,id)=>a+SPECIES[id].def,0) / Object.keys(SPECIES).length;
+
+/* status-move specialists, patched in without touching the species lines */
+const MOVE_PATCH = {
+  drowzee:['Confusion','Hypnosis'], hypno:['Psybeam','Hypnosis'],
+  oddish:['Absorb','Sleep Powder'], gloom:['Razor Leaf','Sleep Powder'],
+  vileplume:['Razor Leaf','Sleep Powder'],
+  bellsprout:['Vine Whip','Sleep Powder'], weepinbell:['Razor Leaf','Sleep Powder'],
+  victreebel:['Razor Leaf','Sleep Powder'],
+  paras:['Vine Whip','Sleep Powder'], parasect:['Razor Leaf','Sleep Powder'],
+};
+Object.keys(MOVE_PATCH).forEach(id=>{ if(SPECIES[id]) SPECIES[id].mv = MOVE_PATCH[id]; });
+/* the poison-flavoured families all learn Poison Sting as their second move */
+['ekans','arbok','nidoran-f','nidorina','nidoqueen','nidoran-m','nidorino','nidoking',
+ 'zubat','golbat','weedle','kakuna','beedrill','grimer','muk','koffing','weezing',
+ 'tentacool','tentacruel','venonat','venomoth'].forEach(id=>{
+  const s = SPECIES[id];
+  if(s) s.mv = [s.mv[1] || s.mv[0], 'Poison Sting'];
+});
+
 const TOTAL_KINDS = Object.keys(SPECIES).length;
 /* Pokédex numbers, in national-dex order */
 const DEX_NO = {};
@@ -439,7 +526,8 @@ const CAVES = [
   {name:'Ghost Cave',  icon:'👻', badge:'ghost',  trainer:'Witch Luna',        avatar:'🧙',
    team:[['gastly',15],['haunter',16],['gengar',18]]},
   {name:'Dragon Cave', icon:'🐉', badge:'dragon', trainer:'Dragon Master Kai', avatar:'🥷',
-   team:[['garados',18],['dragonair',19],['dragonite',21]]},
+   /* Gyarados goes last so Kai can finish with a Mega Gyarados */
+   team:[['dragonair',18],['dragonite',20],['garados',22]]},
 ];
 /* final cave: champion trainer, then Mega Mewtwo X to CATCH */
 const LEGEND = {name:'Legend Cave', trainer:'Mystery Champion', avatar:'👑',
@@ -477,14 +565,26 @@ let G = null; // {party:[mon], balls, dex:[], badges:[], masterBall, bossCaught}
 let B = null; // battle state
 let busy = false;
 
+const BOX_MAX = 40;
 const slotKey = s => 'pk-slot-'+s;
 function sanitizeSave(g){
   if(!g || !g.party || !g.party.length) return null;
   if(!g.badges) g.badges = [];
   g.badges = g.badges.map(b => OLD_BADGE_MAP[b] || b);
-  g.party = g.party.filter(m => SPECIES[m.id]);
+  g.party = g.party.filter(m => m && SPECIES[m.id]).slice(0,6);
+  /* saves from before the Storage Box existed simply have no box */
+  g.box = (Array.isArray(g.box) ? g.box : []).filter(m => m && SPECIES[m.id]).slice(0,BOX_MAX);
   g.dex = (g.dex||[]).filter(id => SPECIES[id]);
   if(!g.party.length) return null;
+  /* battle-only flags never belong in a save file */
+  g.party.concat(g.box).forEach(m => {
+    delete m.mega; delete m.gmax; delete m.tf; delete m.st; delete m.stT; delete m.bossMaxHp;
+    m.lv = Math.max(1, Math.min(100, Math.round(m.lv || 1)));
+    m.exp = Math.max(0, Math.round(m.exp || 0));
+    const mh = maxHpOf(m);
+    m.hp = Math.max(0, Math.min(mh, Math.round(m.hp == null ? mh : m.hp)));
+  });
+  g.box.forEach(m => { m.hp = maxHpOf(m); }); // the box always keeps them healthy
   return g;
 }
 function loadSlot(s){
@@ -522,10 +622,52 @@ function newMon(speciesId, lv){
   const maxHp = s.hp + lv*2;
   return {id:speciesId, lv, exp:0, hp:maxHp};
 }
-function maxHpOf(m){ return SPECIES[m.id].hp + m.lv*2; }
-function atkOf(m){ return SPECIES[m.id].atk + Math.floor(m.lv/2); }
+/* formOf = the shape a Pokémon is fighting AS right now.
+   Normally its own species — but a transformed Ditto borrows someone else's (m.tf). */
+function formOf(m){ return (m && m.tf && SPECIES[m.tf]) ? SPECIES[m.tf] : SPECIES[m.id]; }
+function maxHpOf(m){ return SPECIES[m.id].hp + m.lv*2; } // HP is always your own, even transformed
+function atkOf(m){ return formOf(m).atk + Math.floor(m.lv/2); }
+function baseDefOf(m){ return formOf(m).def; }
+function defOf(m){ return m.mega ? Math.round(baseDefOf(m)*1.3) : baseDefOf(m); }
+function spdOf(m){
+  let s = formOf(m).spd;
+  if(m.st==='par') s *= 0.5;   // paralysis halves speed
+  return s;
+}
+/* an average-defence Pokémon takes exactly 1.0x — tanks less, glass cannons more.
+   The band is deliberately gentle (0.80x ~ 1.20x): wide enough that Onix feels like a
+   wall and Alakazam feels like paper, narrow enough that the game's overall difficulty
+   is unchanged (measured against the pre-defence build, gym by gym). */
+function defFactor(m){
+  const f = (AVG_DEF*4) / (AVG_DEF*3 + defOf(m));
+  return Math.max(0.80, Math.min(1.20, f));
+}
+function burnMult(m){ return m.st==='brn' ? 0.75 : 1; } // burned Pokémon hit softer
 function expNeed(m){ return m.lv*12; }
 function activeMon(){ return G.party.find(m=>m.hp>0) || G.party[0]; }
+function boxOf(){ if(!G.box) G.box = []; return G.box; }
+
+/* ============ STATUS CONDITIONS ============ */
+const STATUS = {
+  brn:{icon:'🔥', label:'Burn',  got:'got burned!'},
+  psn:{icon:'☠️', label:'Poison',got:'got poisoned!'},
+  par:{icon:'⚡', label:'Par',   got:'is paralyzed!'},
+  slp:{icon:'😴', label:'Sleep', got:'fell fast asleep!'},
+};
+function statusTag(m){
+  if(!m || !m.st || !STATUS[m.st]) return '';
+  return ` <span class="tag st-tag">${STATUS[m.st].icon}${STATUS[m.st].label}</span>`;
+}
+function clearStatus(m){ delete m.st; delete m.stT; }
+function statusImmune(m, st){
+  return st==='brn' && formOf(m).type==='Fire'; // fire types shrug off burns
+}
+function applyStatus(m, st){
+  if(!STATUS[st] || m.st || statusImmune(m, st)) return false;
+  m.st = st;
+  if(st==='slp') m.stT = 2 + rand(2); // asleep for 2~3 turns
+  return true;
+}
 
 /* ============ SOUND ============ */
 let AC = null;
@@ -722,7 +864,7 @@ function renderStarter(){
 }
 window.pickStarter = function(id){
   sfx.good();
-  G = {party:[newMon(id,5)], balls:5, dex:[id], badges:[], masterBall:false, bossCaught:false};
+  G = {party:[newMon(id,5)], box:[], balls:5, dex:[id], badges:[], masterBall:false, bossCaught:false};
   save();
   renderTown(`Yay! ${SPECIES[id].name} is your buddy now! Let's go!`);
 };
@@ -767,8 +909,9 @@ function renderTown(msg){
       <div class="grid2">
         <button class="blue" onclick="healAll()" style="padding:10px 4px; font-size:14px;">🏥 Center<br><small>Heal all</small></button>
         <button class="yellow" onclick="renderParty()" style="padding:10px 4px; font-size:14px;">🎒 Team<br><small>${G.party.length}/6</small></button>
+        <button onclick="renderBox()" style="padding:10px 4px; font-size:14px;">📦 Box<br><small>${boxOf().length}/${BOX_MAX}</small></button>
         <button onclick="renderDex()" style="padding:10px 4px; font-size:14px;">📖 Pokédex<br><small>${G.dex.length}/${TOTAL_KINDS}</small></button>
-        <button onclick="renderTypeChart()" style="padding:10px 4px; font-size:14px;">⚔️ Type Chart<br><small>Who beats who?</small></button>
+        <button onclick="renderTypeChart()" style="padding:10px 4px; font-size:14px; grid-column:1 / -1;">⚔️ Type Chart<br><small>Who beats who?</small></button>
       </div>
       <div class="grid2" style="grid-template-columns:repeat(5,1fr); gap:8px;">
         ${CAVES.map((c,i)=>{
@@ -782,7 +925,7 @@ function renderTown(msg){
       <button class="big purple" ${G.badges.length>=1?'':'disabled'} onclick="goPlaza()">
         ${G.badges.length>=1 ? '🏟️ Battle Plaza — surprise trainer!' : '🔒 Battle Plaza (need 1 badge)'}
       </button>
-      ${G.badges.length>=3 ? `<div class="progress-note center">💠 Mega Bracelet${G.badges.length>=5?' + 🔴 Dynamax Band':''} ready — use them in battle!</div>` : ''}
+      ${G.badges.length>=3 ? `<div class="progress-note center">💠 Mega Bracelet${G.badges.length>=5?' + 🔴 Dynamax Band':''} ready — fill the ⚡Power gauge to 100% in battle to use them!</div>` : ''}
       ${G.dex.length<2 && G.badges.length===0 ? `<div class="progress-note center">Catch 1 Pokémon in the grass to open the first cave!</div>`
         : !unlocked ? `<div class="progress-note center">Beat cave trainers to get badges! 🏅 ${G.badges.length}/5 · Cleared caves can be replayed!</div>` : ''}
       <button class="big ${unlocked?'red':''}" ${unlocked?'':'disabled'} onclick="goBoss()">
@@ -890,12 +1033,13 @@ window.healAll = function(){
   sfx.heal();
   heartsFx('heal-monsters');
   setTimeout(()=>{
-    G.party.forEach(m=>m.hp=maxHpOf(m));
+    G.party.forEach(m=>{ m.hp = maxHpOf(m); clearStatus(m); });
+    boxOf().forEach(m=>{ m.hp = maxHpOf(m); clearStatus(m); });
     G.balls = Math.max(G.balls,5);
     save();
     sfx.catchOk();
     busy = false;
-    renderTown('All better! "Come back anytime!" 💗 Poké Balls are full too!');
+    renderTown('All better! Burns, poison, everything gone! 💗 Poké Balls are full too!');
   }, 2000);
 };
 function heartsFx(targetId){
@@ -916,10 +1060,11 @@ function heartsFx(targetId){
 /* ============ SCREEN: MY POKEMON ============ */
 window.renderParty = function(msg){
   sfx.tap();
+  const box = boxOf();
   app.innerHTML = `
   <div class="card fadein">
     <h2>🎒 My Pokémon <small style="color:#6b7a99">(${G.party.length}/6)</small></h2>
-    <p class="sub" style="text-align:left;">The top one battles first. Tap to change! Tap 👋 to say bye-bye.</p>
+    <p class="sub" style="text-align:left;">The top one battles first. Tap to change! 📦 rests them in the Box, 👋 says bye-bye.</p>
     ${msg?`<div class="msgbox" style="margin-bottom:12px;"><span>${msg}</span></div>`:''}
     <div class="stack">
       ${G.party.map((m,i)=>{
@@ -932,12 +1077,84 @@ window.renderParty = function(msg){
             <div class="lv">Lv.${m.lv} · ⭐ ${m.exp}/${expNeed(m)} · ${s.mv.join(' / ')}</div>
             <div class="hpbar"><div class="hpfill" style="width:${pct}%;background:${hpColor(pct)}"></div></div>
           </div>
-          <button style="padding:6px 10px; font-size:14px;" onclick="releaseMon(event,${i})">👋</button>
+          <button style="padding:6px 8px; font-size:14px;" ${G.party.length<=1||box.length>=BOX_MAX?'disabled':''} onclick="depositMon(event,${i})" title="Send to Box">📦</button>
+          <button style="padding:6px 8px; font-size:14px;" onclick="releaseMon(event,${i})">👋</button>
         </div>`;
       }).join('')}
     </div>
-    <div style="margin-top:14px;"><button class="big" onclick="backTown()">⬅ Back to Town</button></div>
+    <div class="stack" style="margin-top:14px;">
+      <button class="big" onclick="renderBox()">📦 Storage Box (${box.length}/${BOX_MAX})</button>
+      <button class="big" onclick="backTown()">⬅ Back to Town</button>
+    </div>
   </div>`;
+};
+
+/* ============ SCREEN: STORAGE BOX ============ */
+window.renderBox = function(msg){
+  sfx.tap();
+  const box = boxOf();
+  app.innerHTML = `
+  <div class="card fadein">
+    <h2>📦 Storage Box <small style="color:#6b7a99">(${box.length}/${BOX_MAX})</small></h2>
+    <p class="sub" style="text-align:left;">Everyone in the Box takes a nice nap — they are always fully healed! Team: ${G.party.length}/6.</p>
+    ${msg?`<div class="msgbox" style="margin-bottom:12px;"><span>${msg}</span></div>`:''}
+    <div class="stack">
+      ${box.length ? box.map((m,i)=>{
+        const s = SPECIES[m.id];
+        return `
+        <div class="party-item">
+          ${spriteImg(m.id,48)}
+          <div class="info">
+            <div class="nm"><span class="dnum">${dexNum(m.id)}</span> ${s.name} <span class="tag">${s.type}</span> ${MEGA[m.id]?'💠':''}</div>
+            <div class="lv">Lv.${m.lv} · HP ${m.hp}/${maxHpOf(m)}</div>
+          </div>
+          <button class="green" style="padding:6px 9px; font-size:13px;" ${G.party.length>=6?'disabled':''} onclick="withdrawMon(${i})">🎒 Team</button>
+          <button style="padding:6px 8px; font-size:14px;" onclick="releaseBox(${i})">👋</button>
+        </div>`;
+      }).join('') : `<div class="msgbox"><span>The Box is empty. Catch more friends! 🔴</span></div>`}
+    </div>
+    ${G.party.length>=6 ? `<div class="progress-note center" style="margin-top:8px;">Your team is full — say bye-bye or 📦 someone from the Team screen to make room.</div>` : ''}
+    <div class="stack" style="margin-top:14px;">
+      <button class="big" onclick="renderParty()">🎒 My Team</button>
+      <button class="big" onclick="backTown()">⬅ Back to Town</button>
+    </div>
+  </div>`;
+};
+window.depositMon = function(ev, i){
+  ev.stopPropagation();
+  const box = boxOf();
+  if(G.party.length<=1){ renderParty('You need at least 1 Pokémon on your team! 😊'); return; }
+  if(box.length>=BOX_MAX){ renderParty('The Box is full! 📦'); return; }
+  const m = G.party.splice(i,1)[0];
+  clearStatus(m);
+  delete m.tf; delete m.mega; delete m.gmax;
+  m.hp = maxHpOf(m); // a rest in the Box heals it up completely
+  box.push(m);
+  sfx.heal();
+  save();
+  renderParty(`${SPECIES[m.id].name} is resting in the Box — all healed up! 📦💗`);
+};
+window.withdrawMon = function(i){
+  const box = boxOf();
+  if(G.party.length>=6){ renderBox('Your team is full! 🎒'); return; }
+  const m = box.splice(i,1)[0];
+  if(!m) return;
+  m.hp = maxHpOf(m);
+  G.party.push(m);
+  sfx.good();
+  save();
+  renderBox(`${SPECIES[m.id].name} joined your team! 🎒✨`);
+};
+window.releaseBox = function(i){
+  const box = boxOf();
+  const m = box[i];
+  if(!m) return;
+  if(!confirm(`Say bye-bye to ${SPECIES[m.id].name}? It will go play in the wild.`)) return;
+  box.splice(i,1);
+  G.balls++;
+  sfx.good();
+  save();
+  renderBox(`${SPECIES[m.id].name} waved bye-bye! 👋 It left a Poké Ball for you! 🔴 +1`);
 };
 window.setLeader = function(i){
   if(i===0) return;
@@ -980,11 +1197,11 @@ window.goArea = function(i){
       id = to; s = SPECIES[id];
     }
   }
-  B = {enemy:newMon(id, lv), trainer:null, cave:null, legend:false, queue:[], powerUsed:false, over:false};
+  B = newBattle({enemy:newMon(id, lv), trainer:null, cave:null, legend:false, queue:[]});
   BGM.play(rare ? 'boss' : 'battle');
-  renderBattle(rare
+  renderBattle((rare
     ? `🌟 WOW!! A legendary <b>${SPECIES[id].name}</b> appeared!!`
-    : `Look! A wild <b>${SPECIES[id].name}</b> is here!`);
+    : `Look! A wild <b>${SPECIES[id].name}</b> is here!`) + dittoPrep());
   if(rare) sfx.power(); else sfx.tap();
 };
 window.goPlaza = function(){
@@ -1006,11 +1223,15 @@ window.goPlaza = function(){
     }
     queue.push(makeTrainerMon(id, lv));
   }
-  B = {enemy:queue.shift(), trainer:tr, cave:null, legend:false, plaza:true, queue, powerUsed:false, over:false};
+  B = newBattle({enemy:queue.shift(), trainer:tr, cave:null, legend:false, plaza:true, queue});
   BGM.play('boss');
-  renderBattle(`${tr.avatar} ${tr.trainer} wants to battle! "Go, <b>${SPECIES[B.enemy.id].name}</b>!"`);
+  renderBattle(`${tr.avatar} ${tr.trainer} wants to battle! "Go, <b>${SPECIES[B.enemy.id].name}</b>!"` + dittoPrep());
   sfx.fail();
 };
+/* fresh battle state — ⚡power gauge starts empty, so Mega/Dynamax must be earned */
+function newBattle(o){
+  return Object.assign({queue:[], powerUsed:false, over:false, gauge:0, enemyMega:false, forced:false}, o);
+}
 function makeTrainerMon(id, lv){
   const m = newMon(id, lv);
   m.bossMaxHp = Math.round(maxHpOf(m)*1.2); // trainer Pokémon are extra tough
@@ -1022,9 +1243,9 @@ window.goCave = function(i){
   const c = CAVES[i];
   if(activeMon().hp===0){ renderTown('Your Pokémon are all tired! Heal them first. 🏥'); return; }
   const queue = c.team.map(([id,lv]) => makeTrainerMon(id, lv));
-  B = {enemy:queue.shift(), trainer:c, cave:c, legend:false, queue, powerUsed:false, over:false};
+  B = newBattle({enemy:queue.shift(), trainer:c, cave:c, legend:false, queue});
   BGM.play('boss');
-  renderBattle(`${c.avatar} ${c.trainer} wants to battle! "Go, <b>${SPECIES[B.enemy.id].name}</b>!"`);
+  renderBattle(`${c.avatar} ${c.trainer} wants to battle! "Go, <b>${SPECIES[B.enemy.id].name}</b>!"` + dittoPrep());
   sfx.fail();
 };
 window.goBoss = function(){
@@ -1039,40 +1260,68 @@ window.goBoss = function(){
   const mw = newMon('mewtwoX', 24);
   mw.bossMaxHp = 200; mw.hp = 200;
   queue.push(mw);
-  B = {enemy:queue.shift(), trainer:LEGEND, cave:null, legend:true, queue, powerUsed:false, over:false};
+  B = newBattle({enemy:queue.shift(), trainer:LEGEND, cave:null, legend:true, queue});
   BGM.play('boss');
-  renderBattle(`${LEGEND.avatar} ${LEGEND.trainer} wants to battle! "Go, <b>${SPECIES[B.enemy.id].name}</b>!"`);
+  renderBattle(`${LEGEND.avatar} ${LEGEND.trainer} wants to battle! "Go, <b>${SPECIES[B.enemy.id].name}</b>!"` + dittoPrep());
   sfx.fail();
 };
 function bossMaxHpOf(m){ return m.bossMaxHp || maxHpOf(m); }
 function isCatchPhase(){ return B.legend && B.enemy.id==='mewtwoX' && !G.bossCaught; }
 
+/* ============ DITTO: TRANSFORM ============
+   Ditto copies whoever it faces — looks, type, moves, atk/def/spd. HP stays its own.
+   Runs when a battle starts, when a new Pokémon is sent out, and clears on the way out. */
+function dittoPrep(){
+  const my = activeMon(), e = B.enemy;
+  let note = '';
+  if(my.id==='ditto' && e.id!=='ditto'){
+    my.tf = e.tf || e.id;
+    note += ` Your Ditto TRANSFORMED into <b>${SPECIES[my.tf].name}</b>! ✨`;
+  }
+  if(e.id==='ditto' && my.id!=='ditto'){
+    e.tf = my.tf || my.id;
+    note += ` The Ditto TRANSFORMED into <b>${SPECIES[e.tf].name}</b>! ✨`;
+  }
+  return note;
+}
+
 /* ===== Mega Evolution & Dynamax ===== */
+/* the ⚡power gauge fills as you fight: +18 attacking, +12 taking a hit.
+   A short wild scrap almost never reaches 100 — gym and champion battles do. */
+const GAUGE_MAX = 100;
+function addGauge(n){
+  if(!B || B.over) return;
+  B.gauge = Math.min(GAUGE_MAX, (B.gauge||0) + n);
+}
+function gaugeReady(){ return (B.gauge||0) >= GAUGE_MAX; }
+function powerUnlocked(){ return G.badges.length >= 3; }
 function canMega(){
-  if(!B || B.over || B.powerUsed) return false;
+  if(!B || B.over || B.powerUsed || !gaugeReady()) return false;
   const my = activeMon();
-  return G.badges.length >= 3 && !!MEGA[my.id] && !my.mega && !my.gmax;
+  return G.badges.length >= 3 && !!MEGA[my.id] && !my.tf && !my.mega && !my.gmax;
 }
 function canGmax(){
-  if(!B || B.over || B.powerUsed) return false;
+  if(!B || B.over || B.powerUsed || !gaugeReady()) return false;
   const my = activeMon();
   return G.badges.length >= 5 && SPECIES[my.id].evolveLv === null && !my.mega && !my.gmax;
 }
-function clearPowers(){
-  G.party.forEach(m => { delete m.mega; delete m.gmax; });
+/* wipe everything that only exists inside a battle */
+function clearBattleFlags(){
+  G.party.forEach(m => { delete m.mega; delete m.gmax; delete m.tf; clearStatus(m); });
 }
-function powerMult(m){ return m.mega ? 1.5 : (m.gmax ? 2 : 1); }
+function powerMult(m){ return m.mega ? 1.4 : (m.gmax ? 1.7 : 1); }
 window.doMega = async function(){
   if(busy || !canMega()) return; busy = true; setBtns(false);
   const my = activeMon();
   my.mega = true;
   B.powerUsed = true;
+  B.gauge = 0;
   sfx.power();
   setMsg(`${SPECIES[my.id].name}'s Mega Bracelet is shining! 💠`);
   flashEl('my-sprite');
   await ringBurstFx('my-sprite','💠');
   await ringBurstFx('my-sprite','✨');
-  renderBattle(`⚡ MEGA EVOLUTION! ⚡ It became <b>${MEGA[my.id].name}</b>! Power way up!`);
+  renderBattle(`⚡ MEGA EVOLUTION! ⚡ It became <b>${MEGA[my.id].name}</b>! Attack AND defence up!`);
   shakeScreen();
   busy = false; setBtns(true);
 };
@@ -1081,22 +1330,45 @@ window.doGmax = async function(){
   const my = activeMon();
   my.gmax = 3;
   B.powerUsed = true;
+  B.gauge = 0;
+  const healed = Math.min(maxHpOf(my) - my.hp, Math.round(maxHpOf(my)*0.25));
+  my.hp += healed;
   sfx.power();
   setMsg(`${SPECIES[my.id].name} is getting HUGE! 🔴☁️`);
   flashEl('my-sprite');
   await ringBurstFx('my-sprite','🔴');
   await ringBurstFx('my-sprite','☁️');
-  renderBattle(`🔴 DYNAMAX! 🔴 <b>G-Max ${SPECIES[my.id].name}</b> is GIANT for 3 moves! Power way way up!`);
+  renderBattle(`🔴 DYNAMAX! 🔴 <b>G-Max ${SPECIES[my.id].name}</b> is GIANT for 3 moves!${healed>0?` It got ${healed} HP back! 💗`:''}`);
   shakeScreen();
   busy = false; setBtns(true);
 };
+/* the enemy trainer's LAST Pokémon fights back with a Mega of its own (once, below 55% HP).
+   Mega Mewtwo X waits at the end of the Champion's queue but isn't part of the team,
+   so Blastoise still counts as the last one. */
+async function maybeEnemyMega(){
+  const e = B.enemy;
+  const behind = B.queue.filter(m => m.id !== 'mewtwoX').length;
+  if(!B.trainer || behind || B.enemyMega) return false;
+  if(!MEGA[e.id] || e.tf || e.mega) return false;
+  if(e.hp <= 0 || e.hp > bossMaxHpOf(e)*0.55) return false;
+  B.enemyMega = true;
+  e.mega = true;
+  sfx.power();
+  setMsg(`${B.trainer.trainer}: "Now! Show them our REAL power!" 💠`);
+  flashEl('enemy-sprite');
+  await ringBurstFx('enemy-sprite','💠');
+  renderBattle(`💠 MEGA EVOLUTION! ${SPECIES[e.id].name} became <b>${MEGA[e.id].name}</b>!`);
+  shakeScreen();
+  await sleep(1300);
+  return true;
+}
 function flashEl(id){
   const el = document.getElementById(id);
   if(el){ el.classList.remove('flashit'); void el.offsetWidth; el.classList.add('flashit'); }
 }
 
 function movesOf(m){
-  return SPECIES[m.id].mv.map(n => Object.assign({name:n}, MOVES[n]));
+  return formOf(m).mv.map(n => Object.assign({name:n}, MOVES[n]));
 }
 function typeMult(moveType, defType){
   const t = TYPES[moveType];
@@ -1106,24 +1378,34 @@ function typeMult(moveType, defType){
   return 1;
 }
 
-function myMonLabel(my){
-  if(my.mega && MEGA[my.id]) return MEGA[my.id].name;
-  if(my.gmax) return 'G-Max ' + SPECIES[my.id].name;
-  return SPECIES[my.id].name;
+/* battle name + sprite, honouring Mega / Dynamax / a transformed Ditto */
+function monLabel(m){
+  if(m.mega && MEGA[m.id] && !m.tf) return MEGA[m.id].name;
+  if(m.gmax) return 'G-Max ' + formOf(m).name;
+  return formOf(m).name;
 }
-function myMonSprite(my){
-  if(my.mega && MEGA[my.id]) return spriteImg(MEGA[my.id].sprite, 104);
-  if(my.gmax) return `<span class="gmax-glow">${spriteImg(my.id, 140)}</span>`;
-  return spriteImg(my.id, 88);
+function monSprite(m, size){
+  if(m.mega && MEGA[m.id] && !m.tf) return spriteImg(MEGA[m.id].sprite, Math.round(size*1.18));
+  if(m.gmax) return `<span class="gmax-glow">${spriteImg(m.tf || m.id, Math.round(size*1.55))}</span>`;
+  return spriteImg(m.tf || m.id, size);
+}
+function moveBtnLabel(mv){
+  const tf = TYPES[mv.t].fx;
+  /* only hint at the status when its icon isn't already the type icon
+     (Fire moves burn, Electric moves paralyse — no need to say it twice) */
+  const st = mv.st && STATUS[mv.st].icon !== tf ? ' ' + STATUS[mv.st].icon : '';
+  return `${mv.pri?'⏩':''}${tf} ${mv.name}${st}`;
 }
 function renderBattle(msg){
   const e = B.enemy, my = activeMon();
-  const es = SPECIES[e.id], ms = SPECIES[my.id];
+  const es = formOf(e), ms = formOf(my);
   const eMax = bossMaxHpOf(e);
   const ePct = Math.max(0, Math.round(e.hp/eMax*100));
   const mMax = maxHpOf(my), mPct = Math.max(0, Math.round(my.hp/mMax*100));
   const mv = movesOf(my);
   const teamDots = B.trainer ? '🔴'.repeat(1 + B.queue.length) : '';
+  const canSwitch = G.party.filter(m=>m.hp>0 && m!==my).length > 0;
+  const gauge = Math.round(B.gauge||0);
   const ballBtn = isCatchPhase()
     ? `<button class="yellow" id="btn-ball" onclick="throwBall()">🟣 Master Ball</button>`
     : `<button class="yellow" id="btn-ball" onclick="throwBall()">🔴 Ball ×${G.balls}</button>`;
@@ -1135,27 +1417,34 @@ function renderBattle(msg){
     ${B.trainer ? `<div class="trainer-line" style="margin-bottom:6px;">${B.trainer.avatar} ${B.trainer.trainer} &nbsp;${teamDots}</div>` : ''}
     <div class="row" style="align-items:flex-start;">
       <div style="flex:1;">
-        <div class="nm" style="font-weight:800;">${es.name} <span class="tag">${es.type}</span></div>
-        <div class="lv" style="font-size:13px;color:#6b7a99;font-weight:800;">Lv.${e.lv}</div>
+        <div class="nm" style="font-weight:800;">${monLabel(e)} <span class="tag">${es.type}</span>${statusTag(e)}</div>
+        <div class="lv" style="font-size:13px;color:#6b7a99;font-weight:800;">Lv.${e.lv}${e.tf?' · ✨copycat Ditto':''}</div>
         <div class="hpbar" style="margin-top:4px;"><div class="hpfill" style="width:${ePct}%;background:${hpColor(ePct)}"></div></div>
       </div>
-      <div class="mon-big" id="enemy-sprite">${spriteImg(e.id, B.trainer?110:100)}</div>
+      <div class="mon-big" id="enemy-sprite">${monSprite(e, B.trainer?110:100)}</div>
     </div>
     <div class="row" style="align-items:flex-end; margin-top:10px;">
-      <div class="mon-big" id="my-sprite">${myMonSprite(my)}</div>
+      <div class="mon-big" id="my-sprite">${monSprite(my, 88)}</div>
       <div style="flex:1;">
-        <div class="nm" style="font-weight:800; text-align:right;">${myMonLabel(my)} <span class="tag">${ms.type}</span>${my.gmax?` <span class="tag">🔴×${my.gmax}</span>`:''}</div>
+        <div class="nm" style="font-weight:800; text-align:right;">${monLabel(my)} <span class="tag">${ms.type}</span>${my.gmax?` <span class="tag">🔴×${my.gmax}</span>`:''}${statusTag(my)}</div>
         <div class="lv" style="font-size:13px;color:#6b7a99;font-weight:800;text-align:right;">Lv.${my.lv} · HP ${my.hp}/${mMax}</div>
         <div class="hpbar" style="margin-top:4px;"><div class="hpfill" style="width:${mPct}%;background:${hpColor(mPct)}"></div></div>
       </div>
     </div>
+    ${powerUnlocked() ? `
+    <div class="row" style="margin-top:8px; gap:6px;">
+      <span style="font-size:12px;font-weight:800;color:#6b7a99;">⚡Power</span>
+      <div class="gaugebar"><div class="gaugefill ${gauge>=GAUGE_MAX?'gauge-full':''}" style="width:${gauge}%;background:${gauge>=GAUGE_MAX?'var(--purple)':'var(--yellow)'}"></div></div>
+      <span style="font-size:12px;font-weight:800;">${gauge}%</span>
+    </div>` : ''}
     <div class="msgbox" id="battle-msg" style="margin:12px 0;"><span>${msg}</span></div>
     <div class="grid2" id="battle-btns">
       ${powerBtns}
-      <button class="red" onclick="useMove(0)">${TYPES[mv[0].t].fx} ${mv[0].name}</button>
-      <button class="red" onclick="useMove(1)">${TYPES[mv[1].t].fx} ${mv[1].name}</button>
+      <button class="red move-btn" onclick="useMove(0)">${moveBtnLabel(mv[0])}</button>
+      <button class="red move-btn" onclick="useMove(1)">${moveBtnLabel(mv[1])}</button>
       ${ballBtn}
-      <button onclick="runAway()">💨 Run Away</button>
+      <button class="blue" ${canSwitch?'':'disabled'} onclick="openSwitch()">🔄 Switch</button>
+      <button style="grid-column:1 / -1;" onclick="runAway()">💨 Run Away</button>
     </div>
   </div>`;
 }
@@ -1273,47 +1562,113 @@ async function ballFx(emoji){
   await sleep(550);
 }
 
+/* ============ TURN ENGINE ============
+   Both sides pick a move, then SPEED decides who swings first
+   (a ⏩priority move like Quick Attack always jumps the queue).
+   Every helper below returns true when it has taken over the flow
+   (battle won/lost, a screen swapped in) so the caller stops. */
+function pickEnemyMove(e){
+  const mv = movesOf(e);
+  return mv[rand(mv.length)];
+}
+function myGoesFirst(my, mv, e, emv){
+  const pa = mv.pri || 0, pb = emv.pri || 0;
+  if(pa !== pb) return pa > pb;
+  const sa = spdOf(my), sb = spdOf(e);
+  if(sa === sb) return Math.random() < 0.5;
+  return sa > sb;
+}
+/* sleep / paralysis can keep a Pokémon from moving at all */
+async function canAct(m){
+  if(m.st==='slp'){
+    if(m.stT > 0){
+      m.stT--;
+      setMsg(`${monLabel(m)} is fast asleep... 😴`);
+      await sleep(950);
+      return false;
+    }
+    clearStatus(m);
+    renderBattle(`${monLabel(m)} woke up! 🌞`);
+    await sleep(900);
+  }
+  if(m.st==='par' && Math.random() < 0.25){
+    setMsg(`${monLabel(m)} is all zappy and can't move! ⚡`);
+    await sleep(950);
+    return false;
+  }
+  return true;
+}
+async function landStatus(mv, target, targetSprite){
+  if(!mv.st || target.hp<=0 || !(Math.random() < (mv.stc||0))) return;
+  if(!applyStatus(target, mv.st)) return;
+  sfx.power();
+  burst(targetSprite, STATUS[mv.st].icon);
+  renderBattle(`${monLabel(target)} ${STATUS[mv.st].got} ${STATUS[mv.st].icon}`);
+  await sleep(1050);
+}
+
 window.useMove = async function(i){
   if(busy||B.over) return; busy=true; setBtns(false);
-  const my = activeMon(), e = B.enemy;
+  const my = activeMon();
   const mv = movesOf(my)[i];
-  setMsg(`${myMonLabel(my)} used ${mv.name}!`);
-  await sleep(400);
+  const emv = pickEnemyMove(B.enemy);
+  if(myGoesFirst(my, mv, B.enemy, emv)){
+    if(await myAction(mv)) return;
+    if(await enemyAction(emv)) return;
+  }else{
+    if(await enemyAction(emv)) return;
+    if(await myAction(mv)) return;
+  }
+  if(await endOfTurn()) return;
+  busy=false; setBtns(true);
+};
+
+async function myAction(mv){
+  const my = activeMon(), e = B.enemy;
   const usedGmaxTurn = !!my.gmax;
+  if(!await canAct(my)){
+    await tickGmax(my, usedGmaxTurn);
+    return false;
+  }
+  setMsg(`${monLabel(my)} used ${mv.name}!`);
+  await sleep(400);
   if(Math.random() > mv.acc){
     sfx.fail(); setMsg('Oops, it missed! 😅');
     await sleep(800);
     await tickGmax(my, usedGmaxTurn);
-    await enemyTurn();
-    return;
+    return false;
   }
   if(mv.t==='Normal'){ await lungeFx('my-sprite'); }
   else { await attackFx('my-sprite','enemy-sprite', TYPES[mv.t].fx); }
-  const mult = typeMult(mv.t, SPECIES[e.id].type);
-  burst('enemy-sprite','💥', mult>1 || powerMult(my)>1);
-  if(mult>1 || powerMult(my)>1){ shakeScreen(); ringBurstFx('enemy-sprite', TYPES[mv.t].fx); }
-  let dmg = Math.max(1, Math.round((atkOf(my)*mv.pow*powerMult(my) + rand(4)) * mult));
+  const mult = typeMult(mv.t, formOf(e).type);
+  const big = mult>1 || powerMult(my)>1;
+  burst('enemy-sprite','💥', big);
+  if(big){ shakeScreen(); ringBurstFx('enemy-sprite', TYPES[mv.t].fx); }
+  const dmg = Math.max(1, Math.round(
+    (atkOf(my)*burnMult(my)*mv.pow*powerMult(my) + rand(4)) * mult * defFactor(e)));
   e.hp -= dmg;
   // Mega Mewtwo X can't be knocked out on the first try — you have to catch it!
   if(isCatchPhase() && e.hp < 1) e.hp = 1;
   sfx.hit(); shake('enemy-sprite');
-  renderBattle(mult>1 ? `SUPER hit! 💥 ${dmg} damage!` : mult<0.5 ? `It barely works on ${SPECIES[e.id].type} Pokémon... ${dmg} damage 🙈` : mult<1 ? `Hmm, not so good... ${dmg} damage` : `Pow! ${dmg} damage!`);
+  addGauge(18);
+  renderBattle(mult>1 ? `SUPER hit! 💥 ${dmg} damage!` : mult<0.5 ? `It barely works on ${formOf(e).type} Pokémon... ${dmg} damage 🙈` : mult<1 ? `Hmm, not so good... ${dmg} damage` : `Pow! ${dmg} damage!`);
   setBtns(false);
   await sleep(900);
+  if(e.hp>0) await landStatus(mv, e, 'enemy-sprite');
+  await tickGmax(my, usedGmaxTurn);
+  await maybeEnemyMega(); // dropping the last one below 55% sets off its Mega right away
   if(isCatchPhase() && e.hp===1){
     setMsg('Mega Mewtwo X is wobbly...! 🌟 Now! Throw the <b>Master Ball</b>!');
     busy=false; setBtns(true);
-    return;
+    return true;
   }
   if(e.hp<=0){
     e.hp=0;
-    if(B.trainer){ await trainerMonDown(); }
-    else { await winWild(`The wild ${SPECIES[e.id].name} fell down!`); }
-    return;
+    await enemyDown();
+    return true;
   }
-  await tickGmax(my, usedGmaxTurn);
-  await enemyTurn();
-};
+  return false;
+}
 async function tickGmax(my, used){
   if(!used || !my.gmax) return;
   my.gmax--;
@@ -1324,61 +1679,163 @@ async function tickGmax(my, used){
   }
 }
 
-async function enemyTurn(){
-  const my = activeMon(), e = B.enemy;
-  const emoves = movesOf(e);
-  const emv = emoves[rand(emoves.length)];
-  setMsg(`${SPECIES[e.id].name} used ${emv.name}!`);
+async function enemyAction(emv){
+  const e = B.enemy;
+  await maybeEnemyMega();
+  if(!await canAct(e)) return false;
+  const my = activeMon();
+  setMsg(`${monLabel(e)} used ${emv.name}!`);
   await sleep(500);
   if(Math.random() > emv.acc){
     sfx.fail();
-    setMsg(`${SPECIES[e.id].name}'s attack missed! 😮`);
+    setMsg(`${monLabel(e)}'s attack missed! 😮`);
     await sleep(800);
-    busy=false; setBtns(true);
-    return;
+    return false;
   }
   if(emv.t==='Normal'){ await lungeFx('enemy-sprite'); }
   else { await attackFx('enemy-sprite','my-sprite', TYPES[emv.t].fx); }
-  const mult = typeMult(emv.t, SPECIES[my.id].type);
+  const mult = typeMult(emv.t, formOf(my).type);
   burst('my-sprite','💥', mult>1);
   if(mult>1) shakeScreen();
-  const factor = B.trainer ? (B.legend ? 0.65 : 0.75) : 0.65; // tuned: enemies now use real moves with power multipliers
-  let dmg = Math.max(1, Math.round((atkOf(e)*factor*emv.pow + rand(3)) * mult));
+  /* re-tuned so trainer battles land where they always did, now that enemies also
+     get defence normalisation, status conditions and a Mega on their last Pokémon */
+  const factor = B.trainer ? (B.legend ? 0.55 : 0.62) : 0.65;
+  const dmg = Math.max(1, Math.round(
+    (atkOf(e)*burnMult(e)*factor*emv.pow*powerMult(e) + rand(3)) * mult * defFactor(my)));
   my.hp = Math.max(0, my.hp - dmg);
   sfx.hit(); shake('my-sprite');
+  addGauge(12);
   renderBattle(mult>1 ? `Ouch!! Super hit! ${dmg} damage!` : `Ouch! ${dmg} damage!`);
   setBtns(false);
   await sleep(900);
-  if(my.hp===0){
-    const next = G.party.find(m=>m.hp>0);
-    if(next){
-      sfx.fail();
-      setMsg(`${SPECIES[my.id].name} is too tired... Go, ${SPECIES[next.id].name}!`);
-      await sleep(1100);
-      renderBattle(`You can do it, ${SPECIES[next.id].name}!`);
-      busy=false; setBtns(true);
-      return;
+  if(my.hp>0){
+    await landStatus(emv, my, 'my-sprite');
+    return false;
+  }
+  return await myFainted(my);
+}
+
+/* burn & poison nibble away at the end of every turn */
+async function endOfTurn(){
+  for(const side of ['mine','enemy']){
+    const m = side==='mine' ? activeMon() : B.enemy;
+    if(!m || m.hp<=0) continue;
+    if(m.st!=='brn' && m.st!=='psn') continue;
+    const max = side==='mine' ? maxHpOf(m) : bossMaxHpOf(m);
+    let d = Math.max(1, Math.round(max/16));
+    if(side==='enemy' && isCatchPhase()) d = Math.min(d, m.hp-1);
+    if(d<=0) continue;
+    m.hp = Math.max(0, m.hp - d);
+    sfx.hit();
+    shake(side==='mine' ? 'my-sprite' : 'enemy-sprite');
+    renderBattle(`${monLabel(m)} is hurt by ${m.st==='brn'?'its burn 🔥':'the poison ☠️'}! ${d} damage`);
+    setBtns(false);
+    await sleep(950);
+    if(m.hp<=0){
+      if(side==='mine') return await myFainted(m);
+      await enemyDown();
+      return true;
     }
-    // all fainted
-    sfx.fail();
-    setMsg('All your Pokémon are tired... Time to go home!');
-    await sleep(1400);
-    B.over=true; busy=false;
-    clearPowers();
-    G.party.forEach(m=>m.hp=maxHpOf(m));
-    save();
-    renderTown('The nurse healed everyone! Let\'s try again! 💪');
+  }
+  return false;
+}
+
+async function enemyDown(){
+  const e = B.enemy;
+  if(B.trainer){ await trainerMonDown(); }
+  else { await winWild(`The wild ${monLabel(e)} fell down!`); }
+}
+
+/* my Pokémon dropped: either pick who goes next, or head home */
+async function myFainted(fallen){
+  sfx.fail();
+  clearStatus(fallen);
+  delete fallen.tf;
+  if(G.party.some(m=>m.hp>0)){
+    setMsg(`${SPECIES[fallen.id].name} is too tired to battle...`);
+    await sleep(1200);
+    B.forced = true;
+    busy=false;
+    renderSwitch(true);
+    return true;
+  }
+  setMsg('All your Pokémon are tired... Time to go home!');
+  await sleep(1400);
+  B.over=true; busy=false;
+  clearBattleFlags();
+  G.party.forEach(m=>m.hp=maxHpOf(m));
+  save();
+  renderTown('The nurse healed everyone! Let\'s try again! 💪');
+  return true;
+}
+
+/* ============ SWITCHING ============ */
+window.openSwitch = function(){
+  if(busy||B.over) return;
+  renderSwitch(false);
+};
+function renderSwitch(forced){
+  sfx.tap();
+  const cur = activeMon();
+  const picks = G.party.map((m,i)=>({m,i})).filter(o => o.m.hp>0 && (forced || o.m !== cur));
+  app.innerHTML = `
+  <div class="card fadein">
+    <h2>${forced ? '😵 Who goes next?' : '🔄 Switch Pokémon'}</h2>
+    <p class="sub" style="text-align:left;">${forced
+      ? 'Pick your next battler!'
+      : 'Careful — switching uses up your turn, so the other one gets a free hit!'}</p>
+    <div class="stack">
+      ${picks.map(o=>{
+        const s = SPECIES[o.m.id], mh = maxHpOf(o.m), pct = Math.round(o.m.hp/mh*100);
+        return `
+        <div class="party-item" onclick="pickSwitch(${o.i},${forced?1:0})" style="cursor:pointer;">
+          ${spriteImg(o.m.id,52)}
+          <div class="info">
+            <div class="nm">${s.name} <span class="tag">${s.type}</span>${statusTag(o.m)}</div>
+            <div class="lv">Lv.${o.m.lv} · HP ${o.m.hp}/${mh} · ⚡${s.spd} 🛡️${s.def}</div>
+            <div class="hpbar"><div class="hpfill" style="width:${pct}%;background:${hpColor(pct)}"></div></div>
+          </div>
+          <span style="font-size:22px;">➡️</span>
+        </div>`;
+      }).join('')}
+    </div>
+    ${forced ? '' : `<div style="margin-top:12px;"><button class="big" onclick="cancelSwitch()">⬅ Never mind</button></div>`}
+  </div>`;
+}
+window.cancelSwitch = function(){ sfx.tap(); renderBattle('What will you do? 🤔'); };
+window.pickSwitch = async function(i, forced){
+  if(busy) return;
+  const target = G.party[i];
+  if(!target || target.hp<=0) return;
+  sfx.tap();
+  const out = activeMon();
+  const m = G.party.splice(i,1)[0];
+  G.party.unshift(m); // the front of the team is always the one battling
+  if(out !== m){ delete out.tf; } // a Ditto coming back drops its borrowed shape
+  B.forced = false;
+  const note = dittoPrep();
+  if(forced){
+    busy=false;
+    renderBattle(`You can do it, <b>${monLabel(m)}</b>!` + note);
     return;
   }
+  busy=true;
+  renderBattle(`Come back! Go, <b>${monLabel(m)}</b>! 🔄` + note);
+  setBtns(false);
+  await sleep(1000);
+  if(await enemyAction(pickEnemyMove(B.enemy))) return;
+  if(await endOfTurn()) return;
   busy=false; setBtns(true);
-}
+};
 
 window.throwBall = async function(){
   if(busy||B.over) return;
   const e = B.enemy;
   if(B.trainer && !isCatchPhase()){ setMsg("You can't catch a trainer's Pokémon! 😮"); return; }
   if(!isCatchPhase() && G.balls<=0){ setMsg('No balls left! Get more at the Pokémon Center.'); return; }
-  if(G.party.length>=6 && !isCatchPhase()){ setMsg('Your team is full! Say bye-bye to someone first. 👋'); return; }
+  if(!isCatchPhase() && G.party.length>=6 && boxOf().length>=BOX_MAX){
+    setMsg('Your team AND your Box are full! Say bye-bye to someone first. 👋'); return;
+  }
   busy=true; setBtns(false);
   const master = isCatchPhase();
   if(!master) G.balls--;
@@ -1390,29 +1847,41 @@ window.throwBall = async function(){
   await sleep(1100);
   const eMax = bossMaxHpOf(e);
   const hpRatio = e.hp/eMax;
+  const sleepyBonus = e.st==='slp' ? 0.20 : 0; // a snoozing Pokémon is much easier to catch
   let chance;
   if(master){
     chance = hpRatio > 0.4 ? 0.05 : (1-hpRatio)*0.85;
     if(e.hp===1) chance = 0.95;
+    chance += sleepyBonus;
   }else{
-    chance = 0.25 + (1-hpRatio)*0.65;
+    chance = 0.25 + (1-hpRatio)*0.65 + sleepyBonus;
   }
-  if(Math.random() < chance){
+  if(Math.random() < Math.min(1, chance)){
     sfx.catchOk();
     if(master){ await bossCaught(); return; }
     B.over=true;
-    const caught = {...e, hp:Math.max(e.hp, Math.round(maxHpOf(e)/2))};
-    delete caught.bossMaxHp;
-    G.party.push(caught);
+    const caught = Object.assign({}, e, {hp:Math.max(e.hp, Math.round(maxHpOf(e)/2))});
+    delete caught.bossMaxHp; delete caught.tf; delete caught.mega; delete caught.gmax;
+    delete caught.st; delete caught.stT;
+    let where = '';
+    if(G.party.length<6){
+      G.party.push(caught);
+    }else{
+      caught.hp = maxHpOf(caught); // the Box heals whoever rests in it
+      boxOf().push(caught);
+      where = ` Your team is full, so it went to the Box! 📦 (${boxOf().length}/${BOX_MAX})`;
+    }
     if(!G.dex.includes(e.id)) G.dex.push(e.id);
-    setMsg(`Click! ✨ You caught <b>${SPECIES[e.id].name}</b>!`);
-    await sleep(1300);
+    setMsg(`Click! ✨ You caught <b>${SPECIES[e.id].name}</b>!` + where);
+    await sleep(1600);
     await winWild(null, true);
   }else{
     sfx.fail();
     setMsg(master ? 'Oh no, it popped out! Make it more sleepy first!' : 'Oh no, it popped out! Hit it a little, then try again!');
     await sleep(1100);
-    await enemyTurn();
+    if(await enemyAction(pickEnemyMove(B.enemy))) return;
+    if(await endOfTurn()) return;
+    busy=false; setBtns(true);
   }
 };
 
@@ -1422,7 +1891,7 @@ window.runAway = async function(){
   setMsg(B.trainer ? 'You ran away! The trainer will wait for you. 💨' : 'You ran away! 💨');
   await sleep(900);
   B.over=true; busy=false;
-  clearPowers();
+  clearBattleFlags();
   save();
   renderTown();
 };
@@ -1443,6 +1912,8 @@ async function grantExp(defeated, isTrainerMon){
     await sleep(1100);
   }
 }
+/* the Box keeps everyone rested, so top them up whenever we save the game state */
+function restBox(){ boxOf().forEach(m => { m.hp = maxHpOf(m); clearStatus(m); }); }
 function findEvolution(){
   const m = G.party.find(m => SPECIES[m.id].evolveLv && m.lv >= SPECIES[m.id].evolveLv);
   if(!m) return null;
@@ -1452,7 +1923,8 @@ function findEvolution(){
 }
 /* evolution chain → then town */
 function finishBattle(msg){
-  clearPowers();
+  clearBattleFlags();
+  restBox();
   save();
   const evo = findEvolution();
   if(evo){ renderEvolution(evo, msg); return; }
@@ -1478,13 +1950,14 @@ async function winWild(msg, wasCatch){
 async function trainerMonDown(){
   const e = B.enemy;
   sfx.good();
-  setMsg(`${SPECIES[e.id].name} fell down!`);
+  setMsg(`${monLabel(e)} fell down!`);
   await sleep(900);
   await grantExp(e, true);
   if(B.queue.length){
     B.enemy = B.queue.shift();
     sfx.fail();
-    renderBattle(`${B.trainer.avatar} ${B.trainer.trainer} sends out <b>${SPECIES[B.enemy.id].name}</b>!`);
+    const note = dittoPrep(); // a fresh opponent means a fresh copy for Ditto
+    renderBattle(`${B.trainer.avatar} ${B.trainer.trainer} sends out <b>${SPECIES[B.enemy.id].name}</b>!` + note);
     busy=false; setBtns(true);
     return;
   }
@@ -1556,13 +2029,14 @@ function renderEvolution(evo, nextMsg){
 async function bossCaught(){
   B.over=true; busy=false;
   BGM.stop();
-  clearPowers();
+  clearBattleFlags();
   G.bossCaught = true;
   if(!G.dex.includes('mewtwoX')) G.dex.push('mewtwoX');
-  if(G.party.length<6){
-    const m = newMon('mewtwoX', 24); m.hp = maxHpOf(m);
-    G.party.push(m);
-  }
+  const mw = newMon('mewtwoX', 24); mw.hp = maxHpOf(mw);
+  let toBox = false;
+  if(G.party.length<6){ G.party.push(mw); }
+  else if(boxOf().length<BOX_MAX){ boxOf().push(mw); toBox = true; }
+  restBox();
   save();
   sfx.fanfare();
   confetti();
@@ -1571,11 +2045,11 @@ async function bossCaught(){
     <div class="mon-big"><span class="bounce">${spriteImg('mewtwoX',130)}</span></div>
     <h1>🏆 YOU WIN! 🏆</h1>
     <p class="sub" style="font-size:16px;">You beat the Champion and caught <b>Mega Mewtwo X</b>!<br>
-    ${G.party.some(m=>m.id==='mewtwoX') ? 'Now it\'s your friend! 💜' : 'It\'s in your book now! 📖'}</p>
+    ${G.party.some(m=>m.id==='mewtwoX') ? 'Now it\'s your friend! 💜' : toBox ? 'It is waiting for you in the Box! 📦' : 'It\'s in your book now! 📖'}</p>
     <div class="card" style="background:var(--soft); margin:10px 0;">
       <b>Your Adventure</b><br>
       🏅 Badges: ${G.badges.length}/5 &nbsp;·&nbsp; 📖 Pokédex: ${G.dex.length}/${TOTAL_KINDS}<br>
-      🎒 Friends: ${G.party.length} &nbsp;·&nbsp; ⭐ Best Level: ${Math.max(...G.party.map(m=>m.lv))}<br>
+      🎒 Friends: ${G.party.length} &nbsp;·&nbsp; 📦 Box: ${boxOf().length} &nbsp;·&nbsp; ⭐ Best Level: ${Math.max(...G.party.map(m=>m.lv))}<br>
       <small>Can you fill the whole Pokédex? Trainers love rematches!</small>
     </div>
     <div class="stack">
