@@ -1,0 +1,23 @@
+# Static site: every game is a plain folder with an index.html.
+# There is no build step — Netlify just serves this directory as-is.
+[build]
+  publish = "."
+
+# Game files change whenever we ship an update, so always revalidate.
+# Netlify sends ETags, so an unchanged game answers 304 and costs nothing.
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"
+
+# Unknown paths land back on the game list instead of a bare 404 page.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 404

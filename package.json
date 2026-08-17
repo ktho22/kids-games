@@ -1,0 +1,12 @@
+{
+  "name": "kids-games",
+  "version": "1.0.0",
+  "private": true,
+  "description": "아이들을 위한 HTML 미니 게임 모음집",
+  "scripts": {
+    "serve": "python3 -m http.server 8000",
+    "login": "./deploy.sh login",
+    "preview": "./deploy.sh preview",
+    "deploy": "./deploy.sh prod"
+  }
+}

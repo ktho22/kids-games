@@ -23,9 +23,42 @@
 
 ```bash
 # 로컬 서버로 실행 (선택)
-python3 -m http.server 8000
+npm run serve
 # 브라우저에서 http://localhost:8000 접속
 ```
+
+## 호스팅
+
+같은 파일들을 두 곳에서 서비스합니다. 어느 쪽 주소로 들어가도 게임은 동일합니다.
+
+| 위치 | 주소 | 업데이트 방법 |
+|------|------|--------------|
+| GitHub Pages | https://ktho22.github.io/kids-games/ | `git push` 하면 자동 반영 |
+| Netlify | 배포 후 발급되는 `*.netlify.app` 주소 | `npm run deploy` |
+
+### Netlify에 올리기
+
+처음 한 번만 로그인이 필요합니다. 아래 명령을 실행하면 브라우저가 열리고, 거기서 Netlify 계정으로 승인하면 됩니다.
+
+```bash
+npm run login
+```
+
+이후에는 배포 명령 한 줄이면 새 게임이나 수정 사항이 반영됩니다.
+
+```bash
+npm run deploy
+```
+
+라이브 주소를 건드리지 않고 먼저 확인만 하고 싶다면 미리보기 배포를 씁니다. 비공개 임시 URL이 발급됩니다.
+
+```bash
+npm run preview
+```
+
+CLI 없이 올리고 싶다면 [app.netlify.com/drop](https://app.netlify.com/drop) 에 이 폴더를 그대로 끌어다 놓아도 됩니다.
+
+> **게임 저장 데이터는 주소별로 따로 보관됩니다.** 브라우저가 사이트마다 저장 공간을 분리하기 때문에, GitHub Pages에서 하던 진행 상황이 Netlify 주소로 자동으로 넘어가지는 않습니다. Pocket Mini Adventure는 저장 슬롯의 📤 버튼으로 공유 코드를 복사해서, 새 주소에서 📥 로 붙여넣으면 그대로 이어서 할 수 있습니다.
 
 ## 기술 스택
 
