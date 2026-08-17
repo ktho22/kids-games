@@ -1582,8 +1582,10 @@ async function ballFx(emoji){
 }
 
 /* ============ TURN ENGINE ============
-   Both sides pick a move, then SPEED decides who swings first
-   (a ⏩priority move like Quick Attack always jumps the queue).
+   YOU swing first, always — a fast or scary-looking enemy never gets
+   a free hit in before a kid can even pick a move. The only exception
+   is a ⏩priority move like Quick Attack, which still jumps the queue
+   the way it does in the real games (and the player has that move too).
    Every helper below returns true when it has taken over the flow
    (battle won/lost, a screen swapped in) so the caller stops. */
 function pickEnemyMove(e){
@@ -1593,9 +1595,7 @@ function pickEnemyMove(e){
 function myGoesFirst(my, mv, e, emv){
   const pa = mv.pri || 0, pb = emv.pri || 0;
   if(pa !== pb) return pa > pb;
-  const sa = spdOf(my), sb = spdOf(e);
-  if(sa === sb) return Math.random() < 0.5;
-  return sa > sb;
+  return true; // equal priority: the player always goes first
 }
 /* sleep / paralysis can keep a Pokémon from moving at all */
 async function canAct(m){
