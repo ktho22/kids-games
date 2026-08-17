@@ -651,7 +651,7 @@ function boxOf(){ if(!G.box) G.box = []; return G.box; }
 const STATUS = {
   brn:{icon:'🔥', label:'Burn',  got:'got burned!'},
   psn:{icon:'☠️', label:'Poison',got:'got poisoned!'},
-  par:{icon:'⚡', label:'Par',   got:'is paralyzed!'},
+  par:{icon:'⚡', label:'Zap',   got:'got all zappy and stiff!'},
   slp:{icon:'😴', label:'Sleep', got:'fell fast asleep!'},
 };
 function statusTag(m){
@@ -756,7 +756,7 @@ function renderTitle(){
   <div class="card fadein center">
     <div class="mon-big"><span class="bounce">${spriteImg('pikachu',84)}</span> <span class="bounce" style="animation-delay:.3s">${spriteImg('pairi',84)}</span> <span class="bounce" style="animation-delay:.6s">${spriteImg('kkobugi',84)}</span></div>
     <h1>Pocket Mini Adventure</h1>
-    <p class="sub">Explore 8 lands! Fill your Pokédex with ${TOTAL_KINDS} kinds!<br>Mega Evolve 💠 Dynamax 🔴 and catch <b>Mega Mewtwo X</b>!</p>
+    <p class="sub">Explore 8 lands! Fill your Pokédex with ${TOTAL_KINDS} kinds!<br>Charge the ⚡Power gauge to Mega Evolve 💠 and Dynamax 🔴 — then catch <b>Mega Mewtwo X</b>!</p>
     <div class="stack">
       ${slots.map(({s,g})=>{
         if(g){
@@ -911,7 +911,7 @@ function renderTown(msg){
         <button class="yellow" onclick="renderParty()" style="padding:10px 4px; font-size:14px;">🎒 Team<br><small>${G.party.length}/6</small></button>
         <button onclick="renderBox()" style="padding:10px 4px; font-size:14px;">📦 Box<br><small>${boxOf().length}/${BOX_MAX}</small></button>
         <button onclick="renderDex()" style="padding:10px 4px; font-size:14px;">📖 Pokédex<br><small>${G.dex.length}/${TOTAL_KINDS}</small></button>
-        <button onclick="renderTypeChart()" style="padding:10px 4px; font-size:14px; grid-column:1 / -1;">⚔️ Type Chart<br><small>Who beats who?</small></button>
+        <button onclick="renderTypeChart()" style="padding:10px 4px; font-size:14px; grid-column:1 / -1;">⚔️ Battle Guide<br><small>Types, speed &amp; status</small></button>
       </div>
       <div class="grid2" style="grid-template-columns:repeat(5,1fr); gap:8px;">
         ${CAVES.map((c,i)=>{
@@ -1009,12 +1009,30 @@ window.renderTypeChart = function(){
         ${v.barely && v.barely.length ? `<br><span style="color:#9aa5bb;">🙈 barely works vs ${icons(v.barely)}</span>` : ''}
       </div>
     </div>`).join('');
+  const tip = (icon, name, text) => `
+    <div style="background:#fff; border:2px solid var(--ink); border-radius:12px; padding:8px 12px; font-weight:800;">
+      <div>${icon} ${name}</div>
+      <div style="font-size:13px; margin-top:3px; line-height:1.5; color:#6b7a99;">${text}</div>
+    </div>`;
   app.innerHTML = `
   <div class="card fadein">
-    <h2>⚔️ Type Chart</h2>
+    <h2>⚔️ Battle Guide</h2>
     <p class="sub" style="text-align:left;">💥 SUPER = extra damage! 😅 weak = less. 🙈 barely = almost nothing. Pick smart moves!</p>
     <div class="progress-note" style="margin-bottom:10px;">🔥Fire 💧Water 🍃Grass ⚡Electric 💫Normal 🪶Flying 🔮Psychic 🪨Rock 🟣Ghost 🌀Dragon 👊Fighting</div>
     <div class="stack" style="gap:8px;">${rows}</div>
+    <h2 style="margin-top:18px;">✨ Battle Tricks</h2>
+    <p class="sub" style="text-align:left;">Every Pokémon has a speed and a defence now. Here's what they do!</p>
+    <div class="stack" style="gap:8px;">
+      ${tip('⚡','SPEED','The faster Pokémon swings first. Moves marked ⏩ (like Quick Attack) always go first, no matter what!')}
+      ${tip('🛡️','DEFENCE','Tough ones like Onix and Snorlax take less damage. Soft ones like Alakazam and Chansey take more. Check ⚡ and 🛡️ on the Team screen!')}
+      ${tip('🔥','BURN','Hurts a bit every turn AND makes attacks weaker. Fire Pokémon can never be burned!')}
+      ${tip('☠️','POISON','Hurts a bit every single turn until the battle ends.')}
+      ${tip('⚡','ZAP (paralysis)','Speed drops by half, and sometimes it is too stiff to move at all.')}
+      ${tip('😴','SLEEP','Can\'t move for 2~3 turns — and a sleeping wild Pokémon is <b>much easier to catch</b>! 🔴 Try Hypnosis or Sleep Powder first.')}
+      ${tip('💠🔴','MEGA & DYNAMAX','Fill the ⚡Power gauge to 100% by attacking and getting hit. Long battles against cave trainers fill it up!')}
+      ${tip('🔄','SWITCH','Swap Pokémon any time — but you skip your turn, so the other one gets a free hit.')}
+      ${tip('🏥','ALL BETTER','Burns, poison, everything goes away when the battle ends, at the Pokémon Center, or in the 📦 Box.')}
+    </div>
     <div style="margin-top:14px;"><button class="big" onclick="backTown()">⬅ Back to Town</button></div>
   </div>`;
 };
@@ -1073,8 +1091,9 @@ window.renderParty = function(msg){
         <div class="party-item ${i===0?'active-mon':''}" onclick="setLeader(${i})" style="cursor:pointer;">
           ${spriteImg(m.id,56)}
           <div class="info">
-            <div class="nm"><span class="dnum">${dexNum(m.id)}</span> ${s.name} <span class="tag">${s.type}</span> ${MEGA[m.id]?'💠':''} ${m.hp===0?'😵':''}</div>
-            <div class="lv">Lv.${m.lv} · ⭐ ${m.exp}/${expNeed(m)} · ${s.mv.join(' / ')}</div>
+            <div class="nm"><span class="dnum">${dexNum(m.id)}</span> ${s.name} <span class="tag">${s.type}</span> ${MEGA[m.id]?'💠':''} ${m.hp===0?'😵':''}${statusTag(m)}</div>
+            <div class="lv">Lv.${m.lv} · ⭐ ${m.exp}/${expNeed(m)} · ⚡${s.spd} 🛡️${s.def}</div>
+            <div class="lv">${s.mv.map(n=>(MOVES[n].pri?'⏩':'')+n).join(' / ')}</div>
             <div class="hpbar"><div class="hpfill" style="width:${pct}%;background:${hpColor(pct)}"></div></div>
           </div>
           <button style="padding:6px 8px; font-size:14px;" ${G.party.length<=1||box.length>=BOX_MAX?'disabled':''} onclick="depositMon(event,${i})" title="Send to Box">📦</button>
@@ -1106,7 +1125,7 @@ window.renderBox = function(msg){
           ${spriteImg(m.id,48)}
           <div class="info">
             <div class="nm"><span class="dnum">${dexNum(m.id)}</span> ${s.name} <span class="tag">${s.type}</span> ${MEGA[m.id]?'💠':''}</div>
-            <div class="lv">Lv.${m.lv} · HP ${m.hp}/${maxHpOf(m)}</div>
+            <div class="lv">Lv.${m.lv} · HP ${m.hp}/${maxHpOf(m)} · ⚡${s.spd} 🛡️${s.def}</div>
           </div>
           <button class="green" style="padding:6px 9px; font-size:13px;" ${G.party.length>=6?'disabled':''} onclick="withdrawMon(${i})">🎒 Team</button>
           <button style="padding:6px 8px; font-size:14px;" onclick="releaseBox(${i})">👋</button>
@@ -1626,10 +1645,9 @@ window.useMove = async function(i){
 async function myAction(mv){
   const my = activeMon(), e = B.enemy;
   const usedGmaxTurn = !!my.gmax;
-  if(!await canAct(my)){
-    await tickGmax(my, usedGmaxTurn);
-    return false;
-  }
+  /* being asleep or zapped costs the turn but NOT a Dynamax charge —
+     Dynamax lasts 3 *moves*, and you didn't get to make one */
+  if(!await canAct(my)) return false;
   setMsg(`${monLabel(my)} used ${mv.name}!`);
   await sleep(400);
   if(Math.random() > mv.acc){
