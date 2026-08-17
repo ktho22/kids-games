@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>게임 데이터 이사</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 40px 20px 60px;
+    color: #fff;
+  }
+  .wrap { width: 100%; max-width: 680px; }
+  h1 {
+    font-size: 2em; margin-bottom: 8px;
+    background: linear-gradient(90deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .lede { color: #aab; line-height: 1.6; margin-bottom: 28px; }
+  .panel {
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.13);
+    border-radius: 16px; padding: 22px; margin-bottom: 18px;
+  }
+  .panel h2 { font-size: 1.15em; margin-bottom: 6px; }
+  .panel p { color: #aab; font-size: .93em; line-height: 1.6; margin-bottom: 14px; }
+  .step {
+    display: inline-block; font-size: .78em; font-weight: 700; letter-spacing: .04em;
+    color: #0f3460; background: #feca57; border-radius: 99px;
+    padding: 3px 10px; margin-bottom: 10px;
+  }
+  button {
+    font: inherit; font-weight: 700; cursor: pointer;
+    background: #48dbfb; color: #0b1c33; border: none;
+    border-radius: 11px; padding: 13px 20px;
+  }
+  button.ghost { background: rgba(255,255,255,0.14); color: #fff; }
+  button:disabled { opacity: .45; cursor: default; }
+  button + button { margin-left: 8px; }
+  textarea {
+    width: 100%; min-height: 130px; font-family: ui-monospace, Menlo, monospace;
+    font-size: 12px; line-height: 1.5; word-break: break-all;
+    background: rgba(0,0,0,0.32); color: #cfe8ff;
+    border: 1px solid rgba(255,255,255,0.16); border-radius: 11px;
+    padding: 12px; margin-bottom: 12px; resize: vertical;
+  }
+  ul.found { list-style: none; margin: 4px 0 14px; }
+  ul.found li {
+    padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.08);
+    font-size: .92em; display: flex; gap: 10px; align-items: baseline;
+  }
+  ul.found li:last-child { border-bottom: none; }
+  ul.found .size { color: #7d8aa3; font-size: .85em; margin-left: auto; font-variant-numeric: tabular-nums; }
+  .note {
+    font-size: .88em; color: #9fb0c8; line-height: 1.6;
+    background: rgba(72,219,251,0.09); border-left: 3px solid #48dbfb;
+    border-radius: 0 8px 8px 0; padding: 12px 14px; margin-top: 6px;
+  }
+  .msg { border-radius: 10px; padding: 12px 14px; font-size: .93em; line-height: 1.55; margin-top: 12px; }
+  .msg.ok   { background: rgba(88,179,104,0.16); border: 1px solid rgba(88,179,104,0.5); }
+  .msg.bad  { background: rgba(232,72,79,0.14);  border: 1px solid rgba(232,72,79,0.5); }
+  .origin { font-family: ui-monospace, Menlo, monospace; font-size: .85em; color: #7d8aa3; margin-top: 22px; }
+  a.back { color: #48dbfb; text-decoration: none; font-weight: 700; }
+  @media (max-width: 480px) {
+    body { padding: 24px 14px 48px; }
+    h1 { font-size: 1.55em; }
+    button { width: 100%; }
+    button + button { margin-left: 0; margin-top: 8px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>게임 데이터 이사</h1>
+  <p class="lede">
+    저장 데이터는 주소마다 따로 보관돼요. 그래서 새 주소로 옮기면 진행 상황이 비어 보입니다.
+    <b>예전 주소에서 코드를 만들어</b>, <b>새 주소에서 붙여넣으면</b> 모든 게임의 기록이 그대로 따라옵니다.
+  </p>
+
+  <div class="panel">
+    <span class="step">1단계 · 예전 주소에서</span>
+    <h2>이 기기의 저장 데이터 내보내기</h2>
+    <p>아래 버튼을 누르면 이 주소에 저장된 모든 게임 기록이 코드 하나로 만들어집니다.</p>
+    <div id="found-wrap"></div>
+    <button id="btn-export">📤 코드 만들기</button>
+    <button id="btn-copy" class="ghost" disabled>📋 복사하기</button>
+    <div id="export-msg"></div>
+    <textarea id="out" readonly placeholder="코드 만들기를 누르면 여기에 코드가 나타납니다." style="margin-top:12px;"></textarea>
+    <div class="note">
+      코드가 길어요. 복사하기 버튼을 쓰고, 메모 앱이나 카톡 나에게 보내기로 옮기면 편합니다.
+    </div>
+  </div>
+
+  <div class="panel">
+    <span class="step">2단계 · 새 주소에서</span>
+    <h2>저장 데이터 불러오기</h2>
+    <p>1단계에서 만든 코드를 붙여넣고 불러오기를 누르세요.</p>
+    <textarea id="in" placeholder="KG1. 로 시작하는 코드를 여기에 붙여넣으세요"></textarea>
+    <button id="btn-import">📥 불러오기</button>
+    <div id="import-msg"></div>
+    <div class="note">
+      이미 새 주소에서 게임을 하셨다면, 불러오기가 그 기록을 덮어씁니다. 진행하기 전에 한 번 더 확인해요.
+    </div>
+  </div>
+
+  <p><a class="back" href="../">← 게임 목록으로</a></p>
+  <p class="origin" id="origin"></p>
+</div>
+
+<script>
+/* 게임별로 어떤 키를 쓰는지: 접두어가 맞으면 사람이 읽을 이름으로 보여준다 */
+const LABELS = [
+  ['pk-slot-',            '🔴 포켓 미니 어드벤처 — 저장 슬롯'],
+  ['mini-pokemon-save',   '🔴 포켓 미니 어드벤처 — 예전 저장'],
+  ['bgm-off',             '🔴 포켓 미니 어드벤처 — 소리 설정'],
+  ['bb2_slot_',           '🏗️ 블록 빌더 v2 — 저장 슬롯'],
+  ['bb2_missions',        '🏗️ 블록 빌더 v2 — 미션 기록'],
+  ['blockgame_save',      '🧱 블록 빌더'],
+  ['octonaut_save2',      '🐙 옥토넛 동물 구조'],
+  ['blockdodge_lb',       '⛏️ 마인크래프트 블록 피하기 — 최고 점수'],
+  ['starAdventureStages', '⭐ 스타 어드벤처 — 진행 단계'],
+  ['miniCarBuilder',      '🏎️ 미니카 레이스'],
+  ['hospital-completed',  '🏥 동물 병원 놀이 — 진료 기록'],
+  ['hospital-stars',      '🏥 동물 병원 놀이 — 별'],
+];
+const labelFor = key => (LABELS.find(([p]) => key.startsWith(p)) || [null, '🎮 ' + key])[1];
+const bytes = n => n < 1024 ? n + ' B' : (n / 1024).toFixed(1) + ' KB';
+
+const $ = id => document.getElementById(id);
+const say = (el, text, ok) => { el.innerHTML = '<div class="msg ' + (ok ? 'ok' : 'bad') + '">' + text + '</div>'; };
+
+$('origin').textContent = '지금 보고 있는 주소: ' + location.origin;
+
+function readAll() {
+  const data = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    data[k] = localStorage.getItem(k);
+  }
+  return data;
+}
+
+/* 저장된 항목 목록을 보여준다 */
+function showFound() {
+  const data = readAll();
+  const keys = Object.keys(data).sort();
+  const wrap = $('found-wrap');
+  if (!keys.length) {
+    wrap.innerHTML = '<div class="msg bad">이 주소에는 저장된 게임 기록이 없습니다. 아이들이 실제로 플레이한 기기와 주소에서 열어야 해요.</div>';
+    $('btn-export').disabled = true;
+    return 0;
+  }
+  wrap.innerHTML = '<ul class="found">' + keys.map(k =>
+    '<li><span>' + labelFor(k) + '</span><span class="size">' + bytes(data[k].length) + '</span></li>'
+  ).join('') + '</ul>';
+  return keys.length;
+}
+showFound();
+
+/* 유니코드가 섞여도 안전하게 base64로 만든다 */
+const enc = obj => 'KG1.' + btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
+const dec = str => {
+  str = (str || '').trim().replace(/\s+/g, '');
+  if (!str.startsWith('KG1.')) return null;
+  try {
+    const obj = JSON.parse(decodeURIComponent(escape(atob(str.slice(4)))));
+    return (obj && typeof obj === 'object' && !Array.isArray(obj)) ? obj : null;
+  } catch (e) { return null; }
+};
+
+$('btn-export').onclick = () => {
+  const data = readAll();
+  const n = Object.keys(data).length;
+  if (!n) { say($('export-msg'), '저장된 기록이 없어서 코드를 만들 수 없어요.', false); return; }
+  const code = enc(data);
+  $('out').value = code;
+  $('btn-copy').disabled = false;
+  say($('export-msg'), '✅ ' + n + '개 항목으로 코드를 만들었어요. 복사해서 새 주소의 2단계에 붙여넣으세요.', true);
+};
+
+$('btn-copy').onclick = async () => {
+  const ta = $('out');
+  if (!ta.value) return;
+  ta.select();
+  ta.setSelectionRange(0, ta.value.length); // iOS Safari
+  let ok = false;
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(ta.value);
+      ok = true;
+    }
+  } catch (e) { /* 아래 방식으로 한 번 더 시도 */ }
+  if (!ok) { try { ok = document.execCommand('copy'); } catch (e) {} }
+  say($('export-msg'), ok
+    ? '📋 복사했어요! 새 주소에서 이 페이지를 열고 2단계에 붙여넣으세요.'
+    : '복사가 막혀 있어요. 코드 칸을 길게 눌러 직접 복사해 주세요.', ok);
+};
+
+$('btn-import').onclick = () => {
+  const data = dec($('in').value);
+  if (!data) {
+    say($('import-msg'), '코드를 읽을 수 없어요. KG1. 로 시작하는 코드 전체를 빠짐없이 붙여넣었는지 확인해 주세요.', false);
+    return;
+  }
+  const keys = Object.keys(data);
+  if (!keys.length) { say($('import-msg'), '코드는 읽었지만 안에 저장 기록이 없어요.', false); return; }
+  const existing = keys.filter(k => localStorage.getItem(k) !== null);
+  const warn = existing.length
+    ? '\n\n이 기기에 이미 있는 기록 ' + existing.length + '개를 덮어씁니다.'
+    : '';
+  if (!confirm('저장 기록 ' + keys.length + '개를 불러올까요?' + warn)) return;
+  let done = 0, failed = [];
+  keys.forEach(k => {
+    try { localStorage.setItem(k, String(data[k])); done++; }
+    catch (e) { failed.push(k); }
+  });
+  showFound();
+  if (failed.length) {
+    say($('import-msg'), '⚠️ ' + done + '개를 불러왔지만 ' + failed.length + '개는 실패했어요(저장 공간 부족일 수 있어요): ' + failed.join(', '), false);
+  } else {
+    say($('import-msg'), '✅ ' + done + '개를 모두 불러왔어요! <a class="back" href="../">게임 목록으로 가서</a> 이어서 하시면 됩니다.', true);
+  }
+};
+</script>
+</body>
+</html>
