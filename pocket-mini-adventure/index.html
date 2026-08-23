@@ -470,6 +470,60 @@ Object.keys(MOVE_PATCH).forEach(id=>{ if(SPECIES[id]) SPECIES[id].mv = MOVE_PATC
   if(s) s.mv = [s.mv[1] || s.mv[0], 'Poison Sting'];
 });
 
+/* ============ EVOLUTION STAGE + GROWING MOVESET ============
+   Every species gets a .stage (0 = never evolved from anything, 1 = one
+   evolution behind it, 2 = two or more). The base two hand-tuned moves
+   above are kept exactly as-is and never reordered — evolving just ADDS
+   more options on top, so a freshly-evolved Pokémon always feels like it
+   learned something new instead of losing its signature move. */
+(function growMovesByStage(){
+  // computed locally (not the global EVOLVED set below, which isn't filled in yet at this point)
+  const isSomeonesTarget = new Set();
+  Object.values(SPECIES).forEach(sp => {
+    if(sp.evolveTo) (Array.isArray(sp.evolveTo)?sp.evolveTo:[sp.evolveTo]).forEach(t => isSomeonesTarget.add(t));
+  });
+  const STAGE = {};
+  Object.keys(SPECIES).forEach(id => { if(!isSomeonesTarget.has(id)) STAGE[id] = 0; });
+  let changed = true;
+  while(changed){
+    changed = false;
+    Object.entries(SPECIES).forEach(([id, sp]) => {
+      if(STAGE[id] === undefined || !sp.evolveTo) return;
+      (Array.isArray(sp.evolveTo) ? sp.evolveTo : [sp.evolveTo]).forEach(to => {
+        if(!SPECIES[to]) return;
+        const next = STAGE[id] + 1;
+        if(STAGE[to] === undefined || STAGE[to] < next){ STAGE[to] = next; changed = true; }
+      });
+    });
+  }
+  Object.keys(SPECIES).forEach(id => { if(STAGE[id] === undefined) STAGE[id] = 0; });
+  STAGE.mewtwoX = Math.max(STAGE.mewtwoX || 0, 2); // the final boss earns the full moveset too
+  Object.entries(STAGE).forEach(([id, s]) => { if(SPECIES[id]) SPECIES[id].stage = Math.min(s, 2); });
+
+  /* real damaging moves only (skips Splash/Hypnosis/Sleep Powder — weak on
+     purpose, not a reward worth handing out for evolving), sorted weakest→strongest */
+  const byType = {};
+  Object.entries(MOVES).forEach(([name, mv]) => {
+    if(mv.pow < 1) return;
+    (byType[mv.t] = byType[mv.t] || []).push([name, mv.pow]);
+  });
+  Object.values(byType).forEach(arr => arr.sort((a,b) => a[1]-b[1]));
+  function candidates(type){
+    const own = (byType[type]||[]).map(x=>x[0]).reverse();       // strongest of their own type first
+    const normal = (byType['Normal']||[]).map(x=>x[0]).reverse();
+    return [...own, 'Quick Attack', ...normal];
+  }
+  Object.values(SPECIES).forEach(sp => {
+    if(!sp.mv) return;
+    const target = sp.stage >= 2 ? 4 : sp.stage === 1 ? 3 : 2;
+    if(sp.mv.length >= target) return;
+    for(const name of candidates(sp.type)){
+      if(sp.mv.length >= target) break;
+      if(!sp.mv.includes(name)) sp.mv.push(name);
+    }
+  });
+})();
+
 const TOTAL_KINDS = Object.keys(SPECIES).length;
 /* Pokédex numbers, in national-dex order */
 const DEX_NO = {};
@@ -507,14 +561,13 @@ const MEGA = {
 
 const AREAS = [
   {"name":"Grass","icon":"🌿","min":2,"need":0,"pool":["gugu","kkoret","spearow","pikachu","jigglypuff","meowth","magnemite","voltorb","lickitung","chansey","electabuzz","ditto","eevee","mareep"],"rare":["zapdos"]},
-  {"name":"Flower Woods","icon":"🌸","min":5,"need":1,"pool":["isanghae","caterpie","metapod","weedle","nidoran-f","zubat","oddish","bellsprout","farfetchd","doduo","scyther","chikorita"],"rare":["mew"]},
-  {"name":"Beach","icon":"🏖️","min":6,"need":1,"pool":["kkobugi","goraduck","poliwag","tentacool","slowpoke","seel","shellder","krabby","horsea","yeongking","totodile"],"rare":["kyogre"]},
+  {"name":"Flower Woods","icon":"🌸","min":5,"need":1,"pool":["caterpie","metapod","weedle","nidoran-f","zubat","oddish","bellsprout","farfetchd","doduo","scyther","chikorita"],"rare":["mew"]},
+  {"name":"Beach","icon":"🏖️","min":6,"need":1,"pool":["goraduck","poliwag","tentacool","slowpoke","seel","shellder","krabby","horsea","yeongking","totodile"],"rare":["kyogre"]},
   {"name":"Dark Forest","icon":"🌲","min":8,"need":2,"pool":["clefairy","vulpix","abra","gastly","drowzee","mr-mime","togepi","ralts"],"rare":["latios"]},
   {"name":"Swamp","icon":"🐸","min":10,"need":3,"pool":["tangela","jynx","pinsir","lapras","heracross","goldeen","staryu","mudkip","ekans","nidoran-m","paras","venonat","grimer","exeggcute","koffing","treecko"],"rare":["lugia"]},
   {"name":"Mountain","icon":"⛰️","min":11,"need":4,"pool":["sandshrew","diglett","mankey","machop","geodude","onix","cubone","hitmonlee","hitmonchan","rhyhorn","omanyte","kabuto","aerodactyl","larvitar","aron","riolu"],"rare":["groudon"]},
   {"name":"Snowy Peak","icon":"❄️","min":13,"need":5,"pool":["kangaskhan","tauros","porygon","snorlax","dratini","bagon","gible"],"rare":["articuno","rayquaza"]},
-  {"name":"Volcano","icon":"🌋","min":14,"need":5,"pool":["ponyta","magmar","pairi","growlithe","cyndaquil","torchic"],"rare":["moltres","ho-oh"]},
-];
+  {"name":"Volcano","icon":"🌋","min":14,"need":5,"pool":["ponyta","magmar","growlithe","cyndaquil","torchic"],"rare":["moltres","ho-oh"]}];
 /* each cave is a TRAINER with a team of 3 */
 const CAVES = [
   {name:'Rock Cave',   icon:'🪨', badge:'rock',   trainer:'Hiker Rocky',       avatar:'🧗',
@@ -938,6 +991,40 @@ function renderTown(msg){
 window.toTitle = function(){ sfx.tap(); BGM.stop(); renderTitle(); };
 
 /* ============ SCREEN: POKEDEX ============ */
+/* ---- where/how rare each species is, for the Pokédex ---- */
+function whoEvolvesInto(id){
+  return Object.entries(SPECIES).find(([,sp]) =>
+    sp.evolveTo && (Array.isArray(sp.evolveTo) ? sp.evolveTo.includes(id) : sp.evolveTo === id))?.[0] || null;
+}
+function trainerOnlySet(){
+  const s = new Set();
+  CAVES.forEach(c => c.team.forEach(([id]) => s.add(id)));
+  LEGEND.team.forEach(([id]) => s.add(id));
+  return s;
+}
+function rarityInfo(id){
+  if(['pairi','kkobugi','isanghae'].includes(id))
+    return {tag:'🎁', short:'Starter', text:'A starter — pick it at the very beginning of the game!'};
+  if(id === 'mewtwoX')
+    return {tag:'🏆', short:'Final boss', text:'The final boss — beat the Champion, then catch it with the Master Ball!'};
+  for(const a of AREAS){
+    if(a.rare.includes(id))
+      return {tag:'🌟', short:'Rare', text:`Legendary — a rare ~6% encounter in ${a.name} (Lv.${a.min}+).`};
+  }
+  const poolAreas = AREAS.filter(a => a.pool.includes(id));
+  if(poolAreas.length){
+    const best = poolAreas.reduce((b,a)=> (94/a.pool.length) > (94/b.pool.length) ? a : b);
+    const pct = Math.max(1, Math.round(94/best.pool.length));
+    return poolAreas.length>1
+      ? {tag:'🌱', short:'Wild', text:`Found in the wild in ${poolAreas.length} lands — best odds ~${pct}% in ${best.name}.`}
+      : {tag:'🌱', short:'Wild', text:`Found in the wild in ${best.name} — about ~${pct}% of encounters there.`};
+  }
+  const from = whoEvolvesInto(id);
+  if(from) return {tag:'✨', short:'Evolve', text:`Not found in the wild — evolve ${SPECIES[from] ? SPECIES[from].name : from} to get it!`};
+  if(trainerOnlySet().has(id))
+    return {tag:'🏆', short:'Trainer', text:'Not found in the wild — only a Trainer\'s team has this one. Beat them to see it!'};
+  return {tag:'❓', short:'Mystery', text:'A mysterious Pokémon — how do you get this one?'};
+}
 window.renderDex = function(){
   sfx.tap();
   const targets = new Set();
@@ -947,8 +1034,9 @@ window.renderDex = function(){
   const node = (id, small) => {
     const got = G.dex.includes(id);
     const s = SPECIES[id];
-    return `<div class="dex-node">
-      <div class="dnum">${dexNum(id)}</div>
+    const r = rarityInfo(id);
+    return `<div class="dex-node" onclick="renderDexDetail('${id}')" style="cursor:pointer;">
+      <div class="dnum">${dexNum(id)} <span title="${r.short}">${r.tag}</span></div>
       ${got ? spriteImg(id, small?38:44) : `<span class="silhouette">${spriteImg(id, small?38:44)}</span>`}
       <div class="dn" style="${got?'':'color:#9aa5bb;'}">${got ? s.name : '???'}</div>
     </div>`;
@@ -956,7 +1044,7 @@ window.renderDex = function(){
   const megaNode = (id) => {
     const got = G.dex.includes(id);
     const m = MEGA[id];
-    return `<div class="dex-node dex-mega">
+    return `<div class="dex-node dex-mega" onclick="renderDexDetail('${id}',true)" style="cursor:pointer;">
       <div class="dnum" style="color:var(--purple);">${dexNum(id)}💠</div>
       ${got ? spriteImg(m.sprite, 44) : `<span class="silhouette">${spriteImg(m.sprite, 44)}</span>`}
       <div class="dn" style="color:var(--purple);">${got ? m.name : '???'}</div>
@@ -986,13 +1074,31 @@ window.renderDex = function(){
   app.innerHTML = `
   <div class="card fadein">
     <h2>📖 Pokédex <small style="color:#6b7a99">(${G.dex.length}/${TOTAL_KINDS})</small></h2>
-    <p class="sub" style="text-align:left;">➜ shows who they grow into! 💠 is the special MEGA battle form!</p>
+    <p class="sub" style="text-align:left;">➜ shows who they grow into! 💠 is the special MEGA battle form! Tap any Pokémon to see how rare it is — 🌱 wild, 🌟 legendary, 🎁 starter, ✨ evolve only, 🏆 trainer only.</p>
     <div class="stack" style="gap:8px;">${families.join('')}</div>
     <h2 style="margin-top:16px;">⭐ One-of-a-kind</h2>
     <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px;">
-      ${solos.map(id=>`<div class="dex-cell"><div class="dnum">${dexNum(id)}</div>${G.dex.includes(id) ? spriteImg(id,44) : `<span class="silhouette">${spriteImg(id,44)}</span>`}<div class="dn" style="${G.dex.includes(id)?'':'color:#9aa5bb;'}">${G.dex.includes(id) ? SPECIES[id].name : '???'}</div></div>`).join('')}
+      ${solos.map(id=>`<div class="dex-cell" onclick="renderDexDetail('${id}')" style="cursor:pointer;"><div class="dnum">${dexNum(id)} <span title="${rarityInfo(id).short}">${rarityInfo(id).tag}</span></div>${G.dex.includes(id) ? spriteImg(id,44) : `<span class="silhouette">${spriteImg(id,44)}</span>`}<div class="dn" style="${G.dex.includes(id)?'':'color:#9aa5bb;'}">${G.dex.includes(id) ? SPECIES[id].name : '???'}</div></div>`).join('')}
     </div>
     <div style="margin-top:14px;"><button class="big" onclick="backTown()">⬅ Back to Town</button></div>
+  </div>`;
+};
+window.renderDexDetail = function(id, isMega){
+  sfx.tap();
+  const got = G.dex.includes(id);
+  const s = SPECIES[id];
+  const r = rarityInfo(id);
+  const stageLabel = ['Base form', 'First evolution', 'Fully evolved'][s.stage||0];
+  const sp = isMega && MEGA[id] ? MEGA[id].sprite : id;
+  const label = isMega && MEGA[id] ? MEGA[id].name : s.name;
+  app.innerHTML = `
+  <div class="card fadein center">
+    <div class="mon-big">${got ? spriteImg(sp,96) : `<span class="silhouette">${spriteImg(sp,96)}</span>`}</div>
+    <h2>${dexNum(id)} ${got ? label : '???'}</h2>
+    ${got ? `<p class="sub">${s.type} type · ${stageLabel} · knows ${s.mv.length} moves</p>` : `<p class="sub">${s.type} type — catch it to learn its name!</p>`}
+    <div class="msgbox center" style="justify-content:center; text-align:left;"><span>${r.tag} ${r.text}</span></div>
+    ${got ? `<p class="progress-note center" style="margin-top:10px;">Moves: ${s.mv.join(' · ')}</p>` : ''}
+    <div style="margin-top:14px;"><button class="big" onclick="renderDex()">⬅ Back to Pokédex</button></div>
   </div>`;
 };
 
@@ -1459,8 +1565,7 @@ function renderBattle(msg){
     <div class="msgbox" id="battle-msg" style="margin:12px 0;"><span>${msg}</span></div>
     <div class="grid2" id="battle-btns">
       ${powerBtns}
-      <button class="red move-btn" onclick="useMove(0)">${moveBtnLabel(mv[0])}</button>
-      <button class="red move-btn" onclick="useMove(1)">${moveBtnLabel(mv[1])}</button>
+      ${mv.map((m,i)=>`<button class="red move-btn" onclick="useMove(${i})">${moveBtnLabel(m)}</button>`).join('')}
       ${ballBtn}
       <button class="blue" ${canSwitch?'':'disabled'} onclick="openSwitch()">🔄 Switch</button>
       <button style="grid-column:1 / -1;" onclick="runAway()">💨 Run Away</button>
@@ -1511,13 +1616,19 @@ function shakeScreen(){
     {duration:320});
 }
 /* particles arc from attacker to target with spin & sparkle trail */
-async function attackFx(fromId, toId, emoji){
+/* how flashy an attack looks: 0 (never evolved) → 2 (fully evolved / Mega / Dynamax) */
+function fxStage(m){
+  let s = (m && formOf(m).stage) || 0;
+  if(m && (m.mega || m.gmax)) s = 2;
+  return s;
+}
+async function attackFx(fromId, toId, emoji, stage){
   const a = centerOf(fromId), b = centerOf(toId);
   if(!a || !b || noMotion) return;
-  const n = 10;
+  const n = 10 + (stage||0)*4;
   for(let i=0;i<n;i++){
     const main = i % 3 !== 2; // every 3rd particle is a sparkle trail
-    const s = spawnFx(a.x, a.y, main ? emoji : '✨', 18 + rand(16));
+    const s = spawnFx(a.x, a.y, main ? emoji : '✨', 18 + (stage||0)*3 + rand(16));
     const dx = b.x-a.x + (Math.random()*40-20);
     const dy = b.y-a.y + (Math.random()*40-20);
     const mx = dx/2 + (Math.random()*70-35);
@@ -1656,12 +1767,15 @@ async function myAction(mv){
     await tickGmax(my, usedGmaxTurn);
     return false;
   }
+  const myStage = fxStage(my);
   if(mv.t==='Normal'){ await lungeFx('my-sprite'); }
-  else { await attackFx('my-sprite','enemy-sprite', TYPES[mv.t].fx); }
+  else { await attackFx('my-sprite','enemy-sprite', TYPES[mv.t].fx, myStage); }
   const mult = typeMult(mv.t, formOf(e).type);
-  const big = mult>1 || powerMult(my)>1;
+  const big = mult>1 || powerMult(my)>1 || myStage>=2;
   burst('enemy-sprite','💥', big);
+  // evolved Pokémon always get a little extra sparkle; only a true big hit shakes the screen
   if(big){ shakeScreen(); ringBurstFx('enemy-sprite', TYPES[mv.t].fx); }
+  else if(myStage>=1){ ringBurstFx('enemy-sprite', TYPES[mv.t].fx); }
   const dmg = Math.max(1, Math.round(
     (atkOf(my)*burnMult(my)*mv.pow*powerMult(my) + rand(4)) * mult * defFactor(e)));
   e.hp -= dmg;
@@ -1710,11 +1824,14 @@ async function enemyAction(emv){
     await sleep(800);
     return false;
   }
+  const eStage = fxStage(e);
   if(emv.t==='Normal'){ await lungeFx('enemy-sprite'); }
-  else { await attackFx('enemy-sprite','my-sprite', TYPES[emv.t].fx); }
+  else { await attackFx('enemy-sprite','my-sprite', TYPES[emv.t].fx, eStage); }
   const mult = typeMult(emv.t, formOf(my).type);
-  burst('my-sprite','💥', mult>1);
-  if(mult>1) shakeScreen();
+  const eBig = mult>1 || eStage>=2;
+  burst('my-sprite','💥', eBig);
+  if(eBig) shakeScreen();
+  else if(eStage>=1) ringBurstFx('my-sprite', TYPES[emv.t].fx);
   /* re-tuned so trainer battles land where they always did, now that enemies also
      get defence normalisation, status conditions and a Mega on their last Pokémon */
   const factor = B.trainer ? (B.legend ? 0.55 : 0.62) : 0.65;
