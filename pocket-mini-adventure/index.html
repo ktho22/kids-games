@@ -863,7 +863,17 @@ window.playSlot = function(s){
   sfx.tap();
   SLOT = s;
   const g = loadSlot(s);
-  if(g){ G = g; renderTown(); }
+  if(g){
+    G = g;
+    renderTown();
+    if(G.cloud){
+      checkCloudInbox().then(r => {
+        if(r && r.inbox && r.inbox.length && SLOT===s){
+          renderTown(r.inbox.map(i=>i.text).join('<br>'));
+        }
+      });
+    }
+  }
   else renderStarter();
 };
 /* ---- per-slot management: rename, cloud link, offline backup code, delete ---- */
@@ -878,7 +888,7 @@ window.renderSlotManage = function(s){
     <div class="stack">
       <button class="blue" onclick="renameSlot(${s})">✏️ Rename this save</button>
       ${g.cloud
-        ? `<button class="purple" onclick="renderFriendCode(${s})">☁️ Online — Code: ${g.cloud.code}</button>`
+        ? `<button class="purple" onclick="renderCloudInfo(${s})">☁️ Online — Code: ${g.cloud.code}</button>`
         : `<button class="purple" onclick="linkSlotCloud(${s})">☁️ Go Online (battle & trade with friends)</button>`}
       <button onclick="exportSlot(${s})">📤 Offline backup code</button>
       <button style="border-color:var(--red); color:var(--red);" onclick="deleteSlot(${s})">🗑️ Delete this save</button>
@@ -913,6 +923,42 @@ window.exportSlot = function(s){
     <h2>📤 Offline Backup Code</h2>
     <p class="sub" style="text-align:left;">This is a snapshot you paste in manually — good as a backup, or on a device without internet. If you've gone ☁️ online, that already keeps every device in sync automatically.</p>
     <textarea class="code-box" id="code-out" readonly>${code}</textarea>
+    <div class="stack" style="margin-top:12px;">
+      <button class="big blue" onclick="copyCode()">📋 Copy Code</button>
+      <button class="big" onclick="renderSlotManage(${s})">⬅ Back</button>
+    </div>
+  </div>`;
+};
+window.linkSlotCloud = async function(s){
+  sfx.tap();
+  const g = loadSlot(s);
+  if(!g) return;
+  app.innerHTML = `<div class="card fadein center"><h2>☁️ Going online…</h2><p class="sub">One moment!</p></div>`;
+  try{
+    const { code, ownerToken } = await cloudCall('publish', { name: slotDisplayName(g,s), state: {
+      party: g.party, box: g.box, balls: g.balls, dex: g.dex, badges: g.badges,
+      masterBall: g.masterBall, bossCaught: g.bossCaught,
+    }});
+    g.cloud = { code, ownerToken };
+    localStorage.setItem(slotKey(s), JSON.stringify(g));
+    if(SLOT===s) G = g;
+    sfx.catchOk();
+    renderCloudInfo(s, 'You\'re online! Share your code with a friend to battle or trade. 🎉');
+  }catch(e){
+    sfx.fail();
+    app.innerHTML = `<div class="card fadein center"><h2>☁️ Couldn't connect</h2><p class="sub">Check your internet and try again in a moment.</p><button class="big" onclick="renderSlotManage(${s})">⬅ Back</button></div>`;
+  }
+};
+window.renderCloudInfo = function(s, msg){
+  sfx.tap();
+  const g = loadSlot(s);
+  if(!g || !g.cloud) { renderSlotManage(s); return; }
+  app.innerHTML = `
+  <div class="card fadein">
+    <h2>☁️ Online</h2>
+    ${msg ? `<div class="msgbox" style="margin-bottom:12px;"><span>${msg}</span></div>` : ''}
+    <p class="sub" style="text-align:left;">Tell a friend this code so they can look you up from the 🌐 Friends screen in Town — they can battle your team or trade with you, any time, even if you're not playing right now.</p>
+    <textarea class="code-box" id="code-out" readonly style="text-align:center; font-size:22px; font-weight:800; min-height:auto; padding:16px;">${g.cloud.code}</textarea>
     <div class="stack" style="margin-top:12px;">
       <button class="big blue" onclick="copyCode()">📋 Copy Code</button>
       <button class="big" onclick="renderSlotManage(${s})">⬅ Back</button>
@@ -1025,7 +1071,8 @@ function renderTown(msg){
         <button class="yellow" onclick="renderParty()" style="padding:10px 4px; font-size:14px;">🎒 Team<br><small>${G.party.length}/6</small></button>
         <button onclick="renderBox()" style="padding:10px 4px; font-size:14px;">📦 Box<br><small>${boxOf().length}/${BOX_MAX}</small></button>
         <button onclick="renderDex()" style="padding:10px 4px; font-size:14px;">📖 Pokédex<br><small>${G.dex.length}/${TOTAL_KINDS}</small></button>
-        <button onclick="renderTypeChart()" style="padding:10px 4px; font-size:14px; grid-column:1 / -1;">⚔️ Battle Guide<br><small>Types, speed &amp; status</small></button>
+        <button onclick="renderTypeChart()" style="padding:10px 4px; font-size:14px;">⚔️ Battle Guide<br><small>Types &amp; status</small></button>
+        <button class="purple" onclick="${G.cloud?'renderFriends()':'renderTown(\'Go ☁️ online first — 💾 Save Slots → ⚙️ → Go Online.\')'}" style="padding:10px 4px; font-size:14px;">🌐 Friends<br><small>${G.cloud?'Battle &amp; trade':'Go online first'}</small></button>
       </div>
       <div class="grid2" style="grid-template-columns:repeat(5,1fr); gap:8px;">
         ${CAVES.map((c,i)=>{
@@ -1050,6 +1097,182 @@ function renderTown(msg){
   </div>`;
 }
 window.toTitle = function(){ sfx.tap(); BGM.stop(); renderTitle(); };
+
+/* ============ CLOUD: FRIENDS, BATTLE & TRADE ============
+   Everything here is async-friendly by design — a friend never has to
+   be online at the same moment. Battling pulls a snapshot of their
+   current team and fights it like any other trainer; trading posts an
+   offer that sits waiting until they next open the game. */
+async function checkCloudInbox(){
+  if(!G.cloud) return null;
+  try{
+    const r = await cloudCall('check', { code: G.cloud.code, ownerToken: G.cloud.ownerToken, since: G.cloud.lastCheck||0 });
+    G.cloud.lastCheck = Date.now();
+    if(r.newer && r.state){
+      G.party = (r.state.party||G.party).filter(m=>m&&SPECIES[m.id]);
+      G.box = (r.state.box||G.box).filter(m=>m&&SPECIES[m.id]);
+      G.balls = r.state.balls ?? G.balls;
+      G.dex = r.state.dex || G.dex;
+      G.badges = r.state.badges || G.badges;
+      if(!G.party.length) G.party = r.state.party || G.party; // never end up with an empty team
+    }
+    try{ localStorage.setItem(slotKey(SLOT), JSON.stringify(G)); }catch(e){}
+    return r;
+  }catch(e){ return null; }
+}
+window.renderFriends = function(){
+  sfx.tap();
+  app.innerHTML = `
+  <div class="card fadein">
+    <h2>🌐 Friends</h2>
+    <p class="sub" style="text-align:left;">Your code: <b>${G.cloud.code}</b> — share it so a friend can find you. Enter theirs below to visit them!</p>
+    <div class="row">
+      <input id="friend-code" class="code-box" style="min-height:auto; padding:12px; flex:1; text-align:center; font-weight:800;" placeholder="e.g. NOVA482" maxlength="10">
+      <button class="green" onclick="lookupFriend()">🔎 Go</button>
+    </div>
+    <div id="friend-result" style="margin-top:12px;"></div>
+    <div class="stack" style="margin-top:14px;">
+      <button onclick="renderTradeBoard()">📤 My Trade Post</button>
+      <button onclick="renderFriendsRefresh()">🔄 Check for updates</button>
+      <button onclick="backTown()">⬅ Back to Town</button>
+    </div>
+  </div>`;
+};
+window.renderFriendsRefresh = async function(){
+  sfx.tap();
+  const r = await checkCloudInbox();
+  if(!r){ renderTown('Couldn\'t reach the server — check your internet and try again. 📡'); return; }
+  const msg = r.inbox && r.inbox.length ? r.inbox.map(i=>i.text).join('<br>') : 'No news — all quiet! 😊';
+  renderTown(msg);
+};
+window.lookupFriend = async function(){
+  const input = document.getElementById('friend-code');
+  const code = (input ? input.value : '').trim().toUpperCase();
+  const box = document.getElementById('friend-result');
+  if(!code){ return; }
+  box.innerHTML = `<div class="msgbox"><span>Looking...</span></div>`;
+  try{
+    const f = await cloudCall('fetchPublic', { code });
+    if(code === G.cloud.code){ box.innerHTML = `<div class="msgbox"><span>That's your own code! 😄 Share it with someone else.</span></div>`; return; }
+    const lead = f.party[0];
+    box.innerHTML = `
+      <div class="party-item">
+        ${lead ? spriteImg(lead.id,48) : ''}
+        <div class="info">
+          <div class="nm">${f.name}</div>
+          <div class="lv">${lead ? `${SPECIES[lead.id].name} Lv.${lead.lv} leads · ` : ''}🏅 ${f.badges}/5 · 📖 ${f.dexCount}</div>
+        </div>
+      </div>
+      <div class="grid2" style="margin-top:10px;">
+        <button class="red" onclick='goFriendBattle(${JSON.stringify(f)})'>⚔️ Battle their team</button>
+        <button class="purple" ${f.tradePost?'':'disabled'} onclick='viewFriendTrade(${JSON.stringify(f)})'>🔁 ${f.tradePost?'See their trade':'No trade posted'}</button>
+      </div>`;
+  }catch(e){
+    box.innerHTML = `<div class="msgbox"><span>Hmm, no one has that code. Double-check it! 🧐</span></div>`;
+  }
+};
+window.goFriendBattle = function(f){
+  sfx.tap();
+  if(activeMon().hp===0){ renderTown('Your Pokémon are all tired! Heal them first. 🏥'); return; }
+  const team = (f.party||[]).slice(0,6);
+  if(!team.length){ return; }
+  const queue = team.map(m => makeTrainerMon(m.id, m.lv));
+  const tr = { trainer: f.name, avatar: '🧑' };
+  B = newBattle({ enemy: queue.shift(), trainer: tr, cave:null, legend:false, friend:{code:f.code, name:f.name}, queue });
+  BGM.play('boss');
+  renderBattle(`🌐 You challenge ${f.name}'s team! "Go, <b>${SPECIES[B.enemy.id].name}</b>!"` + dittoPrep());
+  sfx.fail();
+};
+window.viewFriendTrade = function(f){
+  sfx.tap();
+  const tp = f.tradePost;
+  app.innerHTML = `
+  <div class="card fadein center">
+    <h2>🔁 ${f.name}'s Trade Post</h2>
+    <div class="mon-big">${spriteImg(tp.mon.id,72)}</div>
+    <p class="sub">Offering: <b>${SPECIES[tp.mon.id].name}</b> Lv.${tp.mon.lv}${tp.want?`<br>Wants: ${tp.want}`:''}</p>
+    <p class="progress-note center">Pick one of your Pokémon to offer for it:</p>
+    <div class="stack">
+      ${G.party.map(m=>`<button onclick='offerTrade(${JSON.stringify(f.code)},${JSON.stringify(m.uid)})'>${SPECIES[m.id].name} Lv.${m.lv}</button>`).join('')}
+      <button onclick="renderFriends()">⬅ Back</button>
+    </div>
+  </div>`;
+};
+window.offerTrade = async function(targetCode, offerMonUid){
+  sfx.tap();
+  try{
+    await cloudCall('tradeOffer', { targetCode, fromCode: G.cloud.code, fromOwnerToken: G.cloud.ownerToken, offerMonUid });
+    sfx.good();
+    renderTown(`Offer sent! ${targetCode.slice(0,4)}… will see it next time they play. 📬`);
+  }catch(e){
+    sfx.fail();
+    renderTown('Couldn\'t send the offer — try again in a moment. 📡');
+  }
+};
+window.renderTradeBoard = async function(){
+  sfx.tap();
+  app.innerHTML = `<div class="card fadein center"><h2>📤 My Trade Post</h2><p class="sub">Loading…</p></div>`;
+  let r;
+  try{ r = await cloudCall('check', { code: G.cloud.code, ownerToken: G.cloud.ownerToken, since: 9999999999999 }); }
+  catch(e){ renderTown('Couldn\'t reach the server. Try again in a moment. 📡'); return; }
+  const tp = r.tradePost, offers = r.tradeOffers||[];
+  app.innerHTML = `
+  <div class="card fadein">
+    <h2>📤 My Trade Post</h2>
+    ${tp ? `
+      <div class="party-item">
+        ${spriteImg(tp.mon.id,48)}
+        <div class="info"><div class="nm">${SPECIES[tp.mon.id].name} Lv.${tp.mon.lv}</div><div class="lv">${tp.want?`Wants: ${tp.want}`:'Wants: anything!'}</div></div>
+      </div>
+      <p class="sub" style="margin-top:10px;">Offers so far:</p>
+      <div class="stack">
+        ${offers.length ? offers.map(o=>`
+          <div class="party-item">
+            ${spriteImg(o.mon.id,40)}
+            <div class="info"><div class="nm">${SPECIES[o.mon.id].name} Lv.${o.mon.lv}</div><div class="lv">from ${o.fromName}</div></div>
+            <button class="green" onclick='acceptOffer(${JSON.stringify(o.offerId)})'>✅ Take it</button>
+          </div>`).join('') : `<p class="progress-note center">No offers yet — check back later!</p>`}
+      </div>
+      <button style="margin-top:10px; border-color:var(--red); color:var(--red);" onclick="cancelTrade()">🗑️ Cancel this post</button>
+    ` : `
+      <p class="sub" style="text-align:left;">Post one of your Pokémon — any friend who looks you up can offer a trade for it!</p>
+      <div class="stack">
+        ${G.party.map(m=>`<button onclick='postTrade(${JSON.stringify(m.uid)})'>${SPECIES[m.id].name} Lv.${m.lv}</button>`).join('')}
+      </div>
+    `}
+    <div style="margin-top:14px;"><button class="big" onclick="renderFriends()">⬅ Back</button></div>
+  </div>`;
+};
+window.postTrade = async function(monUid){
+  sfx.tap();
+  const want = (prompt('Want anything specific back? (or leave blank for "anything")', '') || '').trim();
+  try{
+    await cloudCall('tradePost', { code: G.cloud.code, ownerToken: G.cloud.ownerToken, monUid, want: want || null });
+    sfx.good();
+    renderTradeBoard();
+  }catch(e){ sfx.fail(); renderTown('Couldn\'t post the trade — try again in a moment. 📡'); }
+};
+window.cancelTrade = async function(){
+  if(!confirm('Cancel your trade post?')) return;
+  try{ await cloudCall('tradeCancel', { code: G.cloud.code, ownerToken: G.cloud.ownerToken }); }catch(e){}
+  sfx.tap();
+  renderTradeBoard();
+};
+window.acceptOffer = async function(offerId){
+  sfx.tap();
+  try{
+    const r = await cloudCall('tradeAccept', { code: G.cloud.code, ownerToken: G.cloud.ownerToken, offerId });
+    const got = r.gotMon;
+    await checkCloudInbox(); // pulls the post-trade party (with the new Pokémon) down into G
+    if(!G.dex.includes(got.id)) G.dex.push(got.id);
+    save();
+    sfx.catchOk();
+    renderTown(`✨ Traded! You got a ${SPECIES[got.id].name}!`);
+  }catch(e){
+    sfx.fail();
+    renderTradeBoard();
+  }
+};
 
 /* ============ SCREEN: POKEDEX ============ */
 /* ---- where/how rare each species is, for the Pokédex ---- */
@@ -1414,6 +1637,10 @@ window.goPlaza = function(){
   renderBattle(`${tr.avatar} ${tr.trainer} wants to battle! "Go, <b>${SPECIES[B.enemy.id].name}</b>!"` + dittoPrep());
   sfx.fail();
 };
+function reportFriendBattle(won){
+  if(!G.cloud || !B.friend) return;
+  cloudCall('battleResult', { code: B.friend.code, fromCode: G.cloud.code, fromName: slotDisplayName(G,SLOT), won }).catch(()=>{});
+}
 /* fresh battle state — ⚡power gauge starts empty, so Mega/Dynamax must be earned */
 function newBattle(o){
   return Object.assign({queue:[], powerUsed:false, over:false, gauge:0, enemyMega:false, forced:false}, o);
@@ -1958,6 +2185,7 @@ async function myFainted(fallen){
   setMsg('All your Pokémon are tired... Time to go home!');
   await sleep(1400);
   B.over=true; busy=false;
+  if(B.friend) reportFriendBattle(false);
   clearBattleFlags();
   G.party.forEach(m=>m.hp=maxHpOf(m));
   save();
@@ -2159,6 +2387,13 @@ async function trainerMonDown(){
   }
   // whole team beaten!
   B.over=true; busy=false;
+  if(B.friend){
+    G.balls++;
+    sfx.fanfare();
+    reportFriendBattle(true);
+    finishBattle(`You beat ${B.friend.name}'s team! 🎉 They'll see it next time they play. You got a Poké Ball! 🔴 +1`);
+    return;
+  }
   if(B.plaza){
     G.balls++;
     sfx.fanfare();
