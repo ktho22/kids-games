@@ -8,5 +8,8 @@
     "login": "./deploy.sh login",
     "preview": "./deploy.sh preview",
     "deploy": "./deploy.sh prod"
+  },
+  "dependencies": {
+    "@netlify/blobs": "^8"
   }
 }

@@ -1,7 +1,13 @@
-# Static site: every game is a plain folder with an index.html.
-# There is no build step — Netlify just serves this directory as-is.
+# Every game is still a plain static folder — "npm install" here exists
+# only so the one serverless function (cloud saves) has its dependency
+# available to bundle. Nothing about the games themselves gets built.
 [build]
+  command = "npm install"
   publish = "."
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
 
 # Game files change whenever we ship an update, so always revalidate.
 # Netlify sends ETags, so an unchanged game answers 304 and costs nothing.

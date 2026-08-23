@@ -619,7 +619,9 @@ let B = null; // battle state
 let busy = false;
 
 const BOX_MAX = 40;
+const SLOT_COUNT = 5;
 const slotKey = s => 'pk-slot-'+s;
+function rid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,9); }
 function sanitizeSave(g){
   if(!g || !g.party || !g.party.length) return null;
   if(!g.badges) g.badges = [];
@@ -632,12 +634,15 @@ function sanitizeSave(g){
   /* battle-only flags never belong in a save file */
   g.party.concat(g.box).forEach(m => {
     delete m.mega; delete m.gmax; delete m.tf; delete m.st; delete m.stT; delete m.bossMaxHp;
+    if(!m.uid) m.uid = rid(); // saves from before trading existed
     m.lv = Math.max(1, Math.min(100, Math.round(m.lv || 1)));
     m.exp = Math.max(0, Math.round(m.exp || 0));
     const mh = maxHpOf(m);
     m.hp = Math.max(0, Math.min(mh, Math.round(m.hp == null ? mh : m.hp)));
   });
   g.box.forEach(m => { m.hp = maxHpOf(m); }); // the box always keeps them healthy
+  if(typeof g.name !== 'string' || !g.name.trim()) g.name = '';
+  if(!g.cloud || typeof g.cloud.code !== 'string') g.cloud = null;
   return g;
 }
 function loadSlot(s){
@@ -649,6 +654,30 @@ function loadSlot(s){
 }
 function save(){
   try{ localStorage.setItem(slotKey(SLOT), JSON.stringify(G)); }catch(e){}
+  try{ cloudPush(); }catch(e){} // best-effort background sync; must never block local play
+}
+/* ============ CLOUD SYNC (Netlify Blobs, via a serverless function) ============
+   Every call is fire-and-forget from the caller's point of view — a spotty
+   connection or a server hiccup should never interrupt a battle or a save.
+   Only the screens that explicitly show cloud state (Slot Manage, Friends,
+   Trade Board) await these and show their own errors. */
+const CLOUD_URL = '/.netlify/functions/cloud';
+async function cloudCall(action, payload){
+  const res = await fetch(CLOUD_URL, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ action, ...payload }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if(!res.ok) throw new Error(data.error || 'cloud request failed');
+  return data;
+}
+function cloudPush(){
+  if(!G || !G.cloud) return;
+  cloudCall('push', { code: G.cloud.code, ownerToken: G.cloud.ownerToken, state: {
+    party: G.party, box: G.box, balls: G.balls, dex: G.dex, badges: G.badges,
+    masterBall: G.masterBall, bossCaught: G.bossCaught,
+  }}).catch(()=>{}); // offline or the server hiccuped — the next save() retries
 }
 /* share codes: copy your save between devices */
 function makeCode(g){
@@ -673,7 +702,7 @@ try{
 function newMon(speciesId, lv){
   const s = SPECIES[speciesId];
   const maxHp = s.hp + lv*2;
-  return {id:speciesId, lv, exp:0, hp:maxHp};
+  return {id:speciesId, lv, exp:0, hp:maxHp, uid:rid()};
 }
 /* formOf = the shape a Pokémon is fighting AS right now.
    Normally its own species — but a transformed Ditto borrows someone else's (m.tf). */
@@ -803,23 +832,23 @@ function spriteImg(key, size){
 }
 
 /* ============ SCREEN: TITLE + SAVE SLOTS ============ */
+function slotDisplayName(g, s){ return g.name && g.name.trim() ? g.name : `Slot ${s}`; }
 function renderTitle(){
-  const slots = [1,2,3].map(s => ({s, g: loadSlot(s)}));
+  const slots = Array.from({length:SLOT_COUNT}, (_,i)=>i+1).map(s => ({s, g: loadSlot(s)}));
   app.innerHTML = `
   <div class="card fadein center">
     <div class="mon-big"><span class="bounce">${spriteImg('pikachu',84)}</span> <span class="bounce" style="animation-delay:.3s">${spriteImg('pairi',84)}</span> <span class="bounce" style="animation-delay:.6s">${spriteImg('kkobugi',84)}</span></div>
     <h1>Pocket Mini Adventure</h1>
-    <p class="sub">Explore 8 lands! Fill your Pokédex with ${TOTAL_KINDS} kinds!<br>Charge the ⚡Power gauge to Mega Evolve 💠 and Dynamax 🔴 — then catch <b>Mega Mewtwo X</b>!</p>
+    <p class="sub">Explore 8 lands! Fill your Pokédex with ${TOTAL_KINDS} kinds!<br>Charge the ⚡Power gauge to Mega Evolve 💠 and Dynamax 🔴 — then catch <b>Mega Mewtwo X</b>!<br>Go ☁️ online to battle and trade with a friend's save!</p>
     <div class="stack">
       ${slots.map(({s,g})=>{
         if(g){
           const lead = g.party[0];
           return `<div class="row">
             <button class="big green" style="flex:1;" onclick="playSlot(${s})">
-              ▶ Slot ${s} — ${SPECIES[lead.id].name} Lv.${lead.lv}<br><small>🏅 ${g.badges.length}/5 · 📖 ${g.dex.length}/${TOTAL_KINDS}</small>
+              ▶ ${slotDisplayName(g,s)} — ${SPECIES[lead.id].name} Lv.${lead.lv}<br><small>🏅 ${g.badges.length}/5 · 📖 ${g.dex.length}/${TOTAL_KINDS}${g.cloud?' · ☁️':''}</small>
             </button>
-            <button style="padding:10px;" onclick="exportSlot(${s})" title="Share code">📤</button>
-            <button style="padding:10px;" onclick="deleteSlot(${s})" title="Delete">🗑️</button>
+            <button style="padding:10px;" onclick="renderSlotManage(${s})" title="Manage">⚙️</button>
           </div>`;
         }
         return `<div class="row">
@@ -828,7 +857,6 @@ function renderTitle(){
         </div>`;
       }).join('')}
     </div>
-    <p class="progress-note" style="margin-top:10px;">📤 Share code → play on another device! 📥 Paste it there.</p>
   </div>`;
 }
 window.playSlot = function(s){
@@ -838,8 +866,40 @@ window.playSlot = function(s){
   if(g){ G = g; renderTown(); }
   else renderStarter();
 };
+/* ---- per-slot management: rename, cloud link, offline backup code, delete ---- */
+window.renderSlotManage = function(s){
+  sfx.tap();
+  const g = loadSlot(s);
+  if(!g){ renderTitle(); return; }
+  app.innerHTML = `
+  <div class="card fadein">
+    <h2>⚙️ ${slotDisplayName(g,s)}</h2>
+    <p class="sub" style="text-align:left;">🏅 ${g.badges.length}/5 · 📖 ${g.dex.length}/${TOTAL_KINDS}</p>
+    <div class="stack">
+      <button class="blue" onclick="renameSlot(${s})">✏️ Rename this save</button>
+      ${g.cloud
+        ? `<button class="purple" onclick="renderFriendCode(${s})">☁️ Online — Code: ${g.cloud.code}</button>`
+        : `<button class="purple" onclick="linkSlotCloud(${s})">☁️ Go Online (battle & trade with friends)</button>`}
+      <button onclick="exportSlot(${s})">📤 Offline backup code</button>
+      <button style="border-color:var(--red); color:var(--red);" onclick="deleteSlot(${s})">🗑️ Delete this save</button>
+      <button onclick="renderTitle()">⬅ Back</button>
+    </div>
+  </div>`;
+};
+window.renameSlot = function(s){
+  const g = loadSlot(s);
+  if(!g) return;
+  const name = prompt('What should this save be called?', slotDisplayName(g,s));
+  if(name === null) { renderSlotManage(s); return; }
+  g.name = name.trim().slice(0,24);
+  try{ localStorage.setItem(slotKey(s), JSON.stringify(g)); }catch(e){}
+  if(SLOT===s) G = g;
+  if(g.cloud) cloudCall('rename', {code:g.cloud.code, ownerToken:g.cloud.ownerToken, name:g.name}).catch(()=>{});
+  sfx.tap();
+  renderSlotManage(s);
+};
 window.deleteSlot = function(s){
-  if(!confirm(`Delete Slot ${s}? This cannot be undone!`)) return;
+  if(!confirm(`Delete this save? This cannot be undone!`)) return;
   try{ localStorage.removeItem(slotKey(s)); }catch(e){}
   renderTitle();
 };
@@ -850,12 +910,12 @@ window.exportSlot = function(s){
   const code = makeCode(g);
   app.innerHTML = `
   <div class="card fadein">
-    <h2>📤 Share Code — Slot ${s}</h2>
-    <p class="sub" style="text-align:left;">Copy this code and paste it on another device (📥 button) to keep playing there!</p>
+    <h2>📤 Offline Backup Code</h2>
+    <p class="sub" style="text-align:left;">This is a snapshot you paste in manually — good as a backup, or on a device without internet. If you've gone ☁️ online, that already keeps every device in sync automatically.</p>
     <textarea class="code-box" id="code-out" readonly>${code}</textarea>
     <div class="stack" style="margin-top:12px;">
       <button class="big blue" onclick="copyCode()">📋 Copy Code</button>
-      <button class="big" onclick="renderTitle()">⬅ Back</button>
+      <button class="big" onclick="renderSlotManage(${s})">⬅ Back</button>
     </div>
   </div>`;
 };
@@ -917,7 +977,8 @@ function renderStarter(){
 }
 window.pickStarter = function(id){
   sfx.good();
-  G = {party:[newMon(id,5)], box:[], balls:5, dex:[id], badges:[], masterBall:false, bossCaught:false};
+  const name = (prompt('Name your save! (like "Alex\'s Adventure")', '') || '').trim().slice(0,24);
+  G = {party:[newMon(id,5)], box:[], balls:5, dex:[id], badges:[], masterBall:false, bossCaught:false, name, cloud:null};
   save();
   renderTown(`Yay! ${SPECIES[id].name} is your buddy now! Let's go!`);
 };
