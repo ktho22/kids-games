@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pocket Mini Adventure</title>
+<title>Pocket Mini Adventure — Math Edition</title>
 <style>
   :root{
     --sky:#aee7f8; --grass:#b9e98c; --panel:#fffdf3; --ink:#2b3a55;
@@ -119,6 +119,10 @@
 <div id="app"></div>
 
 <script>
+/* This is the 🔢 Math Edition branch: every attack and every Poké Ball
+   throw doubles as a quick, ungraded arithmetic moment (pitched around
+   age 6). Set to false to get the plain game back. */
+const MATH_MODE = true;
 /* ============ DATA ============ */
 const TYPES = {
   /* matchups based on the classic games: strong=1.5x, weak=0.7x, barely=0.4x */
@@ -838,8 +842,8 @@ function renderTitle(){
   app.innerHTML = `
   <div class="card fadein center">
     <div class="mon-big"><span class="bounce">${spriteImg('pikachu',84)}</span> <span class="bounce" style="animation-delay:.3s">${spriteImg('pairi',84)}</span> <span class="bounce" style="animation-delay:.6s">${spriteImg('kkobugi',84)}</span></div>
-    <h1>Pocket Mini Adventure</h1>
-    <p class="sub">Explore 8 lands! Fill your Pokédex with ${TOTAL_KINDS} kinds!<br>Charge the ⚡Power gauge to Mega Evolve 💠 and Dynamax 🔴 — then catch <b>Mega Mewtwo X</b>!<br>Go ☁️ online to battle and trade with a friend's save!</p>
+    <h1>Pocket Mini Adventure${MATH_MODE?' <span style="font-size:20px; color:var(--blue);">🔢 Math Edition</span>':''}</h1>
+    <p class="sub">Explore 8 lands! Fill your Pokédex with ${TOTAL_KINDS} kinds!<br>Charge the ⚡Power gauge to Mega Evolve 💠 and Dynamax 🔴 — then catch <b>Mega Mewtwo X</b>!<br>Go ☁️ online to battle and trade with a friend's save!${MATH_MODE?'<br>🔢 Every attack and Poké Ball is also a fun number puzzle!':''}</p>
     <div class="stack">
       ${slots.map(({s,g})=>{
         if(g){
@@ -1897,6 +1901,59 @@ function spawnRing(x, y, color){
     {duration:450, easing:'ease-out', fill:'forwards'});
   setTimeout(()=>s.remove(), 500);
 }
+/* ============ MATH MODE (Education Edition) ============
+   Every question uses a REAL number already at play — an attack's own
+   damage, the balls you're about to spend — so it reads as part of the
+   battle, not a quiz bolted on top. Nothing is ever punishing: a wrong
+   tap just shows the right number for a moment, then the game moves on
+   exactly as it would have anyway. Pitched around age 6 (sums/answers
+   generally land under ~20-30), which a curious 4-year-old can still
+   follow along to with a hand held. */
+function splitSum(total){
+  if(total<=1) return [total,0];
+  const a = 1 + rand(total-1);
+  return [a, total-a];
+}
+function mathChoices(correct){
+  const pool = [-3,-2,-1,1,2,3].map(o=>correct+o).filter(v=>v>=0 && v!==correct);
+  for(let i=pool.length-1;i>0;i--){ const j=rand(i+1); [pool[i],pool[j]]=[pool[j],pool[i]]; }
+  const wrongs = [...new Set(pool)].slice(0,2);
+  while(wrongs.length<2) wrongs.push(correct + wrongs.length + 4);
+  const opts = [correct, ...wrongs];
+  for(let i=opts.length-1;i>0;i--){ const j=rand(i+1); [opts[i],opts[j]]=[opts[j],opts[i]]; }
+  return opts;
+}
+/* shows over the CURRENT screen's message box, so battle stays fully visible behind it */
+async function mathChallenge(icon, a, symbol, b, correct){
+  if(!MATH_MODE) return;
+  const opts = mathChoices(correct);
+  const box = document.getElementById('battle-msg');
+  if(!box) return; // screen changed out from under us — skip rather than risk a stuck game
+  box.innerHTML = `
+    <div style="width:100%;">
+      <div style="text-align:center; font-size:26px; font-weight:800; margin-bottom:10px;">${icon} ${a} ${symbol} ${b} = ?</div>
+      <div class="grid3" id="math-opts">
+        ${opts.map(o=>`<button class="blue" style="font-size:24px; padding:16px 0;" onclick="answerMath(${o},${correct})">${o}</button>`).join('')}
+      </div>
+    </div>`;
+  await new Promise(resolve => { window.__mathResolve = resolve; });
+}
+window.answerMath = async function(picked, correct){
+  document.querySelectorAll('#math-opts button').forEach(b=>b.disabled=true);
+  const box = document.getElementById('battle-msg');
+  if(picked === correct){
+    sfx.good();
+    if(box) box.innerHTML = `<div style="width:100%; text-align:center; font-size:22px; font-weight:800;">🎉 Yes! ${correct} is right!</div>`;
+  }else{
+    sfx.fail();
+    if(box) box.innerHTML = `<div style="width:100%; text-align:center; font-size:22px; font-weight:800;">Almost! It's <b>${correct}</b>. 😊</div>`;
+  }
+  await sleep(1100);
+  const resolve = window.__mathResolve;
+  window.__mathResolve = null;
+  if(resolve) resolve();
+};
+
 function shakeScreen(){
   if(noMotion || !document.body.animate) return;
   document.body.animate(
@@ -2066,6 +2123,10 @@ async function myAction(mv){
   else if(myStage>=1){ ringBurstFx('enemy-sprite', TYPES[mv.t].fx); }
   const dmg = Math.max(1, Math.round(
     (atkOf(my)*burnMult(my)*mv.pow*powerMult(my) + rand(4)) * mult * defFactor(e)));
+  if(MATH_MODE){
+    const [pa,pb] = splitSum(dmg);
+    await mathChallenge('💥', pa, '+', pb, dmg);
+  }
   e.hp -= dmg;
   // Mega Mewtwo X can't be knocked out on the first try — you have to catch it!
   if(isCatchPhase() && e.hp < 1) e.hp = 1;
@@ -2262,7 +2323,11 @@ window.throwBall = async function(){
   }
   busy=true; setBtns(false);
   const master = isCatchPhase();
-  if(!master) G.balls--;
+  if(!master){
+    const before = G.balls;
+    G.balls--;
+    if(MATH_MODE) await mathChallenge('🔴', before, '−', 1, G.balls);
+  }
   setMsg(`You threw the ${master?'Master Ball':'Poké Ball'}! ${master?'🟣':'🔴'}`);
   await ballFx(master?'🟣':'🔴');
   await sleep(250);
@@ -2328,11 +2393,14 @@ async function grantExp(defeated, isTrainerMon){
   setMsg(`${SPECIES[my.id].name} got ⭐${gained} stars!`);
   await sleep(1100);
   while(my.exp >= expNeed(my)){
+    const fromLv = my.lv;
     my.exp -= expNeed(my);
     my.lv++;
     my.hp = Math.min(maxHpOf(my), my.hp + 8);
     sfx.good();
-    setMsg(`🎉 Level up! ${SPECIES[my.id].name} is Level ${my.lv} now!`);
+    setMsg(MATH_MODE
+      ? `🎉 Level up! ${fromLv} + 1 = ${my.lv}! ${SPECIES[my.id].name} counted up a level!`
+      : `🎉 Level up! ${SPECIES[my.id].name} is Level ${my.lv} now!`);
     await sleep(1100);
   }
 }
