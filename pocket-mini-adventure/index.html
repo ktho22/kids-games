@@ -123,6 +123,22 @@
    throw doubles as a quick, ungraded arithmetic moment (pitched around
    age 6). Set to false to get the plain game back. */
 const MATH_MODE = true;
+/* Some mobile/embedded browsers (certain in-app webviews, sandboxed
+   previews) block prompt()/confirm() outright — calling them throws
+   instead of just returning a value, which would otherwise crash
+   whatever button the player just tapped. These wrappers fail safe:
+   a blocked prompt() acts like the player hit Cancel (every call site
+   already handles that), and a blocked confirm() acts like "no" so a
+   destructive action (delete, release, cancel a trade) never happens
+   silently just because the dialog couldn't be shown. */
+function safePrompt(message, def){
+  try{ return prompt(message, def); }
+  catch(e){ return null; }
+}
+function safeConfirm(message){
+  try{ return confirm(message); }
+  catch(e){ return false; }
+}
 /* ============ DATA ============ */
 const TYPES = {
   /* matchups based on the classic games: strong=1.5x, weak=0.7x, barely=0.4x */
@@ -903,7 +919,7 @@ window.renderSlotManage = function(s){
 window.renameSlot = function(s){
   const g = loadSlot(s);
   if(!g) return;
-  const name = prompt('What should this save be called?', slotDisplayName(g,s));
+  const name = safePrompt('What should this save be called?', slotDisplayName(g,s));
   if(name === null) { renderSlotManage(s); return; }
   g.name = name.trim().slice(0,24);
   try{ localStorage.setItem(slotKey(s), JSON.stringify(g)); }catch(e){}
@@ -913,7 +929,7 @@ window.renameSlot = function(s){
   renderSlotManage(s);
 };
 window.deleteSlot = function(s){
-  if(!confirm(`Delete this save? This cannot be undone!`)) return;
+  if(!safeConfirm(`Delete this save? This cannot be undone!`)) return;
   try{ localStorage.removeItem(slotKey(s)); }catch(e){}
   renderTitle();
 };
@@ -1027,7 +1043,7 @@ function renderStarter(){
 }
 window.pickStarter = function(id){
   sfx.good();
-  const name = (prompt('Name your save! (like "Alex\'s Adventure")', '') || '').trim().slice(0,24);
+  const name = (safePrompt('Name your save! (like "Alex\'s Adventure")', '') || '').trim().slice(0,24);
   G = {party:[newMon(id,5)], box:[], balls:5, dex:[id], badges:[], masterBall:false, bossCaught:false, name, cloud:null};
   save();
   renderTown(`Yay! ${SPECIES[id].name} is your buddy now! Let's go!`);
@@ -1249,7 +1265,7 @@ window.renderTradeBoard = async function(){
 };
 window.postTrade = async function(monUid){
   sfx.tap();
-  const want = (prompt('Want anything specific back? (or leave blank for "anything")', '') || '').trim();
+  const want = (safePrompt('Want anything specific back? (or leave blank for "anything")', '') || '').trim();
   try{
     await cloudCall('tradePost', { code: G.cloud.code, ownerToken: G.cloud.ownerToken, monUid, want: want || null });
     sfx.good();
@@ -1257,7 +1273,7 @@ window.postTrade = async function(monUid){
   }catch(e){ sfx.fail(); renderTown('Couldn\'t post the trade — try again in a moment. 📡'); }
 };
 window.cancelTrade = async function(){
-  if(!confirm('Cancel your trade post?')) return;
+  if(!safeConfirm('Cancel your trade post?')) return;
   try{ await cloudCall('tradeCancel', { code: G.cloud.code, ownerToken: G.cloud.ownerToken }); }catch(e){}
   sfx.tap();
   renderTradeBoard();
@@ -1562,7 +1578,7 @@ window.releaseBox = function(i){
   const box = boxOf();
   const m = box[i];
   if(!m) return;
-  if(!confirm(`Say bye-bye to ${SPECIES[m.id].name}? It will go play in the wild.`)) return;
+  if(!safeConfirm(`Say bye-bye to ${SPECIES[m.id].name}? It will go play in the wild.`)) return;
   box.splice(i,1);
   G.balls++;
   sfx.good();
@@ -1581,7 +1597,7 @@ window.releaseMon = function(ev, i){
   ev.stopPropagation();
   if(G.party.length<=1){ renderParty('You need at least 1 Pokémon! 😊'); return; }
   const m = G.party[i];
-  if(!confirm(`Say bye-bye to ${SPECIES[m.id].name}? It will go play in the wild.`)) return;
+  if(!safeConfirm(`Say bye-bye to ${SPECIES[m.id].name}? It will go play in the wild.`)) return;
   G.party.splice(i,1);
   G.balls++;
   sfx.good();
