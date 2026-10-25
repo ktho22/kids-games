@@ -20,7 +20,8 @@
 // This is a kids' game played within a household/friend group, not a
 // public service — the model is "friendly, not fortified": enough to
 // stop accidents and stray typos, not a real security boundary.
-const { getStore } = require('@netlify/blobs');
+import { getStore } from '@netlify/blobs';
+import crypto from 'node:crypto';
 
 const WORDS = ['PINE','LEAF','ROCK','WAVE','STAR','MOON','GLOW','SPARK','FLAME','FROST',
   'STORM','CLOUD','RAIN','SNOW','WIND','PEAK','CAVE','REEF','DUNE','MIST','DAWN','DUSK',
@@ -42,16 +43,16 @@ const CORS = {
   'access-control-max-age': '86400',
 };
 function json(status, body){
-  return { statusCode: status, headers: { 'content-type': 'application/json', ...CORS }, body: JSON.stringify(body) };
+  return { status, headers: { 'content-type': 'application/json', ...CORS }, body: JSON.stringify(body) };
 }
-function randToken(){ return require('crypto').randomBytes(18).toString('hex'); }
+function randToken(){ return crypto.randomBytes(18).toString('hex'); }
 function randCode(){
   const w = WORDS[Math.floor(Math.random()*WORDS.length)];
   const n = 100 + Math.floor(Math.random()*900);
   return w + n;
 }
-function randPin(){ return String(require('crypto').randomInt(0, 10000)).padStart(4, '0'); }
-function pinHash(code, pin){ return require('crypto').createHash('sha256').update(code + ':' + pin).digest('hex'); }
+function randPin(){ return String(crypto.randomInt(0, 10000)).padStart(4, '0'); }
+function pinHash(code, pin){ return crypto.createHash('sha256').update(code + ':' + pin).digest('hex'); }
 function clean(s, max){ return (typeof s === 'string' ? s : '').trim().slice(0, max || 24); }
 
 async function uniqueCode(store){
@@ -78,20 +79,12 @@ function publicView(rec){
   };
 }
 
-exports.handler = async (event) => {
-  if(event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
-  if(event.httpMethod !== 'POST') return json(405, { error: 'POST only' });
+export async function handleRequest(method, bodyText, store){
+  if(method === 'OPTIONS') return { status: 204, headers: CORS, body: '' };
+  if(method !== 'POST') return json(405, { error: 'POST only' });
   let body;
-  try{ body = JSON.parse(event.body || '{}'); }catch(e){ return json(400, { error: 'bad json' }); }
+  try{ body = JSON.parse(bodyText || '{}'); }catch(e){ return json(400, { error: 'bad json' }); }
   const { action } = body;
-  // This CLI-deployed function doesn't get the automatic Blobs context that
-  // git-linked deploys get, so it's wired up by hand with a personal access
-  // token (BLOBS_API_TOKEN, set via `netlify env:set` — never in source).
-  const store = getStore({
-    name: 'pocket-saves',
-    siteID: process.env.SITE_ID,
-    token: process.env.BLOBS_API_TOKEN,
-  });
 
   async function loadOwned(code, ownerToken){
     const rec = await store.get(code, { type: 'json' });
@@ -269,4 +262,15 @@ exports.handler = async (event) => {
   }catch(e){
     return json(500, { error: 'server hiccup, try again in a moment' });
   }
+};
+
+// Netlify Functions v2: Blobs credentials (including the uncached edge URL
+// that strong consistency needs) are wired up automatically — no token.
+// 'strong' matters: the default is eventually consistent, so a save written
+// by one device could read back as missing/old on the next request for up to
+// a minute — which looks exactly like "sync doesn't work".
+export default async (req) => {
+  const store = getStore({ name: 'pocket-saves', consistency: 'strong' });
+  const r = await handleRequest(req.method, req.method === 'POST' ? await req.text() : '', store);
+  return new Response(r.status === 204 ? null : r.body, { status: r.status, headers: r.headers }); // a 204 may not carry a body
 };
