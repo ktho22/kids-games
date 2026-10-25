@@ -412,61 +412,18 @@ const SPECIES = {
   "mewtwoX": {"name":"Mega Mewtwo X","emoji":"💜👾","type":"Psychic","hp":60,"atk":18,"evolveLv":null,"mv":["Psychic","Shadow Ball"]},
 };
 
-/* ============ DERIVED STATS: def (defence) + spd (speed) ============
-   Every species gets these computed from its hp/atk, so the species table above
-   never has to be hand-edited. Famous Pokémon then get a multiplier tweak so
-   they *feel* right: Snorlax slow & sturdy, Alakazam fast & papery, Onix a wall. */
-const STAT_TWEAKS = {
-  /* walls: lots of defence, not much hurry */
-  onix:{def:2.00,spd:0.85}, geodude:{def:1.50,spd:0.60}, graveler:{def:1.50,spd:0.60},
-  golem:{def:1.45,spd:0.60}, cloyster:{def:1.90,spd:0.95}, shellder:{def:1.25,spd:0.80},
-  aron:{def:1.50,spd:0.60}, lairon:{def:1.60,spd:0.60}, aggron:{def:1.80,spd:0.60},
-  rhyhorn:{def:1.40,spd:0.60}, rhydon:{def:1.50,spd:0.60}, marowak:{def:1.50,spd:0.70},
-  cubone:{def:1.45,spd:0.70}, omanyte:{def:1.50,spd:0.60}, omastar:{def:1.50,spd:0.70},
-  kabuto:{def:1.30,spd:0.90}, krabby:{def:1.35,spd:0.90}, kingler:{def:1.40,spd:0.95},
-  metapod:{def:1.60,spd:0.40}, kakuna:{def:1.55,spd:0.40}, koffing:{def:1.40,spd:0.70},
-  weezing:{def:1.50,spd:0.80}, magnemite:{def:1.40,spd:0.90}, magneton:{def:1.40,spd:0.95},
-  larvitar:{def:1.30,spd:0.70}, pupitar:{def:1.30,spd:0.70}, tyranitar:{def:1.30,spd:0.75},
-  slowbro:{def:1.35,spd:0.30}, slowpoke:{def:1.10,spd:0.25}, umbreon:{def:1.45,spd:0.75},
-  snorlax:{def:1.30,spd:0.40}, sandshrew:{def:1.30,spd:0.95}, sandslash:{def:1.30,spd:0.95},
-  exeggcute:{def:1.10,spd:0.50}, exeggutor:{def:1.05,spd:0.50}, tangela:{def:1.10,spd:0.80},
-  swampert:{def:1.20,spd:0.75}, meganium:{def:1.15,spd:0.90}, dragonite:{def:1.15,spd:0.95},
-  lapras:{def:1.05,spd:0.70}, dewgong:{def:1.05,spd:0.80}, seel:{def:1.05,spd:0.80},
-  horsea:{def:1.20,spd:1.10}, seadra:{def:1.15,spd:1.10}, ampharos:{def:1.10,spd:0.70},
-  heracross:{def:1.05,spd:1.15}, garchomp:{def:1.05,spd:1.30}, garados:{def:1.05,spd:1.05},
-  /* glass cannons: hit hard, fold fast */
-  alakazam:{def:0.55,spd:1.60}, kadabra:{def:0.65,spd:1.45}, abra:{def:0.70,spd:1.50},
-  gengar:{def:0.70,spd:1.50}, haunter:{def:0.70,spd:1.45}, gastly:{def:0.60,spd:1.40},
-  chansey:{def:0.35,spd:0.60}, jigglypuff:{def:0.45,spd:0.60}, wigglytuff:{def:0.45,spd:0.60},
-  jynx:{def:0.70,spd:1.25}, espeon:{def:0.75,spd:1.30}, hitmonlee:{def:0.70,spd:1.20},
-  muk:{def:0.80,spd:0.60}, grimer:{def:0.80,spd:0.60}, yeongking:{def:0.70,spd:1.30},
-  diglett:{def:0.60,spd:1.50}, dugtrio:{def:0.70,spd:1.60}, voltorb:{def:0.80,spd:1.50},
-  electrode:{def:0.85,spd:1.65}, jolteon:{def:0.80,spd:1.55}, aerodactyl:{def:0.80,spd:1.50},
-  ponyta:{def:0.80,spd:1.35}, rapidash:{def:0.80,spd:1.45}, scyther:{def:0.85,spd:1.40},
-  ninetales:{def:0.85,spd:1.30}, tentacruel:{def:0.85,spd:1.35}, vaporeon:{def:0.85,spd:0.90},
-  gardevoir:{def:0.85,spd:1.15}, mewtwoX:{def:1.00,spd:1.50},
-  /* speedsters (defence stays normal) */
-  pikachu:{spd:1.35}, raichu:{spd:1.30}, meowth:{spd:1.40}, persian:{spd:1.40},
-  kkoret:{spd:1.35}, retra:{spd:1.35}, spearow:{spd:1.30}, fearow:{spd:1.35},
-  gugu:{spd:1.15}, pijyon:{spd:1.20}, pidgeot:{spd:1.30}, doduo:{spd:1.35}, dodrio:{spd:1.50},
-  zubat:{spd:1.30}, golbat:{spd:1.30}, butterfree:{spd:1.20}, beedrill:{spd:1.20},
-  starmie:{spd:1.45}, staryu:{spd:1.30}, tauros:{spd:1.35}, sceptile:{spd:1.35},
-  primeape:{spd:1.30}, mankey:{spd:1.25}, kabutops:{spd:1.20}, arcanine:{spd:1.20},
-  magmar:{spd:1.20}, electabuzz:{spd:1.20}, typhlosion:{spd:1.20}, blaziken:{spd:1.10},
-  lucario:{spd:1.20}, salamence:{spd:1.20}, rayquaza:{spd:1.20}, mew:{spd:1.30},
-  articuno:{spd:1.20}, zapdos:{spd:1.20}, moltres:{spd:1.20}, latios:{spd:1.35},
-  machop:{spd:0.75}, machoke:{spd:0.70}, machamp:{spd:0.75}, lickitung:{spd:0.50},
-  clefairy:{spd:0.70}, clefable:{spd:0.70}, porygon:{spd:0.70}, caterpie:{spd:0.60},
-  weedle:{spd:0.60}, kangaskhan:{spd:1.10}, farfetchd:{spd:1.10}, 'mr-mime':{spd:1.10},
-};
-Object.keys(SPECIES).forEach(id=>{
-  const s = SPECIES[id], t = STAT_TWEAKS[id] || {};
-  s.def = Math.max(1, Math.round(s.hp * 0.42 * (t.def || 1)));
-  s.spd = Math.max(1, Math.round((s.atk * 1.15 + s.hp * 0.16) * (t.spd || 1)));
+/* ============ STATS: the real games' base stats ============
+   [HP, attack (the better of Attack/Sp.Atk), defence (avg of Def/Sp.Def), speed].
+   Stats now grow WITH level (like the real games) instead of a flat bonus per
+   level, so a Charizard stays far ahead of a Rattata at every level. HP/attack
+   are stretched a little (^1.25) so strong Pokémon feel clearly stronger. */
+const BASE_STATS = {"isangpul":[60,80,72,60],"isangkkot":[80,100,92,80],"isanghae":[45,65,57,45],"pairi":[39,60,47,65],"rizamong":[78,109,82,100],"eonibugi":[59,65,80,58],"rizadeu":[58,80,62,80],"weedle":[40,35,25,50],"kkobugi":[44,50,65,43],"geobugwang":[79,85,103,78],"caterpie":[45,30,28,45],"metapod":[50,25,40,30],"butterfree":[60,90,65,70],"kakuna":[45,25,38,35],"spearow":[40,60,31,70],"beedrill":[65,90,60,75],"pijyon":[63,60,53,71],"pidgeot":[83,80,73,101],"ekans":[35,60,49,55],"kkoret":[30,56,35,72],"gugu":[40,45,38,56],"fearow":[65,90,63,100],"retra":[55,81,65,97],"arbok":[60,95,74,80],"raichu":[60,90,68,110],"sandslash":[75,100,83,65],"pikachu":[35,55,45,90],"nidorino":[61,72,56,65],"sandshrew":[50,75,58,40],"nidorina":[70,62,61,56],"nidoran-f":[55,47,46,41],"nidoran-m":[46,57,40,50],"nidoking":[81,102,76,85],"nidoqueen":[90,92,86,76],"jigglypuff":[115,45,23,20],"clefable":[95,95,82,60],"clefairy":[70,60,57,35],"golbat":[75,80,73,90],"ninetales":[73,81,88,100],"vulpix":[38,50,53,65],"wigglytuff":[140,85,48,45],"gloom":[60,85,73,40],"vileplume":[75,110,88,50],"paras":[35,70,55,25],"zubat":[40,45,38,55],"oddish":[45,75,60,30],"parasect":[60,95,80,30],"venomoth":[70,90,68,90],"goraduck":[50,65,49,55],"venonat":[60,55,53,45],"diglett":[10,55,35,95],"dugtrio":[35,100,60,120],"primeape":[65,105,65,95],"meowth":[40,45,38,90],"golduck":[80,95,79,85],"persian":[65,70,63,115],"mankey":[40,80,40,70],"arcanine":[90,110,80,95],"poliwag":[40,50,40,90],"growlithe":[55,70,48,60],"poliwrath":[90,95,93,70],"abra":[25,105,35,90],"machamp":[90,130,83,55],"alakazam":[55,135,70,120],"poliwhirl":[65,65,58,90],"kadabra":[40,120,50,105],"machop":[70,80,43,35],"geodude":[40,80,65,20],"machoke":[80,100,65,45],"weepinbell":[65,90,48,55],"golem":[80,120,98,45],"bellsprout":[50,75,33,40],"tentacool":[40,50,68,70],"rapidash":[65,100,75,105],"victreebel":[80,105,68,70],"graveler":[55,95,80,35],"tentacruel":[80,80,93,100],"ponyta":[50,85,60,90],"doduo":[35,85,40,75],"slowbro":[95,100,95,30],"dodrio":[60,110,65,110],"slowpoke":[90,65,53,15],"magnemite":[25,95,63,45],"grimer":[80,80,50,25],"magneton":[50,120,83,70],"seel":[65,45,63,45],"haunter":[45,115,50,95],"dewgong":[90,70,88,70],"farfetchd":[52,90,59,60],"gastly":[30,100,33,80],"cloyster":[50,95,113,70],"shellder":[30,65,63,40],"muk":[105,105,88,50],"gengar":[60,130,68,110],"drowzee":[60,48,68,42],"onix":[35,45,103,70],"krabby":[30,105,58,50],"kingler":[55,130,83,75],"hypno":[85,73,93,67],"voltorb":[40,55,53,100],"cubone":[50,50,73,35],"koffing":[40,65,70,35],"exeggcute":[60,60,63,40],"exeggutor":[95,125,80,55],"electrode":[60,80,75,150],"weezing":[65,90,95,60],"marowak":[60,80,95,45],"hitmonlee":[50,120,82,87],"chansey":[250,35,55,50],"lickitung":[90,60,75,30],"hitmonchan":[50,105,95,76],"goldeen":[45,67,55,63],"rhyhorn":[80,85,63,25],"seadra":[55,95,70,85],"rhydon":[105,130,83,40],"kangaskhan":[105,95,80,90],"horsea":[30,70,48,60],"mr-mime":[40,100,93,90],"tangela":[65,100,78,60],"pinsir":[65,125,85,85],"starmie":[60,100,85,115],"staryu":[30,70,55,85],"scyther":[70,110,80,105],"garados":[95,125,90,81],"seaking":[80,92,73,68],"jynx":[65,115,65,95],"ditto":[48,48,48,48],"electabuzz":[65,95,71,105],"eevee":[55,55,58,55],"yeongking":[20,15,38,80],"magmar":[65,100,71,93],"lapras":[130,85,88,60],"tauros":[75,100,83,110],"omastar":[70,115,98,55],"vaporeon":[130,110,78,65],"flareon":[65,130,85,65],"jolteon":[65,110,78,130],"snorlax":[160,110,88,30],"aerodactyl":[80,105,70,130],"porygon":[65,85,73,40],"omanyte":[35,90,78,35],"kabuto":[30,80,68,55],"dragonair":[61,84,68,70],"dragonite":[91,134,98,80],"articuno":[90,95,113,85],"kabutops":[60,115,88,80],"zapdos":[90,125,88,100],"meganium":[80,83,100,80],"moltres":[90,125,88,90],"quilava":[58,80,62,80],"mew":[100,100,100,100],"chikorita":[45,49,65,45],"dratini":[41,64,48,50],"bayleef":[60,63,80,60],"typhlosion":[78,109,82,100],"totodile":[50,65,56,43],"cyndaquil":[39,60,47,65],"croconaw":[65,80,72,58],"espeon":[65,130,78,110],"feraligatr":[85,105,92,78],"togepi":[35,40,65,20],"larvitar":[50,64,50,41],"flaaffy":[70,80,58,45],"ampharos":[90,115,88,55],"togetic":[55,80,95,40],"mareep":[55,65,43,35],"treecko":[40,65,45,70],"umbreon":[95,65,120,65],"pupitar":[70,84,70,51],"heracross":[80,125,85,85],"tyranitar":[100,134,105,61],"ho-oh":[106,130,122,90],"lugia":[106,90,142,110],"blaziken":[80,120,70,80],"ralts":[28,45,30,40],"torchic":[45,70,45,45],"combusken":[60,85,60,55],"kirlia":[38,65,45,50],"grovyle":[50,85,55,95],"mudkip":[50,70,50,40],"gardevoir":[68,125,90,80],"aggron":[70,110,120,50],"sceptile":[70,105,75,120],"swampert":[100,110,90,60],"marshtomp":[70,85,70,50],"latios":[80,130,95,110],"lairon":[60,90,95,40],"bagon":[45,75,45,50],"rayquaza":[105,150,90,95],"aron":[50,70,70,30],"shelgon":[65,95,75,50],"kyogre":[100,150,115,90],"groudon":[100,150,115,90],"garchomp":[108,130,90,102],"salamence":[95,135,80,100],"gible":[58,70,45,42],"gabite":[68,90,60,82],"mewtwoX":[106,190,100,130],"lucario":[70,115,70,90],"riolu":[40,70,40,60]};
+const spread = (v, e) => Math.round(100 * Math.pow(v/100, e));
+Object.keys(SPECIES).forEach(id => {
+  const [hp, atk, def, spd] = BASE_STATS[id];
+  const s = SPECIES[id];
+  s.hp = spread(hp, 1.25); s.atk = spread(atk, 1.25); s.def = spread(def, 1.1); s.spd = spd;
 });
-/* damage is normalised against the average defence, so an average Pokémon
-   takes exactly the same damage it always did — only the extremes change */
-const AVG_DEF = Object.keys(SPECIES).reduce((a,id)=>a+SPECIES[id].def,0) / Object.keys(SPECIES).length;
 
 /* status-move specialists, patched in without touching the species lines */
 const MOVE_PATCH = {
@@ -576,31 +533,35 @@ const MEGA = {
 };
 
 const AREAS = [
-  {"name":"Grass","icon":"🌿","min":2,"need":0,"pool":["gugu","kkoret","spearow","pikachu","jigglypuff","meowth","magnemite","voltorb","lickitung","chansey","electabuzz","ditto","eevee","mareep"],"rare":["zapdos"]},
-  {"name":"Flower Woods","icon":"🌸","min":5,"need":1,"pool":["caterpie","metapod","weedle","nidoran-f","zubat","oddish","bellsprout","farfetchd","doduo","scyther","chikorita"],"rare":["mew"]},
-  {"name":"Beach","icon":"🏖️","min":6,"need":1,"pool":["goraduck","poliwag","tentacool","slowpoke","seel","shellder","krabby","horsea","yeongking","totodile"],"rare":["kyogre"]},
-  {"name":"Dark Forest","icon":"🌲","min":8,"need":2,"pool":["clefairy","vulpix","abra","gastly","drowzee","mr-mime","togepi","ralts"],"rare":["latios"]},
-  {"name":"Swamp","icon":"🐸","min":10,"need":3,"pool":["tangela","jynx","pinsir","lapras","heracross","goldeen","staryu","mudkip","ekans","nidoran-m","paras","venonat","grimer","exeggcute","koffing","treecko"],"rare":["lugia"]},
-  {"name":"Mountain","icon":"⛰️","min":11,"need":4,"pool":["sandshrew","diglett","mankey","machop","geodude","onix","cubone","hitmonlee","hitmonchan","rhyhorn","omanyte","kabuto","aerodactyl","larvitar","aron","riolu"],"rare":["groudon"]},
-  {"name":"Snowy Peak","icon":"❄️","min":13,"need":5,"pool":["kangaskhan","tauros","porygon","snorlax","dratini","bagon","gible"],"rare":["articuno","rayquaza"]},
-  {"name":"Volcano","icon":"🌋","min":14,"need":5,"pool":["ponyta","magmar","growlithe","cyndaquil","torchic"],"rare":["moltres","ho-oh"]}];
-/* each cave is a TRAINER with a team of 3 */
+  {"name":"Grass","icon":"🌿","min":2,"max":6,"need":0,"pool":["gugu","kkoret","spearow","mankey","pikachu","jigglypuff","meowth","magnemite","voltorb","lickitung","chansey","electabuzz","ditto","eevee","mareep"],"rare":["zapdos"]},
+  {"name":"Flower Woods","icon":"🌸","min":5,"max":10,"need":1,"pool":["caterpie","metapod","weedle","nidoran-f","zubat","oddish","bellsprout","farfetchd","doduo","scyther","chikorita"],"rare":["mew"]},
+  {"name":"Beach","icon":"🏖️","min":7,"max":12,"need":1,"pool":["goraduck","poliwag","tentacool","slowpoke","seel","shellder","krabby","horsea","yeongking","totodile"],"rare":["kyogre"]},
+  {"name":"Dark Forest","icon":"🌲","min":11,"max":17,"need":2,"pool":["clefairy","vulpix","abra","gastly","drowzee","mr-mime","togepi","ralts"],"rare":["latios"]},
+  {"name":"Swamp","icon":"🐸","min":15,"max":22,"need":3,"pool":["tangela","jynx","pinsir","lapras","heracross","goldeen","staryu","mudkip","ekans","nidoran-m","paras","venonat","grimer","exeggcute","koffing","treecko"],"rare":["lugia"]},
+  {"name":"Mountain","icon":"⛰️","min":20,"max":28,"need":4,"pool":["sandshrew","diglett","mankey","machop","geodude","onix","cubone","hitmonlee","hitmonchan","rhyhorn","omanyte","kabuto","aerodactyl","larvitar","aron","riolu"],"rare":["groudon"]},
+  {"name":"Snowy Peak","icon":"❄️","min":26,"max":34,"need":5,"pool":["kangaskhan","tauros","porygon","snorlax","dratini","bagon","gible"],"rare":["articuno","rayquaza"]},
+  {"name":"Volcano","icon":"🌋","min":30,"max":38,"need":5,"pool":["ponyta","magmar","growlithe","cyndaquil","torchic"],"rare":["moltres","ho-oh"]}];
+/* each cave is a TRAINER — a team of 3 early on, 4 in the later caves.
+   Levels are tuned (by simulation) so a team trained up to the cave's top level
+   wins, and one 4 levels short usually doesn't. */
 const CAVES = [
   {name:'Rock Cave',   icon:'🪨', badge:'rock',   trainer:'Hiker Rocky',       avatar:'🧗',
-   team:[['geodude',7],['rhyhorn',8],['onix',10]]},
+   team:[['geodude',7],['sandshrew',8],['onix',10]]},
   {name:'Ice Cave',    icon:'🧊', badge:'ice',    trainer:'Swimmer Marina',    avatar:'🏊',
-   team:[['poliwhirl',10],['golduck',11],['lapras',13]]},
+   team:[['seel',9],['poliwhirl',10],['lapras',12]]},
   {name:'Fire Cave',   icon:'🔥', badge:'fire',   trainer:'Fire Chief Blaze',  avatar:'🧑‍🚒',
-   team:[['machop',12],['rizadeu',14],['arcanine',16]]},
+   team:[['ponyta',19],['ninetales',20],['magmar',21],['arcanine',23]]},
   {name:'Ghost Cave',  icon:'👻', badge:'ghost',  trainer:'Witch Luna',        avatar:'🧙',
-   team:[['gastly',15],['haunter',16],['gengar',18]]},
+   team:[['haunter',27],['hypno',28],['alakazam',29],['gengar',31]]},
   {name:'Dragon Cave', icon:'🐉', badge:'dragon', trainer:'Dragon Master Kai', avatar:'🥷',
    /* Gyarados goes last so Kai can finish with a Mega Gyarados */
-   team:[['dragonair',18],['dragonite',20],['garados',22]]},
+   team:[['dragonair',31],['salamence',33],['dragonite',33],['garados',34]]},
 ];
 /* final cave: champion trainer, then Mega Mewtwo X to CATCH */
 const LEGEND = {name:'Legend Cave', trainer:'Mystery Champion', avatar:'👑',
-   team:[['raichu',20],['garchomp',21],['rizamong',22],['geobugwang',23]]};
+   team:[['raichu',40],['garchomp',41],['rizamong',42],['geobugwang',43]]};
+const MEWTWO_LV = 45;
+const LEGEND_RATE = 0.03;
 const OLD_BADGE_MAP = {onix:'rock', lapras:'ice', arcanine:'fire', gengar:'ghost', dragonite:'dragon'};
 const LEGENDS = ["articuno","zapdos","moltres","mew","lugia","ho-oh","kyogre","groudon","rayquaza","latios"];
 /* species that are someone's evolved form (not wild-pool bases) */
@@ -841,31 +802,33 @@ try{
 
 function newMon(speciesId, lv){
   const s = SPECIES[speciesId];
-  const maxHp = s.hp + lv*2;
+  const maxHp = maxHpOf({id:speciesId, lv});
   return {id:speciesId, lv, exp:0, hp:maxHp, uid:rid()};
 }
 /* formOf = the shape a Pokémon is fighting AS right now.
    Normally its own species — but a transformed Ditto borrows someone else's (m.tf). */
 function formOf(m){ return (m && m.tf && SPECIES[m.tf]) ? SPECIES[m.tf] : SPECIES[m.id]; }
-function maxHpOf(m){ return SPECIES[m.id].hp + m.lv*2; } // HP is always your own, even transformed
-function atkOf(m){ return formOf(m).atk + Math.floor(m.lv/2); }
-function baseDefOf(m){ return formOf(m).def; }
+function maxHpOf(m){ return Math.floor(SPECIES[m.id].hp*m.lv/50) + m.lv + 10; } // HP is always your own, even transformed
+function atkOf(m){ return Math.floor(formOf(m).atk*m.lv/50) + 5; }
+function baseDefOf(m){ return Math.floor(formOf(m).def*m.lv/50) + 5; }
 function defOf(m){ return m.mega ? Math.round(baseDefOf(m)*1.3) : baseDefOf(m); }
 function spdOf(m){
   let s = formOf(m).spd;
   if(m.st==='par') s *= 0.5;   // paralysis halves speed
   return s;
 }
-/* an average-defence Pokémon takes exactly 1.0x — tanks less, glass cannons more.
-   The band is deliberately gentle (0.80x ~ 1.20x): wide enough that Onix feels like a
-   wall and Alakazam feels like paper, narrow enough that the game's overall difficulty
-   is unchanged (measured against the pre-defence build, gym by gym). */
-function defFactor(m){
-  const f = (AVG_DEF*4) / (AVG_DEF*3 + defOf(m));
-  return Math.max(0.80, Math.min(1.20, f));
+/* the real games' damage formula, simplified: level, move power, attack vs
+   defence, a little randomness. `f` folds in type match-up, burn, Mega/Dynamax
+   and how hard this kind of opponent hits. */
+function calcDamage(att, def, mv, f){
+  const base = ((2*att.lv/5 + 2) * 45 * mv.pow * atkOf(att) / defOf(def)) / 50 + 2;
+  return Math.max(1, Math.round(base * (0.85 + Math.random()*0.15) * f));
 }
+/* enemies hit a bit softer than you do (it's a kids' game), but bosses hit harder
+   than wild Pokémon — this used to be backwards: the Champion hit softest of all */
+function enemyHitFactor(){ return !B.trainer ? 0.7 : B.legend ? 0.85 : 0.8; }
 function burnMult(m){ return m.st==='brn' ? 0.75 : 1; } // burned Pokémon hit softer
-function expNeed(m){ return m.lv*12; }
+function expNeed(m){ return m.lv*12 + Math.floor(m.lv*m.lv/4); } // later levels take longer
 function activeMon(){ return G.party.find(m=>m.hp>0) || G.party[0]; }
 function boxOf(){ if(!G.box) G.box = []; return G.box; }
 
@@ -1303,7 +1266,7 @@ function renderTown(msg){
         ${AREAS.map((ar,i)=>{
           const open = G.badges.length >= ar.need;
           return `<button class="${open?'green':''}" ${open?'':'disabled'} onclick="goArea(${i})" style="padding:10px 6px; font-size:15px;">
-            ${open?ar.icon:'🔒'} ${ar.name}<br><small>${open?`Lv.${ar.min}+`:`Need ${ar.need} badge${ar.need>1?'s':''}`}</small>
+            ${open?ar.icon:'🔒'} ${ar.name}<br><small>${open?`Lv.${ar.min}–${ar.max}`:`Need ${ar.need} badge${ar.need>1?'s':''}`}</small>
           </button>`;
         }).join('')}
       </div>
@@ -1531,12 +1494,13 @@ function rarityInfo(id){
     return {tag:'🏆', short:'Final boss', text:'The final boss — beat the Champion, then catch it with the Master Ball!'};
   for(const a of AREAS){
     if(a.rare.includes(id))
-      return {tag:'🌟', short:'Rare', text:`Legendary — a rare ~6% encounter in ${a.name} (Lv.${a.min}+).`};
+      return {tag:'🌟', short:'Rare', text:`Legendary — a rare ~${Math.round(LEGEND_RATE*100)}% encounter in ${a.name}, always around Lv.40-45. Very strong and hard to catch!`};
   }
   const poolAreas = AREAS.filter(a => a.pool.includes(id));
   if(poolAreas.length){
-    const best = poolAreas.reduce((b,a)=> (94/a.pool.length) > (94/b.pool.length) ? a : b);
-    const pct = Math.max(1, Math.round(94/best.pool.length));
+    const common = 100 - LEGEND_RATE*100;
+    const best = poolAreas.reduce((b,a)=> (common/a.pool.length) > (common/b.pool.length) ? a : b);
+    const pct = Math.max(1, Math.round(common/best.pool.length));
     return poolAreas.length>1
       ? {tag:'🌱', short:'Wild', text:`Found in the wild in ${poolAreas.length} lands — best odds ~${pct}% in ${best.name}.`}
       : {tag:'🌱', short:'Wild', text:`Found in the wild in ${best.name} — about ~${pct}% of encounters there.`};
@@ -1831,11 +1795,11 @@ window.goArea = function(i){
   const ar = AREAS[i];
   if(G.badges.length < ar.need) return;
   if(activeMon().hp===0){ renderTown('Your Pokémon are all tired! Heal them first. 🏥'); return; }
-  const myMax = Math.max(...G.party.map(m=>m.lv));
-  let lv = Math.min(45, Math.max(ar.min, myMax - 2 + rand(4))); // wilds grow with YOU!
+  /* each land has its own level range — wild Pokémon no longer grow with your team */
+  let lv = ar.min + rand(ar.max - ar.min + 1);
   let id, rare = false;
-  if(ar.rare.length && Math.random() < 0.06){
-    id = ar.rare[rand(ar.rare.length)]; rare = true; lv += 2;
+  if(ar.rare.length && Math.random() < LEGEND_RATE){
+    id = ar.rare[rand(ar.rare.length)]; rare = true; lv = 40 + rand(6); // legends are always strong
   }else{
     id = ar.pool[rand(ar.pool.length)];
     let s = SPECIES[id];
@@ -1908,8 +1872,8 @@ window.goBoss = function(){
     return;
   }
   const queue = LEGEND.team.map(([id,lv]) => makeTrainerMon(id, lv));
-  const mw = newMon('mewtwoX', 24);
-  mw.bossMaxHp = 200; mw.hp = 200;
+  const mw = newMon('mewtwoX', MEWTWO_LV);
+  mw.bossMaxHp = Math.round(maxHpOf(mw)*1.5); mw.hp = mw.bossMaxHp;
   queue.push(mw);
   B = newBattle({enemy:queue.shift(), trainer:LEGEND, cave:null, legend:true, queue});
   BGM.play('boss');
@@ -2302,8 +2266,7 @@ async function myAction(mv){
   // evolved Pokémon always get a little extra sparkle; only a true big hit shakes the screen
   if(big){ shakeScreen(); ringBurstFx('enemy-sprite', TYPES[mv.t].fx); }
   else if(myStage>=1){ ringBurstFx('enemy-sprite', TYPES[mv.t].fx); }
-  const dmg = Math.max(1, Math.round(
-    (atkOf(my)*burnMult(my)*mv.pow*powerMult(my) + rand(4)) * mult * defFactor(e)));
+  const dmg = calcDamage(my, e, mv, mult * burnMult(my) * powerMult(my));
   e.hp -= dmg;
   // Mega Mewtwo X can't be knocked out on the first try — you have to catch it!
   if(isCatchPhase() && e.hp < 1) e.hp = 1;
@@ -2358,11 +2321,7 @@ async function enemyAction(emv){
   burst('my-sprite','💥', eBig);
   if(eBig) shakeScreen();
   else if(eStage>=1) ringBurstFx('my-sprite', TYPES[emv.t].fx);
-  /* re-tuned so trainer battles land where they always did, now that enemies also
-     get defence normalisation, status conditions and a Mega on their last Pokémon */
-  const factor = B.trainer ? (B.legend ? 0.55 : 0.62) : 0.65;
-  const dmg = Math.max(1, Math.round(
-    (atkOf(e)*burnMult(e)*factor*emv.pow*powerMult(e) + rand(3)) * mult * defFactor(my)));
+  const dmg = calcDamage(e, my, emv, mult * burnMult(e) * powerMult(e) * enemyHitFactor());
   my.hp = Math.max(0, my.hp - dmg);
   sfx.hit(); shake('my-sprite');
   addGauge(12);
@@ -2517,6 +2476,7 @@ window.throwBall = async function(){
     chance += sleepyBonus;
   }else{
     chance = 0.25 + (1-hpRatio)*0.65 + sleepyBonus;
+    if(LEGENDS.includes(e.id)) chance *= 0.4; // legendaries fight the ball much harder
   }
   if(Math.random() < Math.min(1, chance)){
     sfx.catchOk();
@@ -2559,6 +2519,12 @@ window.runAway = async function(){
 };
 
 /* ===== exp / level ups (shared) ===== */
+function levelUp(m){
+  const before = maxHpOf(m);
+  m.exp -= expNeed(m);
+  m.lv++;
+  m.hp = Math.min(maxHpOf(m), m.hp + (maxHpOf(m) - before)); // keeps the extra HP it just grew
+}
 async function grantExp(defeated, isTrainerMon){
   const my = activeMon();
   const gained = defeated.lv*(isTrainerMon?8:5) + 5;
@@ -2566,12 +2532,25 @@ async function grantExp(defeated, isTrainerMon){
   setMsg(`${SPECIES[my.id].name} got ⭐${gained} stars!`);
   await sleep(1100);
   while(my.exp >= expNeed(my)){
-    my.exp -= expNeed(my);
-    my.lv++;
-    my.hp = Math.min(maxHpOf(my), my.hp + 8);
+    levelUp(my);
     sfx.good();
     setMsg(`🎉 Level up! ${SPECIES[my.id].name} is Level ${my.lv} now!`);
     await sleep(1100);
+  }
+  /* teammates who watched learn half as much — otherwise raising a whole team takes forever */
+  const share = Math.floor(gained/2);
+  const grew = [];
+  G.party.forEach(m => {
+    if(m === my || m.hp <= 0 || share <= 0) return;
+    m.exp += share;
+    let up = false;
+    while(m.exp >= expNeed(m)){ levelUp(m); up = true; }
+    if(up) grew.push(`${SPECIES[m.id].name} Lv.${m.lv}`);
+  });
+  if(grew.length){
+    sfx.good();
+    setMsg(`📚 The team learned too! ${grew.join(', ')}`);
+    await sleep(1300);
   }
 }
 /* the Box keeps everyone rested, so top them up whenever we save the game state */
@@ -2701,7 +2680,7 @@ async function bossCaught(){
   clearBattleFlags();
   G.bossCaught = true;
   if(!G.dex.includes('mewtwoX')) G.dex.push('mewtwoX');
-  const mw = newMon('mewtwoX', 24); mw.hp = maxHpOf(mw);
+  const mw = newMon('mewtwoX', MEWTWO_LV); mw.hp = maxHpOf(mw);
   let toBox = false;
   if(G.party.length<6){ G.party.push(mw); }
   else if(boxOf().length<BOX_MAX){ boxOf().push(mw); toBox = true; }
