@@ -7,6 +7,16 @@
 // and drop a trade offer or a battle result into that save's inbox, but
 // cannot overwrite it, cancel its trade post, or read anything private.
 //
+// To continue the SAME save on another device, the owner also gets a
+// 4-digit PIN: code + PIN hands that device the owner token (`claim`).
+// Wrong PINs are counted and lock the save's claim for a while, so the
+// 10,000 combinations can't just be tried one after another.
+//
+// Pushes carry the revision (`baseRev`) the device last synced from. If
+// another device has pushed since, the push is refused with the newer
+// state instead of silently overwriting it — the game then asks the
+// player which version to keep.
+//
 // This is a kids' game played within a household/friend group, not a
 // public service — the model is "friendly, not fortified": enough to
 // stop accidents and stray typos, not a real security boundary.
@@ -19,9 +29,20 @@ const WORDS = ['PINE','LEAF','ROCK','WAVE','STAR','MOON','GLOW','SPARK','FLAME',
   'HAWK','LYNX','OTTER','CRAB'];
 const MAX_INBOX = 20;
 const MAX_OFFERS = 10;
+const PIN_MAX_FAILS = 8;
+const PIN_LOCK_MS = 10 * 60 * 1000;
 
+// The game is also served from GitHub Pages, which calls this function
+// cross-origin. No cookies are involved (auth is the owner token in the
+// body), so allowing any origin exposes nothing extra.
+const CORS = {
+  'access-control-allow-origin': '*',
+  'access-control-allow-methods': 'POST, OPTIONS',
+  'access-control-allow-headers': 'content-type',
+  'access-control-max-age': '86400',
+};
 function json(status, body){
-  return { statusCode: status, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) };
+  return { statusCode: status, headers: { 'content-type': 'application/json', ...CORS }, body: JSON.stringify(body) };
 }
 function randToken(){ return require('crypto').randomBytes(18).toString('hex'); }
 function randCode(){
@@ -29,6 +50,8 @@ function randCode(){
   const n = 100 + Math.floor(Math.random()*900);
   return w + n;
 }
+function randPin(){ return String(require('crypto').randomInt(0, 10000)).padStart(4, '0'); }
+function pinHash(code, pin){ return require('crypto').createHash('sha256').update(code + ':' + pin).digest('hex'); }
 function clean(s, max){ return (typeof s === 'string' ? s : '').trim().slice(0, max || 24); }
 
 async function uniqueCode(store){
@@ -56,6 +79,7 @@ function publicView(rec){
 }
 
 exports.handler = async (event) => {
+  if(event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
   if(event.httpMethod !== 'POST') return json(405, { error: 'POST only' });
   let body;
   try{ body = JSON.parse(event.body || '{}'); }catch(e){ return json(400, { error: 'bad json' }); }
@@ -80,13 +104,41 @@ exports.handler = async (event) => {
     if(action === 'publish'){
       const code = await uniqueCode(store);
       const ownerToken = randToken();
+      const pin = randPin();
       const rec = {
         code, ownerToken, name: clean(body.name, 24) || code,
+        pinHash: pinHash(code, pin), pinFails: 0, pinLockUntil: 0,
         state: body.state || {}, updatedAt: Date.now(),
         tradePost: null, tradeOffers: [], inbox: [],
       };
       await store.setJSON(code, rec);
-      return json(200, { code, ownerToken });
+      return json(200, { code, ownerToken, pin, updatedAt: rec.updatedAt });
+    }
+
+    /* another device takes over the same save: code + PIN -> owner token + full state */
+    if(action === 'claim'){
+      const code = clean(body.code, 12).toUpperCase();
+      const rec = await store.get(code, { type: 'json' });
+      if(!rec || !rec.pinHash) return json(404, { error: 'no save with that code' });
+      if((rec.pinLockUntil || 0) > Date.now()) return json(429, { error: 'too many wrong PINs — wait 10 minutes and try again' });
+      if(pinHash(code, clean(body.pin, 8)) !== rec.pinHash){
+        rec.pinFails = (rec.pinFails || 0) + 1;
+        if(rec.pinFails >= PIN_MAX_FAILS){ rec.pinFails = 0; rec.pinLockUntil = Date.now() + PIN_LOCK_MS; }
+        await store.setJSON(code, rec);
+        return json(403, { error: 'wrong PIN' });
+      }
+      if(rec.pinFails){ rec.pinFails = 0; await store.setJSON(code, rec); }
+      return json(200, { code, ownerToken: rec.ownerToken, name: rec.name, state: rec.state, updatedAt: rec.updatedAt });
+    }
+
+    /* saves linked before PINs existed (or a forgotten PIN) get a fresh one */
+    if(action === 'newPin'){
+      const { error, rec } = await loadOwned(body.code, body.ownerToken);
+      if(error) return error;
+      const pin = randPin();
+      rec.pinHash = pinHash(rec.code, pin); rec.pinFails = 0; rec.pinLockUntil = 0;
+      await store.setJSON(rec.code, rec);
+      return json(200, { pin });
     }
 
     if(action === 'rename'){
@@ -100,7 +152,12 @@ exports.handler = async (event) => {
     if(action === 'push'){
       const { error, rec } = await loadOwned(body.code, body.ownerToken);
       if(error) return error;
+      const baseRev = Number(body.baseRev);
+      if(Number.isFinite(baseRev) && baseRev > 0 && rec.updatedAt > baseRev){
+        return json(409, { error: 'another device saved newer progress', conflict: true, state: rec.state, updatedAt: rec.updatedAt });
+      }
       rec.state = body.state || rec.state;
+      if(body.state && typeof body.state.name === 'string' && body.state.name.trim()) rec.name = clean(body.state.name, 24);
       rec.updatedAt = Date.now();
       await store.setJSON(rec.code, rec);
       return json(200, { ok: true, updatedAt: rec.updatedAt });

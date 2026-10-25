@@ -659,6 +659,7 @@ function sanitizeSave(g){
   g.box.forEach(m => { m.hp = maxHpOf(m); }); // the box always keeps them healthy
   if(typeof g.name !== 'string' || !g.name.trim()) g.name = '';
   if(!g.cloud || typeof g.cloud.code !== 'string') g.cloud = null;
+  if(g.cloud) delete g.cloud.pinPending;
   return g;
 }
 function loadSlot(s){
@@ -672,12 +673,27 @@ function save(){
   try{ localStorage.setItem(slotKey(SLOT), JSON.stringify(G)); }catch(e){}
   try{ cloudPush(); }catch(e){} // best-effort background sync; must never block local play
 }
+/* the one live object for a slot: the in-memory G when it's the open slot,
+   so background sync results never land on a stale copy */
+function slotObj(s){ return (G && SLOT===s) ? G : loadSlot(s); }
+function persistSlot(slot, g){ try{ localStorage.setItem(slotKey(slot), JSON.stringify(g)); }catch(e){} }
+/* a background request finishing late must not resurrect a deleted save or
+   overwrite a different save that has since taken over the same slot */
+function persistIfCurrent(slot, g){
+  if(SLOT===slot && G && G!==g) return;
+  try{ if(localStorage.getItem(slotKey(slot)) === null) return; }catch(e){ return; }
+  persistSlot(slot, g);
+}
 /* ============ CLOUD SYNC (Netlify Blobs, via a serverless function) ============
    Every call is fire-and-forget from the caller's point of view — a spotty
    connection or a server hiccup should never interrupt a battle or a save.
    Only the screens that explicitly show cloud state (Slot Manage, Friends,
    Trade Board) await these and show their own errors. */
-const CLOUD_URL = '/.netlify/functions/cloud';
+/* the cloud lives on the Netlify site; GitHub Pages (or any other copy) calls it there,
+   so a save syncs no matter which address the game was opened from */
+const CLOUD_URL = location.hostname.endsWith('ktho22-kids-games.netlify.app')
+  ? '/.netlify/functions/cloud'
+  : 'https://ktho22-kids-games.netlify.app/.netlify/functions/cloud';
 async function cloudCall(action, payload){
   const res = await fetch(CLOUD_URL, {
     method: 'POST',
@@ -685,16 +701,124 @@ async function cloudCall(action, payload){
     body: JSON.stringify({ action, ...payload }),
   });
   const data = await res.json().catch(() => ({}));
-  if(!res.ok) throw new Error(data.error || 'cloud request failed');
+  if(!res.ok){ const err = new Error(data.error || 'cloud request failed'); err.status = res.status; err.data = data; throw err; }
   return data;
 }
-function cloudPush(){
-  if(!G || !G.cloud) return;
-  cloudCall('push', { code: G.cloud.code, ownerToken: G.cloud.ownerToken, state: {
-    party: G.party, box: G.box, balls: G.balls, dex: G.dex, badges: G.badges,
-    masterBall: G.masterBall, bossCaught: G.bossCaught,
-  }}).catch(()=>{}); // offline or the server hiccuped — the next save() retries
+function cloudStateOf(g){
+  return { name: g.name, party: g.party, box: g.box, balls: g.balls, dex: g.dex, badges: g.badges,
+    masterBall: g.masterBall, bossCaught: g.bossCaught };
 }
+/* ---- push: one at a time per slot, always from the revision this device last
+   synced (g.cloud.rev). If another device saved since, the server refuses and
+   we park the newer version in g.cloud.conflict for the player to choose. ---- */
+const pushState = new Map();
+function cloudPush(g, slot){
+  g = g || G; slot = slot || SLOT;
+  if(!g || !g.cloud || g.cloud.conflict) return Promise.resolve();
+  g.cloud.dirty = true;
+  persistIfCurrent(slot, g);
+  const cur = pushState.get(slot);
+  if(cur){ cur.again = true; return cur.promise; }
+  const st = { again:false, promise:null };
+  st.promise = (async () => {
+    try{
+      do{
+        st.again = false;
+        try{
+          const r = await cloudCall('push', { code: g.cloud.code, ownerToken: g.cloud.ownerToken,
+            baseRev: g.cloud.rev || 0, state: cloudStateOf(g) });
+          g.cloud.rev = r.updatedAt;
+          if(!st.again) g.cloud.dirty = false;
+        }catch(e){
+          if(e.data && e.data.conflict) g.cloud.conflict = { state: e.data.state, updatedAt: e.data.updatedAt };
+          st.again = false; // offline: stays dirty, the next sync retries
+        }
+        persistIfCurrent(slot, g);
+      }while(st.again);
+    }finally{ pushState.delete(slot); }
+  })();
+  pushState.set(slot, st);
+  return st.promise;
+}
+/* take the cloud's version as this device's save (only between battles) */
+function adoptCloud(g, state, rev){
+  const merged = sanitizeSave(JSON.parse(JSON.stringify(Object.assign({}, state, { cloud: g.cloud }))));
+  if(!merged) return false; // the cloud copy is unusable — keep what we have
+  ['name','party','box','balls','dex','badges','masterBall','bossCaught'].forEach(k => {
+    if(merged[k] !== undefined) g[k] = merged[k];
+  });
+  g.cloud.rev = rev; g.cloud.dirty = false; delete g.cloud.conflict;
+  return true;
+}
+function inBattle(){ return !!(B && !B.over); }
+function onTown(){ return !!(G && document.getElementById('town-screen') && !busy && !inBattle()); }
+const pendingNotes = []; // inbox messages waiting for the next Town screen
+let syncing = null, syncingFor = null, lastSyncAt = 0;
+/* push anything unsaved, then pull whatever another device saved since */
+async function syncNow(opts){
+  opts = opts || {};
+  if(!G || !G.cloud) return null;
+  if(syncing && syncingFor === G) return syncing;
+  if(syncing) await syncing.catch(()=>{}); // finish the previous save's sync first
+  if(!G || !G.cloud) return null;
+  if(!opts.force && Date.now() - lastSyncAt < 15000) return null;
+  const g = G, slot = SLOT;
+  syncingFor = g;
+  syncing = (async () => {
+    try{
+      if(!g.cloud.pin) ensurePin(g, slot);
+      if(g.cloud.dirty && !g.cloud.conflict) await cloudPush(g, slot);
+      if(g.cloud.conflict) return { conflict:true };
+      const r = await cloudCall('check', { code: g.cloud.code, ownerToken: g.cloud.ownerToken, since: g.cloud.rev || 0 });
+      lastSyncAt = Date.now();
+      (r.inbox || []).forEach(i => pendingNotes.push(i.text));
+      let changed = false, conflictNew = false;
+      if(r.newer && r.state){
+        if(g.cloud.dirty){ g.cloud.conflict = { state: r.state, updatedAt: r.updatedAt }; conflictNew = true; }
+        else if(G===g && !inBattle() && !busy){ changed = adoptCloud(g, r.state, r.updatedAt); }
+      }
+      persistIfCurrent(slot, g);
+      return { changed, conflict: !!g.cloud.conflict, conflictNew, notes: (r.inbox||[]).length, r };
+    }catch(e){ return null; }
+    finally{ syncing = null; syncingFor = null; }
+  })();
+  return syncing;
+}
+function townSync(force){
+  return syncNow({ force }).then(res => {
+    if(!res || !onTown()) return res;
+    if(res.changed || res.conflictNew || pendingNotes.length) renderTown(res.changed ? '☁️ Updated with the progress from your other device!' : '');
+    return res;
+  });
+}
+/* every save goes online on its own — no button to find first */
+const linking = new Set();
+async function autoLink(g, slot){
+  if(!g || g.cloud || linking.has(slot)) return;
+  linking.add(slot);
+  try{
+    const r = await cloudCall('publish', { name: slotDisplayName(g, slot), state: cloudStateOf(g) });
+    if(g.cloud) return;
+    g.cloud = { code: r.code, ownerToken: r.ownerToken, pin: r.pin, rev: r.updatedAt };
+    persistIfCurrent(slot, g);
+    cloudPush(g, slot); // anything saved while we were publishing
+    if(G===g && onTown()) renderTown(`☁️ Your save is online! On another device, tap <b>☁️ Continue</b> and enter code <b>${r.code}</b> + PIN <b>${r.pin}</b>.`);
+  }catch(e){ /* offline — tried again next time this save is opened */ }
+  finally{ linking.delete(slot); }
+}
+async function ensurePin(g, slot){
+  if(!g.cloud || g.cloud.pin || g.cloud.pinPending) return;
+  g.cloud.pinPending = true;
+  try{
+    const r = await cloudCall('newPin', { code: g.cloud.code, ownerToken: g.cloud.ownerToken });
+    g.cloud.pin = r.pin;
+  }catch(e){}
+  finally{ delete g.cloud.pinPending; persistIfCurrent(slot, g); }
+}
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible' && onTown()) townSync(true);
+});
+setInterval(() => { if(onTown()) townSync(false); }, 20000);
 /* share codes: copy your save between devices */
 function makeCode(g){
   return 'PK1.' + btoa(unescape(encodeURIComponent(JSON.stringify(g))));
@@ -855,47 +979,46 @@ function renderTitle(){
   <div class="card fadein center">
     <div class="mon-big"><span class="bounce">${spriteImg('pikachu',84)}</span> <span class="bounce" style="animation-delay:.3s">${spriteImg('pairi',84)}</span> <span class="bounce" style="animation-delay:.6s">${spriteImg('kkobugi',84)}</span></div>
     <h1>Pocket Mini Adventure</h1>
-    <p class="sub">Explore 8 lands! Fill your Pokédex with ${TOTAL_KINDS} kinds!<br>Charge the ⚡Power gauge to Mega Evolve 💠 and Dynamax 🔴 — then catch <b>Mega Mewtwo X</b>!<br>Go ☁️ online to battle and trade with a friend's save!</p>
+    <p class="sub">Explore 8 lands! Fill your Pokédex with ${TOTAL_KINDS} kinds!<br>Charge the ⚡Power gauge to Mega Evolve 💠 and Dynamax 🔴 — then catch <b>Mega Mewtwo X</b>!<br>☁️ Your save syncs across devices — and you can battle &amp; trade with friends!</p>
     <div class="stack">
       ${slots.map(({s,g})=>{
         if(g){
           const lead = g.party[0];
           return `<div class="row">
             <button class="big green" style="flex:1;" onclick="playSlot(${s})">
-              ▶ ${slotDisplayName(g,s)} — ${SPECIES[lead.id].name} Lv.${lead.lv}<br><small>🏅 ${g.badges.length}/5 · 📖 ${g.dex.length}/${TOTAL_KINDS}${g.cloud?' · ☁️':''}</small>
+              ▶ ${slotDisplayName(g,s)} — ${SPECIES[lead.id].name} Lv.${lead.lv}<br><small>🏅 ${g.badges.length}/5 · 📖 ${g.dex.length}/${TOTAL_KINDS}${g.cloud?` · ☁️ ${g.cloud.code}`:''}</small>
             </button>
             <button style="padding:10px;" onclick="renderSlotManage(${s})" title="Manage">⚙️</button>
           </div>`;
         }
         return `<div class="row">
           <button class="big yellow" style="flex:1;" onclick="playSlot(${s})">✨ Slot ${s} — New Game</button>
-          <button style="padding:10px;" onclick="importSlot(${s})" title="Enter code">📥</button>
+          <button class="purple" style="padding:10px;" onclick="renderClaim(${s})" title="Continue from another device">☁️<br><small>Continue</small></button>
         </div>`;
       }).join('')}
     </div>
   </div>`;
 }
-window.playSlot = function(s){
+window.playSlot = async function(s){
   sfx.tap();
+  const g = slotObj(s);
   SLOT = s;
-  const g = loadSlot(s);
-  if(g){
-    G = g;
-    renderTown();
-    if(G.cloud){
-      checkCloudInbox().then(r => {
-        if(r && r.inbox && r.inbox.length && SLOT===s){
-          renderTown(r.inbox.map(i=>i.text).join('<br>'));
-        }
-      });
-    }
-  }
-  else renderStarter();
+  if(!g){ G = null; renderStarter(); return; }
+  G = g;
+  if(!G.cloud){ renderTown(); autoLink(G, s); return; }
+  /* pull first, so this device never starts from older progress than the cloud has */
+  app.innerHTML = `<div class="card fadein center"><h2>☁️ Syncing…</h2><p class="sub">Getting your latest progress</p></div>`;
+  const first = syncNow({ force:true });
+  const res = await Promise.race([first, sleep(6000).then(() => 'slow')]);
+  if(SLOT !== s || G !== g) return;
+  renderTown(res === 'slow' || !res ? '📡 Couldn\'t reach the cloud — playing from this device. It will sync when you\'re back online.'
+    : res.changed ? '☁️ Picked up the progress from your other device!' : '');
+  if(res === 'slow') first.then(() => { if(onTown()) townSync(true); });
 };
 /* ---- per-slot management: rename, cloud link, offline backup code, delete ---- */
 window.renderSlotManage = function(s){
   sfx.tap();
-  const g = loadSlot(s);
+  const g = slotObj(s);
   if(!g){ renderTitle(); return; }
   app.innerHTML = `
   <div class="card fadein">
@@ -904,8 +1027,8 @@ window.renderSlotManage = function(s){
     <div class="stack">
       <button class="blue" onclick="renameSlot(${s})">✏️ Rename this save</button>
       ${g.cloud
-        ? `<button class="purple" onclick="renderCloudInfo(${s})">☁️ Online — Code: ${g.cloud.code}</button>`
-        : `<button class="purple" onclick="linkSlotCloud(${s})">☁️ Go Online (battle & trade with friends)</button>`}
+        ? `<button class="purple" onclick="renderCloudInfo(${s})">☁️ Online — Code ${g.cloud.code}${g.cloud.pin?` · PIN ${g.cloud.pin}`:''}</button>`
+        : `<button class="purple" onclick="linkSlotCloud(${s})">☁️ Go Online (sync devices, battle & trade)</button>`}
       <button onclick="exportSlot(${s})">📤 Offline backup code</button>
       <button style="border-color:var(--red); color:var(--red);" onclick="deleteSlot(${s})">🗑️ Delete this save</button>
       <button onclick="renderTitle()">⬅ Back</button>
@@ -913,31 +1036,31 @@ window.renderSlotManage = function(s){
   </div>`;
 };
 window.renameSlot = function(s){
-  const g = loadSlot(s);
+  const g = slotObj(s);
   if(!g) return;
   const name = safePrompt('What should this save be called?', slotDisplayName(g,s));
   if(name === null) { renderSlotManage(s); return; }
   g.name = name.trim().slice(0,24);
-  try{ localStorage.setItem(slotKey(s), JSON.stringify(g)); }catch(e){}
-  if(SLOT===s) G = g;
-  if(g.cloud) cloudCall('rename', {code:g.cloud.code, ownerToken:g.cloud.ownerToken, name:g.name}).catch(()=>{});
+  persistSlot(s, g);
+  if(g.cloud) cloudPush(g, s);
   sfx.tap();
   renderSlotManage(s);
 };
 window.deleteSlot = function(s){
-  if(!safeConfirm(`Delete this save? This cannot be undone!`)) return;
+  if(!safeConfirm(`Delete this save from THIS device? (If it's ☁️ online, you can get it back with its code + PIN.)`)) return;
   try{ localStorage.removeItem(slotKey(s)); }catch(e){}
+  if(SLOT===s) G = null;
   renderTitle();
 };
 window.exportSlot = function(s){
   sfx.tap();
-  const g = loadSlot(s);
+  const g = slotObj(s);
   if(!g) return;
   const code = makeCode(g);
   app.innerHTML = `
   <div class="card fadein">
     <h2>📤 Offline Backup Code</h2>
-    <p class="sub" style="text-align:left;">This is a snapshot you paste in manually — good as a backup, or on a device without internet. If you've gone ☁️ online, that already keeps every device in sync automatically.</p>
+    <p class="sub" style="text-align:left;">A snapshot you paste in by hand — handy as a backup, or for a device with no internet. For everyday use, ☁️ code + PIN keeps every device in sync on its own.</p>
     <textarea class="code-box" id="code-out" readonly>${code}</textarea>
     <div class="stack" style="margin-top:12px;">
       <button class="big blue" onclick="copyCode()">📋 Copy Code</button>
@@ -947,19 +1070,17 @@ window.exportSlot = function(s){
 };
 window.linkSlotCloud = async function(s){
   sfx.tap();
-  const g = loadSlot(s);
+  const g = slotObj(s);
   if(!g) return;
   app.innerHTML = `<div class="card fadein center"><h2>☁️ Going online…</h2><p class="sub">One moment!</p></div>`;
   try{
-    const { code, ownerToken } = await cloudCall('publish', { name: slotDisplayName(g,s), state: {
-      party: g.party, box: g.box, balls: g.balls, dex: g.dex, badges: g.badges,
-      masterBall: g.masterBall, bossCaught: g.bossCaught,
-    }});
-    g.cloud = { code, ownerToken };
-    localStorage.setItem(slotKey(s), JSON.stringify(g));
-    if(SLOT===s) G = g;
+    if(!g.cloud){
+      const r = await cloudCall('publish', { name: slotDisplayName(g,s), state: cloudStateOf(g) });
+      if(!g.cloud) g.cloud = { code: r.code, ownerToken: r.ownerToken, pin: r.pin, rev: r.updatedAt };
+      persistSlot(s, g);
+    }
     sfx.catchOk();
-    renderCloudInfo(s, 'You\'re online! Share your code with a friend to battle or trade. 🎉');
+    renderCloudInfo(s, 'You\'re online! 🎉');
   }catch(e){
     sfx.fail();
     app.innerHTML = `<div class="card fadein center"><h2>☁️ Couldn't connect</h2><p class="sub">Check your internet and try again in a moment.</p><button class="big" onclick="renderSlotManage(${s})">⬅ Back</button></div>`;
@@ -967,19 +1088,114 @@ window.linkSlotCloud = async function(s){
 };
 window.renderCloudInfo = function(s, msg){
   sfx.tap();
-  const g = loadSlot(s);
+  const g = slotObj(s);
   if(!g || !g.cloud) { renderSlotManage(s); return; }
+  if(!g.cloud.pin) ensurePin(g, s).then(() => { if(g.cloud.pin && document.getElementById('cloud-info')) renderCloudInfo(s, msg); });
+  const status = g.cloud.conflict ? '⚠️ Two devices saved different progress — open this save to choose.'
+    : g.cloud.dirty ? '⏳ Some progress is waiting to upload (it will when you\'re online).' : '✅ All synced.';
   app.innerHTML = `
-  <div class="card fadein">
+  <div class="card fadein" id="cloud-info">
     <h2>☁️ Online</h2>
     ${msg ? `<div class="msgbox" style="margin-bottom:12px;"><span>${msg}</span></div>` : ''}
-    <p class="sub" style="text-align:left;">Tell a friend this code so they can look you up from the 🌐 Friends screen in Town — they can battle your team or trade with you, any time, even if you're not playing right now.</p>
-    <textarea class="code-box" id="code-out" readonly style="text-align:center; font-size:22px; font-weight:800; min-height:auto; padding:16px;">${g.cloud.code}</textarea>
+    <div class="grid2">
+      <div class="party-item" style="flex-direction:column; align-items:center;"><small>Code</small><b style="font-size:24px;">${g.cloud.code}</b></div>
+      <div class="party-item" style="flex-direction:column; align-items:center;"><small>PIN</small><b style="font-size:24px;">${g.cloud.pin || '…'}</b></div>
+    </div>
+    <p class="sub" style="text-align:left; margin-top:12px;">📱 <b>Play on another device:</b> open the game there, tap <b>☁️ Continue</b> on an empty slot, and enter the code + PIN. Both devices then stay in sync by themselves.</p>
+    <p class="sub" style="text-align:left;">🌐 <b>Friends:</b> give them only the <b>code</b> (never the PIN) — they can battle or trade with you from the Friends screen.</p>
+    <p class="progress-note">${status}</p>
+    <textarea class="code-box" id="code-out" readonly style="display:none;">${g.cloud.code}</textarea>
     <div class="stack" style="margin-top:12px;">
-      <button class="big blue" onclick="copyCode()">📋 Copy Code</button>
+      <button class="blue" onclick="copyCode()">📋 Copy Code</button>
       <button class="big" onclick="renderSlotManage(${s})">⬅ Back</button>
     </div>
   </div>`;
+};
+/* ---- continue a cloud save on THIS device: code + PIN ---- */
+window.renderClaim = function(s, err){
+  sfx.tap();
+  app.innerHTML = `
+  <div class="card fadein">
+    <h2>☁️ Continue from another device</h2>
+    <p class="sub" style="text-align:left;">On the device you've been playing on: <b>💾 Save Slots → ⚙️ → ☁️ Online</b> shows the code and PIN.</p>
+    <div class="stack">
+      <input id="claim-code" class="code-box" style="min-height:auto; padding:14px; text-align:center; font-size:22px; font-weight:800; text-transform:uppercase;" placeholder="Code (e.g. NOVA482)" maxlength="10" autocapitalize="characters" autocomplete="off">
+      <input id="claim-pin" class="code-box" style="min-height:auto; padding:14px; text-align:center; font-size:22px; font-weight:800; letter-spacing:8px;" placeholder="PIN" maxlength="4" inputmode="numeric" autocomplete="off">
+    </div>
+    ${err ? `<div class="msgbox" style="margin-top:10px;"><span>${err}</span></div>` : ''}
+    <div class="stack" style="margin-top:12px;">
+      <button class="big green" onclick="applyClaim(${s})">✅ Continue here</button>
+      <button onclick="importSlot(${s})">📥 I have a long backup code instead</button>
+      <button class="big" onclick="renderTitle()">⬅ Back</button>
+    </div>
+  </div>`;
+};
+window.applyClaim = async function(s){
+  const code = (document.getElementById('claim-code').value || '').trim().toUpperCase();
+  const pin = (document.getElementById('claim-pin').value || '').trim();
+  if(!code || !/^\d{4}$/.test(pin)){ renderClaim(s, 'Type the code and the 4-number PIN. 🙂'); return; }
+  for(let t=1;t<=SLOT_COUNT;t++){
+    const other = loadSlot(t);
+    if(other && other.cloud && other.cloud.code === code){ playSlot(t); return; } // already on this device
+  }
+  app.innerHTML = `<div class="card fadein center"><h2>☁️ Finding your save…</h2><p class="sub">One moment!</p></div>`;
+  try{
+    const r = await cloudCall('claim', { code, pin });
+    const g = sanitizeSave(Object.assign({}, r.state, { name: (r.state && r.state.name) || r.name || '',
+      cloud: { code: r.code, ownerToken: r.ownerToken, pin, rev: r.updatedAt } }));
+    if(!g){ renderClaim(s, 'That save has no Pokémon in it yet.'); return; }
+    persistSlot(s, g);
+    SLOT = s; G = g;
+    sfx.catchOk();
+    renderTown('☁️ Welcome back! This device now stays in sync with your other one.');
+  }catch(e){
+    sfx.fail();
+    renderClaim(s, e.status===403 ? 'Wrong PIN — check it and try again. 🔢'
+      : e.status===404 ? 'No save has that code. Check the letters and numbers! 🧐'
+      : e.status===429 ? 'Too many wrong PINs — wait 10 minutes, then try again. ⏳'
+      : 'Couldn\'t connect — check the internet and try again. 📡');
+  }
+};
+/* ---- two devices saved different progress: the player picks which one wins ---- */
+function saveSummary(g){
+  if(!g) return '—';
+  const lead = g.party[0];
+  return `${lead ? `${spriteImg(lead.id,40)} ${SPECIES[lead.id].name} Lv.${lead.lv}<br>` : ''}🏅 ${g.badges.length}/5 · 📖 ${g.dex.length} · 🎒 ${g.party.length + (g.box||[]).length}`;
+}
+window.renderCloudConflict = function(){
+  sfx.tap();
+  const c = G.cloud && G.cloud.conflict;
+  if(!c){ renderTown(); return; }
+  const theirs = sanitizeSave(JSON.parse(JSON.stringify(Object.assign({}, c.state, { cloud: null }))));
+  app.innerHTML = `
+  <div class="card fadein">
+    <h2>☁️ Which progress should we keep?</h2>
+    <p class="sub" style="text-align:left;">This save was played on two devices at once, and they don't match. Pick one — the other one is replaced.</p>
+    <div class="stack">
+      <div class="party-item" style="display:block;"><b>📱 This device</b><br>${saveSummary(G)}</div>
+      <button class="big green" onclick="resolveCloudConflict('mine')">Keep THIS device's</button>
+      ${theirs ? `<div class="party-item" style="display:block;"><b>☁️ The other device</b><br>${saveSummary(theirs)}</div>
+      <button class="big blue" onclick="resolveCloudConflict('theirs')">Use the OTHER device's</button>` : ''}
+      <button onclick="backTown()">Decide later</button>
+    </div>
+  </div>`;
+};
+window.resolveCloudConflict = async function(which){
+  const c = G.cloud && G.cloud.conflict;
+  if(!c){ renderTown(); return; }
+  if(which === 'theirs' && adoptCloud(G, c.state, c.updatedAt)){
+    persistSlot(SLOT, G);
+    sfx.catchOk();
+    renderTown('☁️ Loaded the progress from your other device!');
+    return;
+  }
+  /* keep mine: overwrite the cloud, based on the version we just looked at */
+  G.cloud.rev = c.updatedAt; delete G.cloud.conflict;
+  persistSlot(SLOT, G);
+  await cloudPush(G, SLOT);
+  sfx.good();
+  renderTown(G.cloud.conflict ? '⚠️ The other device saved again — pick once more.' : G.cloud.dirty
+    ? '📱 Keeping this device\'s progress — it uploads when you\'re back online.' : '☁️ Saved this device\'s progress to the cloud!');
 };
 window.copyCode = function(){
   const ta = document.getElementById('code-out');
@@ -1016,9 +1232,11 @@ window.applyImport = function(s){
   }
   SLOT = s;
   G = g;
-  save();
+  persistSlot(s, g);
   sfx.catchOk();
+  if(G.cloud){ playSlot(s); return; } // a backup of an online save: sync it with the cloud first
   renderTown('Save loaded! Welcome back! ✅');
+  autoLink(G, s);
 };
 
 /* ============ SCREEN: PICK STARTER ============ */
@@ -1043,6 +1261,7 @@ window.pickStarter = function(id){
   G = {party:[newMon(id,5)], box:[], balls:5, dex:[id], badges:[], masterBall:false, bossCaught:false, name, cloud:null};
   save();
   renderTown(`Yay! ${SPECIES[id].name} is your buddy now! Let's go!`);
+  autoLink(G, SLOT);
 };
 
 /* ============ SCREEN: TOWN ============ */
@@ -1056,14 +1275,20 @@ function renderTown(msg){
   BGM.play('town');
   const unlocked = bossUnlocked();
   const a = activeMon();
+  const notes = pendingNotes.splice(0);
+  msg = [msg, ...notes].filter(Boolean).join('<br>');
+  const c = G.cloud;
+  const cloudChip = !c ? '' : c.conflict ? '⚠️' : c.dirty ? '☁️⏳' : '☁️✅';
   app.innerHTML = `
-  <div class="card fadein">
+  <div class="card fadein" id="town-screen">
     <div class="row">
       <h2>🏘️ Pokémon Town</h2>
       <div class="spacer"></div>
       <span class="ball-count">🏅 ${G.badges.length}/5 · 🔴 ×${G.balls}</span>
+      ${c ? `<button style="padding:5px 9px; font-size:14px;" onclick="renderCloudInfo(SLOT)" title="Cloud sync">${cloudChip}</button>` : ''}
       <button style="padding:5px 9px; font-size:14px;" onclick="toggleBgm()">${BGM.enabled?'🔊':'🔇'}</button>
     </div>
+    ${c && c.conflict ? `<button class="big yellow" style="margin-bottom:12px;" onclick="renderCloudConflict()">⚠️ Your other device saved different progress — tap to choose</button>` : ''}
     ${msg?`<div class="msgbox" style="margin-bottom:12px;"><span>${msg}</span></div>`:''}
     <div class="party-item active-mon" style="margin-bottom:12px;">
       ${spriteImg(a.id,56)}
@@ -1088,7 +1313,7 @@ function renderTown(msg){
         <button onclick="renderBox()" style="padding:10px 4px; font-size:14px;">📦 Box<br><small>${boxOf().length}/${BOX_MAX}</small></button>
         <button onclick="renderDex()" style="padding:10px 4px; font-size:14px;">📖 Pokédex<br><small>${G.dex.length}/${TOTAL_KINDS}</small></button>
         <button onclick="renderTypeChart()" style="padding:10px 4px; font-size:14px;">⚔️ Battle Guide<br><small>Types &amp; status</small></button>
-        <button class="purple" onclick="${G.cloud?'renderFriends()':'renderTown(\'Go ☁️ online first — 💾 Save Slots → ⚙️ → Go Online.\')'}" style="padding:10px 4px; font-size:14px;">🌐 Friends<br><small>${G.cloud?'Battle &amp; trade':'Go online first'}</small></button>
+        <button class="purple" onclick="${G.cloud?'renderFriends()':'goOnlineFromTown()'}" style="padding:10px 4px; font-size:14px;">🌐 Friends<br><small>${G.cloud?'Battle &amp; trade':'Go online first'}</small></button>
       </div>
       <div class="grid2" style="grid-template-columns:repeat(5,1fr); gap:8px;">
         ${CAVES.map((c,i)=>{
@@ -1119,22 +1344,17 @@ window.toTitle = function(){ sfx.tap(); BGM.stop(); renderTitle(); };
    be online at the same moment. Battling pulls a snapshot of their
    current team and fights it like any other trainer; trading posts an
    offer that sits waiting until they next open the game. */
-async function checkCloudInbox(){
-  if(!G.cloud) return null;
-  try{
-    const r = await cloudCall('check', { code: G.cloud.code, ownerToken: G.cloud.ownerToken, since: G.cloud.lastCheck||0 });
-    G.cloud.lastCheck = Date.now();
-    if(r.newer && r.state){
-      G.party = (r.state.party||G.party).filter(m=>m&&SPECIES[m.id]);
-      G.box = (r.state.box||G.box).filter(m=>m&&SPECIES[m.id]);
-      G.balls = r.state.balls ?? G.balls;
-      G.dex = r.state.dex || G.dex;
-      G.badges = r.state.badges || G.badges;
-      if(!G.party.length) G.party = r.state.party || G.party; // never end up with an empty team
-    }
-    try{ localStorage.setItem(slotKey(SLOT), JSON.stringify(G)); }catch(e){}
-    return r;
-  }catch(e){ return null; }
+window.goOnlineFromTown = async function(){
+  renderTown('☁️ Going online…');
+  await autoLink(G, SLOT);
+  renderTown(G.cloud ? '' : '📡 Couldn\'t reach the cloud — check the internet and try again.');
+};
+/* trades work on the cloud copy of your team, so upload first — otherwise a
+   Pokémon caught a minute ago wouldn't exist there yet */
+async function flushCloud(){
+  if(!G.cloud) return false;
+  if(G.cloud.dirty && !G.cloud.conflict) await cloudPush(G, SLOT);
+  return !G.cloud.dirty && !G.cloud.conflict;
 }
 window.renderFriends = function(){
   sfx.tap();
@@ -1156,10 +1376,9 @@ window.renderFriends = function(){
 };
 window.renderFriendsRefresh = async function(){
   sfx.tap();
-  const r = await checkCloudInbox();
+  const r = await syncNow({ force:true });
   if(!r){ renderTown('Couldn\'t reach the server — check your internet and try again. 📡'); return; }
-  const msg = r.inbox && r.inbox.length ? r.inbox.map(i=>i.text).join('<br>') : 'No news — all quiet! 😊';
-  renderTown(msg);
+  renderTown(r.changed ? '☁️ Updated with the progress from your other device!' : pendingNotes.length ? '' : 'No news — all quiet! 😊');
 };
 window.lookupFriend = async function(){
   const input = document.getElementById('friend-code');
@@ -1216,6 +1435,7 @@ window.viewFriendTrade = function(f){
 };
 window.offerTrade = async function(targetCode, offerMonUid){
   sfx.tap();
+  if(!await flushCloud()){ renderTown('📡 Your latest progress hasn\'t uploaded yet — try again in a moment.'); return; }
   try{
     await cloudCall('tradeOffer', { targetCode, fromCode: G.cloud.code, fromOwnerToken: G.cloud.ownerToken, offerMonUid });
     sfx.good();
@@ -1262,6 +1482,7 @@ window.renderTradeBoard = async function(){
 window.postTrade = async function(monUid){
   sfx.tap();
   const want = (safePrompt('Want anything specific back? (or leave blank for "anything")', '') || '').trim();
+  if(!await flushCloud()){ renderTown('📡 Your latest progress hasn\'t uploaded yet — try again in a moment.'); return; }
   try{
     await cloudCall('tradePost', { code: G.cloud.code, ownerToken: G.cloud.ownerToken, monUid, want: want || null });
     sfx.good();
@@ -1276,10 +1497,11 @@ window.cancelTrade = async function(){
 };
 window.acceptOffer = async function(offerId){
   sfx.tap();
+  if(!await flushCloud()){ renderTown('📡 Your latest progress hasn\'t uploaded yet — try again in a moment.'); return; }
   try{
     const r = await cloudCall('tradeAccept', { code: G.cloud.code, ownerToken: G.cloud.ownerToken, offerId });
     const got = r.gotMon;
-    await checkCloudInbox(); // pulls the post-trade party (with the new Pokémon) down into G
+    await syncNow({ force:true }); // pulls the post-trade party (with the new Pokémon) down into G
     if(!G.dex.includes(got.id)) G.dex.push(got.id);
     save();
     sfx.catchOk();
