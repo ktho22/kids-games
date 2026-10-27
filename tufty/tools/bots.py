@@ -50,6 +50,13 @@ def find(menu, label):
   return None
 
 
+def story_strong(ns):
+  """Is the team ready for the current story battle?"""
+  s = ns["step"]()
+  party = sorted(m["lv"] for m in ns["G"]["party"])[-3:]
+  return sum(party) / len(party) >= max(lv for _, lv in s[6]) + 2
+
+
 def smart(ns, b):
   G = ns.get("G")
   scene = ns.get("scene")
@@ -60,9 +67,12 @@ def smart(ns, b):
   if ns.get("notice"):
     log.append(ns["notice"])
     return tap(b, "B")
-  if scene in ("title", "starter", "evolve", "win", "info"):
-    if scene == "win":
+  if scene == "story":
+    return tap(b, "B" if ns["story_ready"]() and story_strong(ns) else "A")
+  if scene in ("title", "starter", "evolve", "win", "info", "talk"):
+    if scene == "win" and "WIN" not in log:
       log.append("WIN")
+      log.append("win at frame %d" % b.frames)
     return tap(b, "B")
   if scene == "battle":
     B = ns["B"]
@@ -71,10 +81,11 @@ def smart(ns, b):
       want = 0
       if ns["catch_phase"]() and e["hp"] == 1:
         want = 1
-      elif not B.trainer and e["id"] not in G["dex"] and G["balls"] > 0 and e["hp"] / ns["boss_max"](e) < 0.45 \
+      elif not B.trainer and e["id"] not in G["dex"] and G["balls"] > 0 \
+          and (e["hp"] / ns["boss_max"](e) < 0.45 or my["lv"] > e["lv"] + 8) \
           and (len(G["party"]) < 6 or len(G["box"]) < 40):
         want = 1
-      if B.cur != want:
+      if B.mcur != want:
         return tap(b, "DOWN")
       return tap(b, "B")
     if B.menu == "fight":
@@ -89,7 +100,7 @@ def smart(ns, b):
         v = pw * acc * ns["type_mult"](t, ns["form"](e)[1])
         if v > best:
           best, bi = v, i
-      if B.cur != bi:
+      if B.fcur != bi:
         return tap(b, "DOWN")
       return tap(b, "B")
     return tap(b, "B")
@@ -105,6 +116,13 @@ def smart(ns, b):
       if hurt:
         return menu_go(b, top, find(top, "Pokemon Center"))
       nb = len(G["badges"])
+      if G["story"] >= int(__import__("os").environ.get("BOT_STORY_END", 20)):
+        if "DONE" not in log:
+          log.append("story done at frame %d" % b.frames)
+        log.append("DONE")
+        return ()
+      if ns["story_ready"]() and story_strong(ns):
+        return menu_go(b, top, find(top, "Story"))
       # team: keep the 6 strongest, rest go to the box (strongest leads)
       lead = party[0]
       if lead is not max(party, key=lambda m: m["lv"]):
@@ -118,17 +136,22 @@ def smart(ns, b):
         if ns["cave_open"](nb) and avg >= need:
           b.goal = ("cave", nb)
           return menu_go(b, top, find(top, "Caves"))
-      elif not G["bossCaught"] and avg >= ns["D"].MEWTWO_LV + 2:
+      elif not G["bossCaught"] and ns["cave_open"](5) and avg >= ns["D"].MEWTWO_LV + 2:
         b.goal = ("cave", 5)
         return menu_go(b, top, find(top, "Caves"))
-      elif G["bossCaught"]:
-        log.append("DONE")
-        return ()
-      # train: the toughest open land that is still beatable
+      # train: the toughest open land that is still beatable; while the
+      # story wants more kinds, the beatable land with most still to catch
       best = 0
       for i, a in enumerate(D.AREAS):
         if nb >= a[3] and a[2] <= avg + 1:
           best = i
+      s = ns["step"]()
+      if s and s[0] == "goal" and s[1][0] == "dex" and not ns["cond_met"](s[1]):
+        def missing(a):
+          return len([p for p in a[4] if p not in G["dex"]])
+        open_ = [i for i, a in enumerate(D.AREAS) if nb >= a[3] and a[1] <= avg]
+        if open_:
+          best = max(open_, key=lambda i: (missing(D.AREAS[i]), i))
       b.goal = ("area", best)
       return menu_go(b, top, find(top, "Explore"))
     goal = getattr(b, "goal", None)
@@ -186,7 +209,7 @@ if __name__ == "__main__":
       traceback.print_exc()
     g = json.loads(sim.store.get("pocket_mini_adventure", "{}"))
     print("frames", sim.badge.frames, "minutes at 60fps ~", round(sim.badge.frames / 60 / 60, 1))
-    print("badges", g.get("badges"), "boss", g.get("bossCaught"), "dex", len(g.get("dex", [])),
+    print("story", g.get("story"), "badges", g.get("badges"), "boss", g.get("bossCaught"), "dex", len(g.get("dex", [])),
           "team", [(m["id"], m["lv"]) for m in g.get("party", [])])
-    notes = [l for l in log if "badge" in l or "WIN" in l or "Champion" in l]
+    notes = [l for l in log if "badge" in l or "WIN" in l or "Champion" in l or "frame" in l or "goal" in l]
     print("\n".join(dict.fromkeys(notes)))

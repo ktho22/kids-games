@@ -9,7 +9,8 @@ Controls:
 * Hold Up + Down = Save and back to the launcher
 
 The rules, numbers and Pokemon all come from the web version (pkdata.py is
-generated from it), so both play the same.
+generated from it), so both play the same. The story (story.py) is the
+badge's own: a rival, Team Grumble, and goals that lead to the Champion.
 """
 
 import math
@@ -18,6 +19,7 @@ import random
 from badgeware import State
 
 import pkdata as D
+import story as ST
 
 
 badge.mode(LORES | VSYNC)
@@ -25,6 +27,7 @@ badge.mode(LORES | VSYNC)
 APP = "/system/apps/pocket_mini_adventure"
 MENU = "/system/apps/menu"
 SAVE = "pocket_mini_adventure"
+SLOTS = 5
 W, H = 160, 120
 
 # how long battle messages stay up, relative to the web game; B skips ahead
@@ -202,6 +205,15 @@ def sanitize(g):
   g.setdefault("bossCaught", False)
   if not g["party"]:
     return None
+  # saves from before the story pick it up where their badges leave off
+  if not isinstance(g.get("story"), int):
+    if g["bossCaught"]:
+      g["story"] = ST.RESUME_AFTER_BOSS
+    else:
+      g["story"] = ST.RESUME_AT_BADGES[min(5, len(g["badges"]))]
+  if g.get("rival") not in D.SPECIES:
+    mine = [i for i in g["dex"] if i in ST.RIVAL_OF]
+    g["rival"] = ST.RIVAL_OF[mine[0]] if mine else "pairi"
   for m in g["party"] + g["box"]:
     for k in ("mega", "gmax", "tf", "st", "stT", "bossMaxHp"):
       m.pop(k, None)
@@ -216,10 +228,18 @@ def sanitize(g):
   return g
 
 
-def load_game():
+SLOT = 1
+
+
+def slot_key(n):
+  """Slot 1 keeps the original name, so saves from before slots still load."""
+  return SAVE if n == 1 else "%s_%d" % (SAVE, n)
+
+
+def load_slot(n):
   g = {}
   try:
-    State.load(SAVE, g)
+    State.load(slot_key(n), g)
   except Exception:
     return None
   return sanitize(g)
@@ -227,7 +247,16 @@ def load_game():
 
 def save():
   if G:
-    State.save(SAVE, G)
+    State.save(slot_key(SLOT), G)
+
+
+def last_slot():
+  meta = {"last": 1}
+  try:
+    State.load(SAVE + "_meta", meta)
+  except Exception:
+    pass
+  return meta["last"] if 1 <= meta.get("last", 1) <= SLOTS else 1
 
 
 def active():
@@ -571,20 +600,27 @@ def badge_count():
 
 
 def cave_open(i):
-  return len(G["dex"]) >= 2 if i == 0 else D.CAVES[i - 1][1] in G["badges"]
+  """Caves open as the story reaches them; one already won stays open. 5 = Legend Cave."""
+  if i < len(D.CAVES) and D.CAVES[i][1] in G["badges"]:
+    return True
+  return G["story"] >= ST.CAVE_OPENS_AT[i]
 
 
-def go_town(msg=None):
-  global scene
+def go_town(msg=None, check=True):
+  global scene, notice
   scene = "menu"
   stack.clear()
   push(town_menu())
   if msg:
     say_notice(msg)
+  # a story scene that is due takes over from the message
+  if check and story_check():
+    notice = None
 
 
 def town_menu():
   items = [
+    ["Story", story_label(), True, open_story],
     ["Explore", "", True, lambda: push(area_menu())],
     ["Caves", "%d/5" % badge_count(), True, lambda: push(cave_menu())],
     ["Pokemon Center", "", True, heal_all],
@@ -592,6 +628,7 @@ def town_menu():
     ["Box", "%d/%d" % (len(G["box"]), D.BOX_MAX), True, lambda: push(box_menu())],
     ["Pokedex", "%d/%d" % (len(G["dex"]), len(D.ORDER)), True, lambda: push(dex_menu())],
     ["Battle Plaza", "" if badge_count() >= 1 else "1 badge", badge_count() >= 1, go_plaza],
+    ["Save Slots", "%d" % SLOT, True, lambda: (save(), go_title())],
     ["Save & Quit", "", True, quit_game],
   ]
   m = Menu(None, items, top=44)
@@ -650,11 +687,10 @@ def cave_menu():
     open_ = cave_open(i)
     done = c[1] in G["badges"]
     right = "BADGE" if done else ("" if open_ else "locked")
-    why = "Catch 1 Pokemon in the grass first!" if i == 0 else "Beat the %s first!" % D.CAVES[i - 1][0]
-    items.append([c[0], right, open_, (lambda i=i: go_cave(i)) if open_ else (lambda why=why: say_notice(why))])
-  boss_open = badge_count() >= len(D.CAVES)
-  items.append(["Legend Cave", "BEATEN" if G["bossCaught"] else ("" if boss_open else "5 badges"), boss_open,
-                go_boss if boss_open else (lambda: say_notice("Win all 5 cave badges to open the Legend Cave!"))])
+    items.append([c[0], right, open_, (lambda i=i: go_cave(i)) if open_ else story_first])
+  boss_open = cave_open(5)
+  items.append(["Legend Cave", "BEATEN" if G["bossCaught"] else ("" if boss_open else "locked"), boss_open,
+                go_boss if boss_open else story_first])
   return Menu("Caves - %d/5 badges" % badge_count(), items, on_back=pop)
 
 
@@ -867,8 +903,10 @@ class Battle:
     self.forced = False
     self.msg = ""
     self.menu = "msg"            # msg | main | fight
-    self.cur = 0
+    self.mcur = 0                # main menu choice, kept between turns
+    self.fcur = 0
     self.bg = bg or AREA_BG[0]
+    self.story = None            # the story step this battle belongs to
 
 
 B = None
@@ -967,7 +1005,7 @@ def intro_task(msg):
   effect("enter", 500)
   yield from say(msg, 1200)
   B.menu = "main"
-  B.cur = 0
+  B.mcur = 0
 
 
 def say(msg, ms=900):
@@ -983,6 +1021,9 @@ def all_tired():
 def go_area(i):
   if all_tired():
     return say_notice("Your Pokemon are all tired! Heal them at the Center first.")
+  s = step()
+  if s and s[0] == "battle" and s[2] == i:
+    return run(story_battle_task(G["story"]))
   name, lo, hi, need, pool, rare = D.AREAS[i]
   lv = lo + rand(hi - lo + 1)
   legendary = False
@@ -1245,7 +1286,7 @@ def enemy_down():
 
 
 def my_fainted(fallen):
-  global scene
+  global scene, story_after
   clear_status(fallen)
   fallen.pop("tf", None)
   if any(m["hp"] > 0 for m in G["party"]):
@@ -1258,6 +1299,8 @@ def my_fainted(fallen):
   clear_battle_flags()
   for m in G["party"]:
     m["hp"] = max_hp(m)
+  if B.story is not None and ST.STEPS[B.story][9] is not None:
+    story_after = (B.story, False)     # this one carries on win or lose
   save()
   go_town("The nurse healed everyone! Let's try again!")
   return True
@@ -1293,6 +1336,7 @@ def pick_switch(m, forced):
   if out is not m:
     out.pop("tf", None)
   B.forced = False
+  B.mcur = 0
   note = ditto_prep()
   effect("enter", 500, "me")
   if forced:
@@ -1501,6 +1545,7 @@ def win_wild(msg, was_catch=False):
 
 
 def trainer_mon_down():
+  global story_after
   e = B.enemy
   effect("faint_foe", 600)
   yield from say("%s fell down!" % label(e), 900)
@@ -1514,6 +1559,10 @@ def trainer_mon_down():
     to_main()
     return
   B.over = True
+  if B.story is not None:
+    story_after = (B.story, True)
+    finish_battle("You beat %s!" % B.trainer)
+    return
   if B.plaza:
     G["balls"] += 1
     finish_battle("You beat %s! They gave you a Poke Ball! +1" % B.trainer)
@@ -1556,23 +1605,22 @@ def battle_input():
     items = main_items()
     n = len(items)
     if repeat(BUTTON_DOWN) or badge.pressed(BUTTON_C):
-      B.cur = (B.cur + 1) % n
+      B.mcur = (B.mcur + 1) % n
     if repeat(BUTTON_UP):
-      B.cur = (B.cur - 1) % n
+      B.mcur = (B.mcur - 1) % n
     if ok():
-      items[B.cur][1]()
+      items[B.mcur][1]()
   elif B.menu == "fight":
     items = fight_items()
     n = len(items)
     if repeat(BUTTON_DOWN) or badge.pressed(BUTTON_C):
-      B.cur = (B.cur + 1) % n
+      B.fcur = (B.fcur + 1) % n
     if repeat(BUTTON_UP):
-      B.cur = (B.cur - 1) % n
+      B.fcur = (B.fcur - 1) % n
     if ok():
-      items[B.cur][1]()
+      items[B.fcur][1]()
     elif back():
       B.menu = "main"
-      B.cur = 0
 
 
 def main_items():
@@ -1580,9 +1628,20 @@ def main_items():
   return [("FIGHT", open_fight), ball, ("TEAM", team_in_battle), ("RUN", run_away)]
 
 
+# each Pokemon's last move, so B, B repeats it (and the menus stay where you left them)
+last_move = {}
+
+
 def open_fight():
   B.menu = "fight"
-  B.cur = 0
+  names = [lab for lab, _ in fight_items()]
+  want = last_move.get(active()["uid"])
+  B.fcur = names.index(want) if want in names else len(names) - len(moves_of(active()))
+
+
+def pick_move(name):
+  last_move[active()["uid"]] = name
+  run(use_move(name))
 
 
 def fight_items():
@@ -1592,7 +1651,7 @@ def fight_items():
   if can_gmax():
     items.append(("DYNAMAX!", do_gmax))
   for name in moves_of(active()):
-    items.append((name, lambda name=name: run(use_move(name))))
+    items.append((name, lambda name=name: pick_move(name)))
   return items
 
 
@@ -1729,7 +1788,7 @@ def draw_battle():
     for n, (lab, _) in enumerate(main_items()):
       x = 6 + (n % 2) * 78
       y = 87 + (n // 2) * 15
-      sel = n == B.cur
+      sel = n == B.mcur
       dim = n == 1 and B.trainer and not catch_phase()
       if sel:
         screen.pen = HILITE
@@ -1745,7 +1804,7 @@ def draw_battle():
     for n, (lab, _) in enumerate(items):
       x = 5 + (n % 2) * 77
       y = 86 + (n // 2) * pitch
-      sel = n == B.cur
+      sel = n == B.fcur
       if lab in ("MEGA!", "DYNAMAX!"):
         pen = PURPLE if lab[0] == "M" else RED
       else:
@@ -1766,61 +1825,83 @@ def draw_title():
   screen.pen = color.rgb(255, 236, 140)
   screen.shape(shape.circle(80, 150, 80))
   screen.pen = RED
-  screen.rectangle(0, 0, W, 4)
-  text_center("POCKET MINI", 6, INK, TITLE)
-  text_center("ADVENTURE", 22, RED, TITLE)
+  screen.rectangle(0, 0, W, 3)
+  text_center("POCKET MINI", 4, INK, TITLE)
+  text_center("ADVENTURE", 19, RED, TITLE)
   bob = int(math.sin(badge.ticks / 300) * 2)
-  draw_sprite("pikachu", 8, 42 + bob)
-  draw_sprite("pairi", W - 56, 44 - bob, flip=True)
+  draw_sprite("pikachu", 1, 8 + bob, 28)
+  draw_sprite("pairi", W - 29, 8 - bob, 28)
   title_menu.draw_inline()
 
 
 class TitleMenu:
+  """One row per save slot: B plays it (or starts a new game), A erases it."""
+
   def __init__(self):
     self.cur = 0
+    self.saves = [None] * SLOTS
 
-  def items(self):
-    if G:
-      return [("Continue", continue_game), ("New Game", new_game)]
-    return [("New Game", new_game)]
+  def refresh(self):
+    self.saves = [load_slot(n) for n in range(1, SLOTS + 1)]
 
   def update(self):
-    it = self.items()
-    if repeat(BUTTON_DOWN) or repeat(BUTTON_UP):
-      self.cur = (self.cur + 1) % len(it)
-    self.cur %= len(it)
+    if repeat(BUTTON_DOWN):
+      self.cur = (self.cur + 1) % SLOTS
+    if repeat(BUTTON_UP):
+      self.cur = (self.cur - 1) % SLOTS
     if ok():
-      it[self.cur][1]()
+      play_slot(self.cur + 1)
+    elif back() and self.saves[self.cur]:
+      n = self.cur + 1
+
+      def yes():
+        State.delete(slot_key(n))
+        self.refresh()
+      ask("Erase save %d? It's gone for good!" % n, yes)
 
   def draw_inline(self):
-    it = self.items()
-    y = 94 - len(it) * 7
-    for n, (lab, _) in enumerate(it):
-      sel = n == self.cur
-      if sel:
-        box(42, y + n * 15 - 1, 76, 15, HILITE)
-      text_center(lab, y + n * 15, INK)
-    if G:
-      text_center("Badges %d/5  Dex %d/%d" % (badge_count(), len(G["dex"]), len(D.ORDER)), 108, INK, TINY)
-    else:
-      text_center("B = OK    A = Back", 108, INK, TINY)
+    for k in range(SLOTS):
+      y = 37 + k * 14
+      g = self.saves[k]
+      sel = k == self.cur
+      box(4, y, W - 8, 13, HILITE if sel else PANEL, INK if sel else FAINT)
+      text("%d" % (k + 1), 8, y, RED if sel else MUTED)
+      if g:
+        lead = g["party"][0]
+        text_fit("%s Lv.%d" % (D.SPECIES[lead["id"]][NAME], lead["lv"]), 19, y, 96)
+        badge_icon(123, y + 6)
+        text("%d" % len(g["badges"]), 129, y + 1, INK, SMALL)
+        if g["bossCaught"]:
+          ball_icon(146, y + 6, 3, True)
+      else:
+        text("New game", 19, y, FAINT)
+    text_center("B = Play     A = Erase", 109, INK, TINY)
 
 
 title_menu = TitleMenu()
 
 
-def continue_game():
-  go_town("Welcome back! %s is ready!" % sp(active())[NAME])
-
-
-def new_game():
-  global scene
+def play_slot(n):
+  global SLOT, G
+  SLOT = n
+  State.save(SAVE + "_meta", {"last": n})
+  G = title_menu.saves[n - 1]
   if G:
-    def yes():
-      global scene
-      scene = "starter"
-    ask("Start over? Your old adventure will be erased!", yes)
-    return
+    continue_game()
+  else:
+    run(intro_story())
+
+
+def continue_game():
+  s = step()
+  go_town("Welcome back! %s is ready! %s" % (
+    sp(active())[NAME], ("Story: " + goal_text()) if s else ""))
+
+
+def intro_story():
+  global scene, starter_cur
+  yield from talk(ST.INTRO)
+  starter_cur = 0
   scene = "starter"
 
 
@@ -1838,7 +1919,8 @@ def starter_input():
   elif ok():
     sid = STARTERS[starter_cur]
     G = {"party": [new_mon(sid, 5)], "box": [], "balls": 5, "dex": [sid], "badges": [],
-         "masterBall": False, "bossCaught": False, "name": "", "cloud": None}
+         "masterBall": False, "bossCaught": False, "name": "", "cloud": None,
+         "story": 0, "rival": ST.RIVAL_OF[sid]}
     save()
     go_town("Yay! %s is your buddy now! Let's go!" % D.SPECIES[sid][NAME])
 
@@ -1940,6 +2022,244 @@ def go_title():
   global scene
   stack.clear()
   scene = "title"
+  title_menu.refresh()
+  title_menu.cur = SLOT - 1
+
+
+# ---------------------------------------------------------------- story
+
+story_after = None      # (step, won) once a story battle is over
+talk_state = None       # (who, lines on this page)
+
+
+def step():
+  i = G["story"]
+  return ST.STEPS[i] if i < len(ST.STEPS) else None
+
+
+def goal_text():
+  s = step()
+  if not s:
+    return "Story complete! Keep catching them all!"
+  return s[3] if s[0] == "battle" else s[2]
+
+
+def cond_met(c):
+  if c[0] == "dex":
+    return len(G["dex"]) >= c[1]
+  if c[0] == "badges":
+    return badge_count() >= c[1]
+  if c[0] == "boss":
+    return G["bossCaught"]
+  if c[0] == "legends":
+    return len([i for i in G["dex"] if i in D.LEGENDS]) >= c[1]
+  return False
+
+
+def story_ready():
+  """The current step is a battle you can go and fight right now."""
+  s = step()
+  return bool(s) and s[0] == "battle" and (s[2] is None or badge_count() >= D.AREAS[s[2]][3])
+
+
+def story_label():
+  if not step():
+    return "DONE"
+  return "GO!" if story_ready() else "%d/%d" % (G["story"] + 1, len(ST.STEPS))
+
+
+def story_first():
+  say_notice("Story first! " + goal_text())
+
+
+def rival_at(lv):
+  """Jay's starter, evolved as far as level lv allows."""
+  sid = G["rival"]
+  s = D.SPECIES[sid]
+  while s[EVLV] and lv >= s[EVLV] and isinstance(s[EVTO], str):
+    sid = s[EVTO]
+    s = D.SPECIES[sid]
+  return sid
+
+
+def fill(s):
+  if not G:
+    return s
+  return s.replace("{rival}", D.SPECIES[G["rival"]][NAME]).replace("{mon}", sp(active())[NAME])
+
+
+def talk(lines):
+  """Show lines of dialogue, a page at a time; B turns the page."""
+  global scene, talk_state
+  back_to = scene
+  scene = "talk"
+  for who, s in lines:
+    page = wrap(fill(s), SMALL, W - 12)
+    for k in range(0, len(page), 3):
+      talk_state = (who, page[k:k + 3])
+      shown = badge.ticks
+      yield
+      while not (ok() and badge.ticks - shown > 250):
+        yield
+  talk_state = None
+  scene = back_to
+
+
+def story_check():
+  """In town: wrap up a story battle, a goal just reached, or start a battle
+  that happens right where you are. True when a story scene started."""
+  global story_after
+  if not G:
+    return False
+  if story_after is not None:
+    i, won = story_after
+    story_after = None
+    if i == G["story"]:
+      run(finish_step(i, won))
+      return True
+  s = step()
+  if not s:
+    return False
+  if s[0] == "goal" and cond_met(s[1]):
+    run(finish_step(G["story"], True))
+    return True
+  if s[0] == "battle" and s[2] is None:
+    run(story_battle_task(G["story"]))
+    return True
+  return False
+
+
+def give(reward):
+  got = []
+  if reward.get("balls"):
+    G["balls"] += reward["balls"]
+    got.append("Got %d Poke Balls!" % reward["balls"])
+  if reward.get("gift"):
+    sid, lv = reward["gift"]
+    m = new_mon(sid, lv)
+    if len(G["party"]) < 6:
+      G["party"].append(m)
+      got.append("%s joined your team!" % D.SPECIES[sid][NAME])
+    else:
+      G["box"].append(m)
+      got.append("%s is waiting in the Box!" % D.SPECIES[sid][NAME])
+    if sid not in G["dex"]:
+      G["dex"].append(sid)
+  return " ".join(got)
+
+
+def finish_step(i, won):
+  s = ST.STEPS[i]
+  if s[0] == "goal":
+    lines, reward = s[4], s[5]
+  else:
+    lines, reward = (s[8] if won else s[9]), s[10]
+  yield from talk(lines)
+  G["story"] = i + 1
+  got = give(reward)
+  save()
+  go_town(None, check=False)
+  if not story_check():
+    say_notice((got + " " if got else "") + ("New goal: " + goal_text() if step() else goal_text()))
+
+
+def story_battle_task(i):
+  s = ST.STEPS[i]
+  yield from talk(s[7])
+  team = [make_trainer_mon(rival_at(lv) if sid == "RIVAL" else sid, lv) for sid, lv in s[6]]
+  b = Battle(team.pop(0), trainer=s[5], queue=team, bg=AREA_BG[s[2]] if s[2] is not None else PLAZA_BG)
+  b.story = i
+  start_battle(b, '%s wants to battle! "Go, %s!"' % (s[5], sp(b.enemy)[NAME]))
+
+
+def open_story():
+  global scene
+  scene = "story"
+
+
+def story_input():
+  global scene
+  if back():
+    scene = "menu"
+  elif ok():
+    scene = "menu"
+    if story_ready():
+      if all_tired():
+        say_notice("Your Pokemon are all tired! Heal them at the Center first.")
+      else:
+        run(story_battle_task(G["story"]))
+
+
+def draw_story():
+  s = step()
+  screen.pen = PAPER
+  screen.clear()
+  screen.pen = INK
+  screen.rectangle(0, 0, W, 14)
+  text("Story", 4, 0, WHITE)
+  text_right("%d/%d" % (min(G["story"] + 1, len(ST.STEPS)), len(ST.STEPS)), W - 4, 2, WHITE, SMALL)
+  # progress along the whole story
+  screen.pen = SHADE
+  screen.rectangle(4, 17, W - 8, 3)
+  screen.pen = GOLD
+  screen.rectangle(4, 17, int((W - 8) * min(1, G["story"] / len(ST.STEPS))), 3)
+  y = 24
+  for line in wrap(goal_text(), BODY, W - 10):
+    text(line, 5, y, INK)
+    y += 13
+  if s:
+    y += 3
+    hint = s[4] if s[0] == "battle" else s[3]
+    for line in wrap(hint, SMALL, W - 10):
+      text(line, 5, y, MUTED, SMALL)
+      y += 11
+  screen.pen = SHADE
+  screen.rectangle(0, H - 13, W, 13)
+  if story_ready():
+    text("B = Go!", 5, H - 12, RED)
+  text_right("A = Back", W - 5, H - 11, MUTED, SMALL)
+
+
+def draw_person(cx, top, shirt, hair):
+  screen.pen = color.rgb(*shirt)
+  screen.shape(shape.rounded_rectangle(cx - 13, top + 21, 26, 26, 7))
+  screen.pen = color.rgb(250, 214, 178)
+  screen.shape(shape.circle(cx, top + 12, 10))
+  was = screen.clip
+  screen.clip = rect(cx - 12, top, 24, 9)
+  screen.pen = color.rgb(*hair)
+  screen.shape(shape.circle(cx, top + 12, 11))
+  screen.clip = was
+  screen.pen = INK
+  screen.rectangle(cx - 4, top + 12, 2, 3)
+  screen.rectangle(cx + 3, top + 12, 2, 3)
+
+
+def draw_talk():
+  screen.pen = color.rgb(200, 226, 248)
+  screen.clear()
+  screen.pen = color.rgb(150, 205, 120)
+  screen.rectangle(0, 56, W, 20)
+  if not talk_state:
+    return
+  who, lines = talk_state
+  name, shirt, hair, partner = ST.PEOPLE[who]
+  bob = int(math.sin(badge.ticks / 250) * 1.5)
+  draw_person(42, 14 + bob, shirt, hair)
+  if partner == "RIVAL":
+    partner = rival_at(max(m["lv"] for m in G["party"])) if G else None
+  if partner:
+    draw_sprite(partner, 82, 18 - bob)
+  box(1, 72, W - 2, 48)
+  wd = width_of(name, SMALL) + 8
+  screen.pen = color.rgb(*shirt)
+  screen.shape(shape.rounded_rectangle(5, 66, wd, 12, 3))
+  text(name, 9, 66, WHITE, SMALL)
+  for n, line in enumerate(lines):
+    text(line, 6, 80 + n * 11, INK, SMALL)
+  if (badge.ticks // 400) % 2:
+    screen.pen = RED
+    screen.triangle(W - 12, 113, W - 6, 113, W - 9, 116)
 
 
 # ---------------------------------------------------------------- overlays
@@ -1972,7 +2292,10 @@ def draw_confirm():
 
 # ---------------------------------------------------------------- main loop
 
-G = load_game()
+G = None
+title_menu.refresh()
+SLOT = last_slot()
+title_menu.cur = SLOT - 1
 exit_to = None
 exit_hold_at = None
 
@@ -1992,10 +2315,13 @@ while exit_to is None:
     exit_hold_at = None
 
   if task:
+    cur = task
     try:
-      next(task)
+      next(cur)
     except StopIteration:
-      task = None
+      # it may have started the next task on its way out
+      if task is cur:
+        task = None
   elif confirm:
     if ok():
       fn = confirm[1]
@@ -2017,6 +2343,8 @@ while exit_to is None:
   elif scene == "info":
     if ok() or back():
       scene = "menu"
+  elif scene == "story":
+    story_input()
   elif scene == "evolve":
     evolve_input()
   elif scene == "win":
@@ -2038,6 +2366,10 @@ while exit_to is None:
     draw_info()
   elif scene == "heal":
     draw_heal()
+  elif scene == "talk":
+    draw_talk()
+  elif scene == "story":
+    draw_story()
   elif scene == "evolve":
     draw_evolve()
   elif scene == "win":
