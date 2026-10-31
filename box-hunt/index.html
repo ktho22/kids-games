@@ -335,6 +335,8 @@ button.hint:active:not(:disabled) { transform:translateY(2px); box-shadow:0 1px 
 const BOX = '📦';
 const PRIZES = ['🧸','🚗','🦖','🎈','🍭','⚽','🪀','🦄','🚀','🍩','🐶','🐱','🐰','🦁','🐼','🐸','🌈','⭐','💎','👑','🎨','🎸','🚂','🚁','🍓','🍦','🧁','🦋','🐬','🪁','🏆','🔮'];
 
+// make-voice.mjs records the lines in this block to voice/*.m4a; rerun `npm run voice` after editing them.
+// VOICE-DATA-START
 // [그림, 이름, 설명 힌트, 수수께끼 힌트]
 const POOLS = {
   forest: [
@@ -461,6 +463,33 @@ const STAGES = [
   { name:'하늘과 우주',pool:'sky',    cols:4, rows:4, boxes:5, level:'riddle', bg:'linear-gradient(160deg,#5b4aa8 0%,#1a1440 100%)' },
   { name:'보물섬',     pool:'all',    cols:4, rows:4, boxes:6, level:'riddle', bg:'linear-gradient(160deg,#ffe29a 0%,#ff9a6b 100%)' },
 ];
+const FINAL_MSG = '모든 상자를 찾았어! 최고의 수수께끼 탐정이야!';
+
+function hasBatchim(word) {
+  const c = word.charCodeAt(word.length - 1);
+  return c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 !== 0;
+}
+function clueFor(item, level) {
+  const [, name, desc, riddle] = item;
+  if (level === 'name') return `${name}${hasBatchim(name) ? '을' : '를'} 찾아봐!`;
+  return level === 'desc' ? desc : riddle;
+}
+const wrongMsg = name => `그건 ${name}${hasBatchim(name) ? '이야' : '야'}. 다시 찾아봐!`;
+const praiseMsg = name => `딩동댕! ${name}${hasBatchim(name) ? '이었어' : '였어'}! 상자 발견!`;
+
+function allPhrases() {
+  const set = new Set([FINAL_MSG]);
+  for (const st of STAGES) for (const item of POOLS[st.pool]) set.add(clueFor(item, st.level));
+  for (const [, name] of POOLS.all) { set.add(wrongMsg(name)); set.add(praiseMsg(name)); }
+  return [...set];
+}
+// FNV-1a: maps a line of text to its recorded file name.
+function voiceKey(text) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
+  return (h >>> 0).toString(16).padStart(8, '0');
+}
+// VOICE-DATA-END
 const SAVE_KEY = 'boxHunt.v1';
 
 let save = loadSave();
@@ -514,42 +543,59 @@ if (canSpeak) {
   speechSynthesis.onvoiceschanged = pickVoice;
 }
 
+try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+const voiceEl = new Audio();
+voiceEl.preload = 'auto';
+
 let speakGen = 0;
 let soundWarned = false;
-// onDone always runs once: when speech ends, fails, or is unavailable.
+// Plays the recorded file for this line; falls back to speechSynthesis if it can't.
+// onDone always runs once: when the line ends, fails, or nothing can play.
 function speak(text, onDone) {
   let done = false;
   const finish = () => { if (!done) { done = true; onDone && onDone(); } };
-  if (!canSpeak) return finish();
   const gen = ++speakGen;
   let started = false;
+  if (canSpeak && (speechSynthesis.speaking || speechSynthesis.pending)) speechSynthesis.cancel();
+
+  let fellBack = false;
+  const fallback = () => {
+    if (gen !== speakGen || started || fellBack) return;
+    fellBack = true;
+    ttsSpeak(text, gen, finish, () => { started = true; });
+  };
+  voiceEl.onplaying = () => { if (gen === speakGen) started = true; };
+  voiceEl.onended = () => { if (gen === speakGen) finish(); };
+  voiceEl.onerror = fallback;
+  voiceEl.src = `voice/${voiceKey(text)}.m4a`;
+  const p = voiceEl.play();
+  if (p) p.catch(err => { if (err.name !== 'AbortError') fallback(); });
+
+  setTimeout(() => {
+    if (gen === speakGen && !started && !soundWarned) {
+      soundWarned = true;
+      toast('🔇 소리가 안 들리면 볼륨을 확인해 주세요');
+    }
+  }, 3000);
+  setTimeout(finish, 15000);
+}
+
+function ttsSpeak(text, gen, finish, onStart) {
+  if (!canSpeak) return finish();
   try {
     const u = new SpeechSynthesisUtterance(text.replace(/["!]/g, ' '));
     u.lang = 'ko-KR';
     if (koVoice) u.voice = koVoice;
     u.rate = 0.95;
     u.pitch = 1.1;
-    u.onstart = () => { started = true; };
+    u.onstart = onStart;
     u.onend = u.onerror = finish;
     window.__utterance = u; // keeps Chrome from garbage-collecting it mid-speech
-    const go = () => { if (gen !== speakGen) return finish(); speechSynthesis.resume(); speechSynthesis.speak(u); };
-    // Safari drops an utterance queued right after cancel(), so only cancel when something is playing.
-    if (speechSynthesis.speaking || speechSynthesis.pending) {
-      speechSynthesis.cancel();
-      setTimeout(go, 150);
-    } else {
-      go();
-    }
+    speechSynthesis.resume();
+    speechSynthesis.speak(u);
   } catch (e) {
-    return finish();
+    finish();
   }
-  setTimeout(() => {
-    if (gen === speakGen && !started && !soundWarned) {
-      soundWarned = true;
-      toast('🔇 소리가 안 들리면 무음 모드와 볼륨을 확인해 주세요');
-    }
-  }, 3000);
-  setTimeout(finish, 8000);
 }
 
 const $ = id => document.getElementById(id);
@@ -561,17 +607,6 @@ function shuffle(a) {
   }
   return a;
 }
-function hasBatchim(word) {
-  const c = word.charCodeAt(word.length - 1);
-  return c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 !== 0;
-}
-
-function clueFor(item, level) {
-  const [, name, desc, riddle] = item;
-  if (level === 'name') return `${name}${hasBatchim(name) ? '을' : '를'} 찾아봐!`;
-  return level === 'desc' ? desc : riddle;
-}
-
 function startStage(i) {
   stageIdx = i;
   const st = STAGES[i];
@@ -648,8 +683,7 @@ function tapTile(k) {
   void t.el.offsetWidth;
   t.el.classList.add('wrong');
   beep([280, 220], 0.1, 'square');
-  const name = t.item[1];
-  const msg = `그건 ${name}${hasBatchim(name) ? '이야' : '야'}. 다시 찾아봐!`;
+  const msg = wrongMsg(t.item[1]);
   toast(msg);
   speak(msg);
   if (missesThisClue >= 2) tiles[targets[clueIdx]].el.classList.add('glow');
@@ -662,10 +696,9 @@ function found(t) {
   t.el.classList.add('open', 'box');
   beep([660, 880, 1320], 0.1, 'triangle');
   burst(t.el);
-  const name = t.item[1];
   let waits = 2;
   const next = () => { if (--waits === 0 && clueIdx < STAGES[stageIdx].boxes) { busy = false; showClue(); } };
-  speak(`딩동댕! ${name}${hasBatchim(name) ? '이었어' : '였어'}! 상자 발견!`, next);
+  speak(praiseMsg(t.item[1]), next);
   setTimeout(next, 1900);
   const prize = pick(PRIZES);
   stagePrizes.push(prize);
@@ -729,7 +762,7 @@ function showClear() {
     $('clearText').innerHTML = `최고의 수수께끼 탐정이에요! 👑<br>보물 가방에 선물이 <b>${save.treasure.length}개</b> 있어요.`;
     $('nextBtn').textContent = '처음부터 다시 🔄';
     beep([523, 659, 784, 1047, 1319], 0.18, 'triangle');
-    speak('모든 상자를 찾았어! 최고의 수수께끼 탐정이야!');
+    speak(FINAL_MSG);
   } else {
     $('clearEmoji').textContent = '🎉';
     $('clearTitle').textContent = `${st.name} 상자를 다 찾았어요!`;
