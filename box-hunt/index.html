@@ -503,16 +503,53 @@ function beep(freqs, dur = 0.12, type = 'sine') {
 }
 
 const canSpeak = 'speechSynthesis' in window;
-function speak(text) {
-  if (!canSpeak) return;
+let koVoice = null;
+function pickVoice() {
+  const vs = speechSynthesis.getVoices();
+  koVoice = vs.find(v => /^ko/i.test(v.lang) && /yuna|유나/i.test(v.name))
+    || vs.find(v => /^ko/i.test(v.lang)) || null;
+}
+if (canSpeak) {
+  pickVoice();
+  speechSynthesis.onvoiceschanged = pickVoice;
+}
+
+let speakGen = 0;
+let soundWarned = false;
+// onDone always runs once: when speech ends, fails, or is unavailable.
+function speak(text, onDone) {
+  let done = false;
+  const finish = () => { if (!done) { done = true; onDone && onDone(); } };
+  if (!canSpeak) return finish();
+  const gen = ++speakGen;
+  let started = false;
   try {
-    speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text.replace(/["!]/g, ' '));
     u.lang = 'ko-KR';
+    if (koVoice) u.voice = koVoice;
     u.rate = 0.95;
     u.pitch = 1.1;
-    speechSynthesis.speak(u);
-  } catch (e) {}
+    u.onstart = () => { started = true; };
+    u.onend = u.onerror = finish;
+    window.__utterance = u; // keeps Chrome from garbage-collecting it mid-speech
+    const go = () => { if (gen !== speakGen) return finish(); speechSynthesis.resume(); speechSynthesis.speak(u); };
+    // Safari drops an utterance queued right after cancel(), so only cancel when something is playing.
+    if (speechSynthesis.speaking || speechSynthesis.pending) {
+      speechSynthesis.cancel();
+      setTimeout(go, 150);
+    } else {
+      go();
+    }
+  } catch (e) {
+    return finish();
+  }
+  setTimeout(() => {
+    if (gen === speakGen && !started && !soundWarned) {
+      soundWarned = true;
+      toast('🔇 소리가 안 들리면 무음 모드와 볼륨을 확인해 주세요');
+    }
+  }, 3000);
+  setTimeout(finish, 8000);
 }
 
 const $ = id => document.getElementById(id);
@@ -626,7 +663,10 @@ function found(t) {
   beep([660, 880, 1320], 0.1, 'triangle');
   burst(t.el);
   const name = t.item[1];
-  speak(`딩동댕! ${name}${hasBatchim(name) ? '이었어' : '였어'}! 상자 발견!`);
+  let waits = 2;
+  const next = () => { if (--waits === 0 && clueIdx < STAGES[stageIdx].boxes) { busy = false; showClue(); } };
+  speak(`딩동댕! ${name}${hasBatchim(name) ? '이었어' : '였어'}! 상자 발견!`, next);
+  setTimeout(next, 1900);
   const prize = pick(PRIZES);
   stagePrizes.push(prize);
   save.treasure.push(prize);
@@ -642,7 +682,6 @@ function found(t) {
     setTimeout(showClear, 1600);
   } else {
     writeSave();
-    setTimeout(() => { busy = false; showClue(); }, 1900);
   }
 }
 
