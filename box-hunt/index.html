@@ -36,6 +36,8 @@ header {
   gap:8px;
 }
 header a.back, .chip {
+  font-family:inherit;
+  cursor:pointer;
   text-decoration:none;
   background:rgba(255,255,255,0.75);
   padding:8px 14px;
@@ -47,7 +49,7 @@ header a.back, .chip {
   white-space:nowrap;
 }
 h1 {
-  font-size:1.6em;
+  font-size:1.5em;
   color:#fff;
   text-shadow:0 2px 0 rgba(0,0,0,0.18);
   text-align:center;
@@ -63,7 +65,7 @@ h1 {
   margin-bottom:10px;
 }
 .found {
-  font-size:1.25em;
+  font-size:1.1em;
   font-weight:600;
   background:rgba(255,255,255,0.85);
   padding:6px 14px;
@@ -82,9 +84,50 @@ button.hint {
   border-radius:16px;
   box-shadow:0 3px 0 #e0c560;
   cursor:pointer;
+  white-space:nowrap;
 }
 button.hint:disabled { opacity:0.45; cursor:default; }
 button.hint:active:not(:disabled) { transform:translateY(2px); box-shadow:0 1px 0 #e0c560; }
+
+.clue {
+  width:100%;
+  max-width:640px;
+  background:#fff;
+  border-radius:20px;
+  padding:14px 16px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  box-shadow:0 4px 0 rgba(0,0,0,0.12), 0 6px 16px rgba(0,0,0,0.12);
+  margin-bottom:12px;
+  min-height:84px;
+}
+.clue .mag { font-size:2em; flex-shrink:0; }
+.clue .text {
+  flex:1;
+  font-size:1.25em;
+  font-weight:600;
+  line-height:1.4;
+  color:#3b2d6b;
+  word-break:keep-all;
+}
+.clue.new { animation:clueIn 0.45s ease; }
+@keyframes clueIn {
+  0% { transform:scale(0.9); opacity:0.3; }
+  60% { transform:scale(1.03); }
+  100% { transform:scale(1); opacity:1; }
+}
+.clue button.speak {
+  font-size:1.6em;
+  border:none;
+  background:#eef3ff;
+  border-radius:50%;
+  width:52px;
+  height:52px;
+  flex-shrink:0;
+  cursor:pointer;
+}
+.clue button.speak:active { transform:scale(0.92); }
 
 #field {
   flex:1;
@@ -95,17 +138,14 @@ button.hint:active:not(:disabled) { transform:translateY(2px); box-shadow:0 1px 
   justify-content:center;
   min-height:0;
 }
-#grid {
-  display:grid;
-  gap:8px;
-}
+#grid { display:grid; gap:10px; }
 .tile {
   position:relative;
-  border-radius:18%;
-  background:rgba(255,255,255,0.35);
-  border:3px solid rgba(255,255,255,0.6);
+  border-radius:20%;
+  background:rgba(255,255,255,0.55);
+  border:3px solid rgba(255,255,255,0.85);
+  box-shadow:0 3px 0 rgba(0,0,0,0.08);
   cursor:pointer;
-  overflow:visible;
 }
 .tile .under, .tile .cover {
   position:absolute;
@@ -113,27 +153,31 @@ button.hint:active:not(:disabled) { transform:translateY(2px); box-shadow:0 1px 
   display:flex;
   align-items:center;
   justify-content:center;
-  font-size:calc(var(--cell) * 0.58);
+  font-size:calc(var(--cell) * 0.6);
   line-height:1;
 }
 .tile .under { opacity:0; transform:scale(0.4); transition:all 0.3s; }
 .tile .cover {
   transition:transform 0.45s cubic-bezier(.3,1.6,.5,1), opacity 0.45s;
-  filter:drop-shadow(0 4px 2px rgba(0,0,0,0.18));
+  filter:drop-shadow(0 3px 2px rgba(0,0,0,0.15));
 }
-.tile:not(.open):hover .cover { transform:scale(1.08) rotate(-4deg); }
+.tile:not(.open):active .cover { transform:scale(0.9); }
 .tile.open { cursor:default; }
 .tile.open .cover { transform:translateY(-70%) rotate(-20deg) scale(0.7); opacity:0; }
 .tile.open .under { opacity:1; transform:scale(1); }
-.tile.open.empty { background:rgba(255,255,255,0.15); border-color:rgba(255,255,255,0.3); }
-.tile.open.empty .under { opacity:0.55; font-size:calc(var(--cell) * 0.4); }
 .tile.open.box {
-  background:rgba(255,236,140,0.9);
+  background:rgba(255,236,140,0.95);
   border-color:#ffd23f;
   box-shadow:0 0 18px 4px rgba(255,210,63,0.75);
 }
 .tile.open.box .under { animation:pop 0.6s ease; }
+.tile.wrong { animation:shake 0.4s ease; }
 .tile.hinting .cover { animation:wiggle 0.5s ease 3; }
+.tile.glow {
+  border-color:#ffd23f;
+  box-shadow:0 0 0 4px rgba(255,210,63,0.6), 0 0 20px 6px rgba(255,210,63,0.6);
+  animation:pulse 1s ease infinite;
+}
 @keyframes pop {
   0% { transform:scale(0.3); }
   60% { transform:scale(1.35) rotate(8deg); }
@@ -143,6 +187,15 @@ button.hint:active:not(:disabled) { transform:translateY(2px); box-shadow:0 1px 
   0%,100% { transform:rotate(0); }
   25% { transform:rotate(-14deg) scale(1.1); }
   75% { transform:rotate(14deg) scale(1.1); }
+}
+@keyframes shake {
+  0%,100% { transform:translateX(0); }
+  20%,60% { transform:translateX(-8px); }
+  40%,80% { transform:translateX(8px); }
+}
+@keyframes pulse {
+  0%,100% { transform:scale(1); }
+  50% { transform:scale(1.06); }
 }
 .spark {
   position:fixed;
@@ -155,6 +208,23 @@ button.hint:active:not(:disabled) { transform:translateY(2px); box-shadow:0 1px 
   from { transform:translate(0,0) scale(1); opacity:1; }
   to { transform:translate(var(--dx),var(--dy)) scale(0.4); opacity:0; }
 }
+.toast {
+  position:fixed;
+  left:50%;
+  bottom:calc(28px + env(safe-area-inset-bottom));
+  transform:translateX(-50%) translateY(20px);
+  background:rgba(40,30,80,0.88);
+  color:#fff;
+  padding:10px 20px;
+  border-radius:20px;
+  font-size:1.1em;
+  opacity:0;
+  transition:all 0.25s;
+  pointer-events:none;
+  z-index:25;
+  white-space:nowrap;
+}
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
 
 .overlay {
   position:fixed;
@@ -179,7 +249,7 @@ button.hint:active:not(:disabled) { transform:translateY(2px); box-shadow:0 1px 
 }
 .panel .big { font-size:3.4em; margin-bottom:6px; }
 .panel h2 { font-size:1.6em; margin-bottom:8px; }
-.panel p { color:#555; font-size:1.05em; line-height:1.5; margin-bottom:14px; }
+.panel p { color:#555; font-size:1.05em; line-height:1.5; margin-bottom:14px; word-break:keep-all; }
 .stars { font-size:2.2em; margin-bottom:10px; letter-spacing:4px; }
 .stars .off { filter:grayscale(1); opacity:0.3; }
 .prizes { font-size:1.8em; margin-bottom:14px; letter-spacing:4px; }
@@ -211,8 +281,8 @@ button.hint:active:not(:disabled) { transform:translateY(2px); box-shadow:0 1px 
 <body>
   <header>
     <a class="back" href="../">← Back</a>
-    <h1 id="title">📦 숨은 상자 찾기</h1>
-    <button class="chip" id="treasureBtn" style="font-family:inherit;cursor:pointer;">🎒 <span id="treasureCount">0</span></button>
+    <h1>📦 숨은 상자 찾기</h1>
+    <button class="chip" id="treasureBtn">🎒 <span id="treasureCount">0</span></button>
   </header>
 
   <div class="status">
@@ -220,13 +290,20 @@ button.hint:active:not(:disabled) { transform:translateY(2px); box-shadow:0 1px 
     <button class="hint" id="hintBtn">💡 힌트 <span id="hintLeft">3</span></button>
   </div>
 
+  <div class="clue" id="clue">
+    <span class="mag">🔍</span>
+    <span class="text" id="clueText"></span>
+    <button class="speak" id="speakBtn" aria-label="다시 듣기">🔊</button>
+  </div>
+
   <div id="field"><div id="grid"></div></div>
+  <div class="toast" id="toast"></div>
 
   <div class="overlay" id="startOverlay">
     <div class="panel">
       <div class="big">📦🔍</div>
       <h2>숨은 상자 찾기</h2>
-      <p>나무, 조개, 눈사람 밑에<br>상자가 숨어 있어요!<br>톡 눌러서 <b>상자를 모두</b> 찾아보세요.<br>상자 안에는 선물이 들어 있어요 🎁</p>
+      <p>위에 나오는 <b>힌트</b>를 잘 듣고<br>딱 맞는 그림을 톡 눌러 보세요!<br>그 밑에 상자가 숨어 있어요 🎁</p>
       <button id="startBtn">시작!</button>
       <div id="resumeWrap" style="display:none; margin-top:6px;">
         <button class="alt" id="fromStartBtn">처음부터</button>
@@ -257,30 +334,150 @@ button.hint:active:not(:disabled) { transform:translateY(2px); box-shadow:0 1px 
 <script>
 const BOX = '📦';
 const PRIZES = ['🧸','🚗','🦖','🎈','🍭','⚽','🪀','🦄','🚀','🍩','🐶','🐱','🐰','🦁','🐼','🐸','🌈','⭐','💎','👑','🎨','🎸','🚂','🚁','🍓','🍦','🧁','🦋','🐬','🪁','🏆','🔮'];
+
+// [그림, 이름, 설명 힌트, 수수께끼 힌트]
+const POOLS = {
+  forest: [
+    ['🐿️','다람쥐','도토리를 볼에 잔뜩 넣는 작은 동물을 찾아봐!','나는 꼬리가 복슬복슬해. 겨울이 오기 전에 도토리를 숨겨 두지. 나는 누구일까?'],
+    ['🦉','부엉이','밤에 눈을 크게 뜨고 "부엉부엉" 우는 새를 찾아봐!','나는 낮에는 자고 밤에 깨어 있어. 고개를 빙글 돌릴 수 있지. 나는 누구일까?'],
+    ['🐻','곰','꿀을 좋아하는 커다란 동물을 찾아봐!','나는 덩치가 아주 커. 겨울에는 동굴에서 겨울잠을 자. 나는 누구일까?'],
+    ['🦊','여우','주황색 털에 꼬리가 풍성한 동물을 찾아봐!','나는 강아지랑 닮았지만 털이 주황색이야. 꾀가 많다고들 해. 나는 누구일까?'],
+    ['🐰','토끼','귀가 길고 깡충깡충 뛰는 동물을 찾아봐!','나는 거북이랑 달리기 시합을 했다가 낮잠을 자서 졌어. 나는 누구일까?'],
+    ['🦔','고슴도치','등에 뾰족한 가시가 잔뜩 난 동물을 찾아봐!','나는 무서우면 몸을 동그랗게 말아. 그러면 가시 공이 되지! 나는 누구일까?'],
+    ['🐌','달팽이','등에 동그란 집을 지고 다니는 친구를 찾아봐!','나는 아주아주 느려. 비 오는 날 나와서 끈적한 길을 남기지. 나는 누구일까?'],
+    ['🐞','무당벌레','빨간 등에 까만 점이 있는 벌레를 찾아봐!','나는 작고 동글동글해. 빨간 옷에 까만 물방울 무늬가 있어. 나는 누구일까?'],
+    ['🦋','나비','알록달록한 날개로 꽃 사이를 나는 곤충을 찾아봐!','나는 원래 꿈틀꿈틀 애벌레였어. 번데기에서 나와 날개가 생겼지. 나는 누구일까?'],
+    ['🍄','버섯','빨간 모자에 하얀 점이 있는 걸 찾아봐!','나는 비 온 뒤에 숲에서 쑥쑥 자라. 모자를 쓰고 있지만 사람은 아니야. 나는 무엇일까?'],
+    ['🐸','개구리','초록색이고 "개굴개굴" 우는 친구를 찾아봐!','나는 어릴 때 꼬리가 있는 올챙이였어. 긴 혀로 파리를 잡아. 나는 누구일까?'],
+    ['🦌','사슴','머리에 나뭇가지 같은 뿔이 있는 동물을 찾아봐!','나는 다리가 길고 날씬해. 산타 할아버지 썰매를 끄는 친구랑 닮았어. 나는 누구일까?'],
+    ['🐝','꿀벌','노랗고 까만 줄무늬에 "윙윙" 나는 곤충을 찾아봐!','나는 꽃에서 꽃으로 날아다니며 달콤한 꿀을 모아. 나는 누구일까?'],
+  ],
+  fruit: [
+    ['🍎','사과','빨갛고 아삭아삭한 동그란 과일을 찾아봐!','백설공주가 한 입 먹고 잠이 든 과일이야. 나는 무엇일까?'],
+    ['🍌','바나나','노랗고 길쭉하게 휜 과일을 찾아봐!','원숭이가 제일 좋아하는 과일이야. 껍질을 쭉쭉 벗겨 먹지. 나는 무엇일까?'],
+    ['🍇','포도','보라색 작은 알이 송이송이 달린 과일을 찾아봐!','나는 작은 알맹이가 여러 개 모여 한 송이가 돼. 주스로 만들면 보라색이야. 나는 무엇일까?'],
+    ['🍓','딸기','빨갛고 겉에 씨가 콕콕 박힌 과일을 찾아봐!','나는 초록 잎 모자를 썼어. 케이크 위에 자주 올라가지. 나는 무엇일까?'],
+    ['🍉','수박','겉은 초록 줄무늬, 속은 빨간 커다란 과일을 찾아봐!','나는 여름에 제일 인기가 많아. 까만 씨를 퉤퉤 뱉으며 먹지. 나는 무엇일까?'],
+    ['🍊','귤','주황색이고 껍질을 손으로 까먹는 과일을 찾아봐!','나는 겨울에 이불 속에서 까먹으면 맛있어. 많이 먹으면 손이 노래져. 나는 무엇일까?'],
+    ['🍍','파인애플','겉이 울퉁불퉁하고 머리에 뾰족한 잎이 난 과일을 찾아봐!','나는 머리에 왕관 같은 잎이 있어. 겉은 거칠지만 속은 노랗고 달콤해. 나는 무엇일까?'],
+    ['🥝','키위','겉은 갈색 털, 속은 초록색인 과일을 찾아봐!','나랑 이름이 같은 새가 있어. 반으로 자르면 까만 씨가 동그랗게 있지. 나는 무엇일까?'],
+    ['🍒','체리','빨간 열매 두 개가 줄기로 붙어 있는 걸 찾아봐!','나는 작고 동그란 쌍둥이야. 긴 줄기로 서로 손을 잡고 있지. 나는 무엇일까?'],
+    ['🥕','당근','주황색이고 길쭉한 뾰족 채소를 찾아봐!','나는 땅속에서 자라. 토끼가 나를 제일 좋아해. 나는 무엇일까?'],
+    ['🌽','옥수수','노란 알갱이가 줄줄이 붙은 걸 찾아봐!','나를 튀기면 팝콘이 돼! 나는 무엇일까?'],
+    ['🍋','레몬','노랗고 아주아주 신 과일을 찾아봐!','나를 먹으면 얼굴이 찡그려져. 너무 시거든! 나는 무엇일까?'],
+    ['🍑','복숭아','분홍빛이고 겉에 보송보송 솜털이 있는 과일을 찾아봐!','나는 엉덩이처럼 생겼어. 말랑말랑하고 달콤해. 나는 무엇일까?'],
+  ],
+  sea: [
+    ['🐙','문어','동그란 머리에 다리가 여덟 개인 바다 동물을 찾아봐!','나는 바위 틈에 숨는 걸 좋아해. 다리가 여덟 개고, 다리마다 빨판이 있어. 나는 누구일까?'],
+    ['🦑','오징어','다리가 열 개이고 몸이 길쭉한 바다 동물을 찾아봐!','나를 말리면 맛있는 간식이 돼. 다리는 열 개야. 나는 누구일까?'],
+    ['🦀','게','옆으로 걷고 집게발이 있는 친구를 찾아봐!','나는 앞으로 못 걷고 옆으로만 걸어. 집게로 콕 집지! 나는 누구일까?'],
+    ['🐬','돌고래','똑똑하고 점프를 잘하는 바다 친구를 찾아봐!','나는 물고기처럼 생겼지만 숨을 쉬러 물 위로 올라와. "끼익끼익" 소리로 친구랑 이야기해. 나는 누구일까?'],
+    ['🐳','고래','바다에서 제일 큰 동물을 찾아봐!','나는 머리 위 구멍으로 물을 "푸우" 뿜어. 몸이 버스보다 커! 나는 누구일까?'],
+    ['🦈','상어','날카로운 이빨과 뾰족한 등지느러미가 있는 물고기를 찾아봐!','나는 바다의 사냥꾼이야. 아기, 엄마, 아빠, 할머니까지 노래에 나오지! 나는 누구일까?'],
+    ['🐢','거북이','등에 단단한 등딱지가 있는 친구를 찾아봐!','나는 토끼랑 달리기 시합을 해서 이겼어. 느리지만 꾸준하지! 나는 누구일까?'],
+    ['🐡','복어','화나면 공처럼 빵빵하게 부푸는 물고기를 찾아봐!','나는 물고기야. 깜짝 놀라면 몸을 동그랗게 빵빵 부풀려. 나는 누구일까?'],
+    ['🦞','랍스터','꼬리가 길고 커다란 집게발을 가진 빨간 바다 동물을 찾아봐!','나는 게랑 친척인데 꼬리가 길어. 삶으면 더 새빨개져. 나는 누구일까?'],
+    ['🐠','열대어','알록달록 줄무늬가 있는 작은 물고기를 찾아봐!','나는 따뜻한 바다 산호 사이에서 헤엄쳐. 어항에서도 볼 수 있지. 나는 누구일까?'],
+    ['🪼','해파리','투명하고 흐물흐물한 바다 친구를 찾아봐!','나는 뼈가 없어서 흐늘흐늘해. 긴 다리에 닿으면 따끔해! 나는 누구일까?'],
+    ['🦐','새우','몸이 굽어 있고 수염이 긴 작은 바다 동물을 찾아봐!','나는 등이 굽어 있어. 튀김으로 만들면 아주 맛있지. 나는 누구일까?'],
+    ['🐚','조개','단단한 껍데기를 열었다 닫았다 하는 걸 찾아봐!','나를 귀에 대면 바다 소리가 들려. 내 안에서 진주가 생기기도 해. 나는 무엇일까?'],
+  ],
+  zoo: [
+    ['🐘','코끼리','코가 아주 길고 귀가 큰 동물을 찾아봐!','나는 코로 물을 빨아들여 샤워를 해. 땅에 사는 동물 중에 제일 커. 나는 누구일까?'],
+    ['🦒','기린','목이 아주아주 긴 동물을 찾아봐!','나는 키가 커서 높은 나무 잎을 먹어. 몸에 갈색 무늬가 있지. 나는 누구일까?'],
+    ['🦁','사자','머리 둘레에 멋진 갈기가 있는 동물을 찾아봐!','나는 동물의 왕이라고 불려. "어흥" 하고 울면 다들 깜짝 놀라. 나는 누구일까?'],
+    ['🐯','호랑이','주황색에 까만 줄무늬가 있는 동물을 찾아봐!','옛날이야기에서 "떡 하나 주면 안 잡아먹지!" 했어. 나는 누구일까?'],
+    ['🐵','원숭이','나무를 잘 타고 "끽끽" 우는 동물을 찾아봐!','나는 나무 사이를 휙휙 건너가. 바나나를 제일 좋아해. 나는 누구일까?'],
+    ['🦓','얼룩말','하얗고 까만 줄무늬 옷을 입은 말을 찾아봐!','나는 말이랑 닮았는데 온몸에 줄무늬가 있어. 나는 누구일까?'],
+    ['🐼','판다','하얀 몸에 눈 주위가 까만 곰을 찾아봐!','나는 대나무를 하루 종일 냠냠 먹어. 나는 누구일까?'],
+    ['🦛','하마','입이 아주 크고 물속에 있기를 좋아하는 동물을 찾아봐!','나는 덩치가 커. 하품하면 입이 엄청 커다래져! 나는 누구일까?'],
+    ['🐊','악어','이빨이 뾰족하고 꼬리가 긴 초록색 동물을 찾아봐!','나는 물속에 숨어 눈만 쏙 내밀고 있어. 후크 선장이 나를 무서워해. 나는 누구일까?'],
+    ['🦘','캥거루','배에 주머니가 있는 동물을 찾아봐!','나는 아기를 배 주머니에 넣고 껑충껑충 뛰어다녀. 나는 누구일까?'],
+    ['🐧','펭귄','뒤뚱뒤뚱 걷고 하늘을 못 나는 새를 찾아봐!','나는 추운 남극에 살아. 까만 턱시도를 입은 것 같지. 나는 누구일까?'],
+    ['🦩','플라밍고','분홍색이고 다리가 가느다란 새를 찾아봐!','나는 한 다리로 서서 잠을 자. 온몸이 분홍색이야. 나는 누구일까?'],
+    ['🐨','코알라','나무에 매달려 자는 회색 동물을 찾아봐!','나는 하루에 거의 20시간을 자. 유칼립투스 잎만 먹어. 나는 누구일까?'],
+  ],
+  ride: [
+    ['🚗','자동차','빨간 자동차를 찾아봐!','나는 바퀴가 네 개야. 엄마 아빠가 운전해서 가족이 함께 타. 나는 무엇일까?'],
+    ['🚌','버스','사람이 많이 타는 긴 차를 찾아봐!','나는 정류장마다 멈춰서 사람들을 태워. 나는 무엇일까?'],
+    ['🚒','소방차','긴 사다리가 달린 빨간 차를 찾아봐!','나는 "애앵애앵" 달려가서 불을 꺼. 나는 무엇일까?'],
+    ['🚓','경찰차','지붕에 빨강 파랑 불빛이 있는 차를 찾아봐!','나는 나쁜 사람을 잡으러 출동해! 나는 무엇일까?'],
+    ['🚑','구급차','하얀색이고 아픈 사람을 태우는 차를 찾아봐!','나는 다친 사람을 태워서 병원으로 빨리 달려가. 나는 무엇일까?'],
+    ['🚂','기차','"칙칙폭폭" 연기를 내며 달리는 걸 찾아봐!','나는 길쭉한 칸이 줄줄이 이어져 있어. 철길 위로만 달려. 나는 무엇일까?'],
+    ['✈️','비행기','날개가 있고 하늘을 나는 탈것을 찾아봐!','나를 타면 아주 먼 나라까지 갈 수 있어. 공항에서 출발하지. 나는 무엇일까?'],
+    ['🚁','헬리콥터','머리 위에 프로펠러가 빙글빙글 도는 탈것을 찾아봐!','나는 활주로 없이도 제자리에서 하늘로 쑥 올라가. 나는 무엇일까?'],
+    ['🚀','로켓','우주로 날아가는 뾰족한 탈것을 찾아봐!','나는 "셋, 둘, 하나, 발사!" 하면 불을 뿜으며 하늘 높이 날아가. 나는 무엇일까?'],
+    ['🚲','자전거','바퀴가 두 개이고 발로 페달을 돌리는 걸 찾아봐!','나는 엔진이 없어. 네가 발로 열심히 굴려야 앞으로 가. 나는 무엇일까?'],
+    ['⛵','돛단배','바람을 받는 큰 천이 달린 배를 찾아봐!','나는 바다 위에 떠 있어. 바람이 불어야 앞으로 갈 수 있지. 나는 무엇일까?'],
+    ['🚜','트랙터','농장에서 밭을 가는 큰 바퀴 차를 찾아봐!','나는 뒷바퀴가 아주 커. 농부 아저씨랑 같이 일해. 나는 무엇일까?'],
+    ['🏍️','오토바이','바퀴 두 개에 엔진이 달린 걸 찾아봐!','나는 "부릉부릉" 소리를 내며 골목을 쌩쌩 달려. 헬멧을 꼭 써야 해. 나는 무엇일까?'],
+  ],
+  room: [
+    ['🧸','곰 인형','폭신폭신한 곰 인형을 찾아봐!','나는 밤마다 너랑 같이 자. 꼭 껴안으면 포근해. 나는 무엇일까?'],
+    ['⚽','축구공','하얗고 까만 무늬가 있는 공을 찾아봐!','나를 발로 뻥 차서 골대에 넣으면 "골인!" 나는 무엇일까?'],
+    ['🎈','풍선','줄이 달려 있고 둥실둥실 뜨는 걸 찾아봐!','나는 바람을 넣으면 빵빵해지고, 손을 놓으면 하늘로 날아가. 나는 무엇일까?'],
+    ['🖍️','크레용','종이에 색칠할 때 쓰는 걸 찾아봐!','나는 종이 위에서 쓱쓱 문지르면 색이 나와. 나는 무엇일까?'],
+    ['📚','책','이야기와 그림이 가득한 걸 찾아봐!','나를 펼치면 재미있는 이야기가 나와. 자기 전에 엄마가 읽어 주지. 나는 무엇일까?'],
+    ['⏰','시계','"따르릉" 울려서 아침에 깨워 주는 걸 찾아봐!','나는 바늘이 빙글빙글 돌아. 몇 시인지 알려 줘. 나는 무엇일까?'],
+    ['🪥','칫솔','이를 닦을 때 쓰는 걸 찾아봐!','나는 치약이랑 단짝이야. 아침저녁으로 입안을 깨끗하게 해. 나는 무엇일까?'],
+    ['🧦','양말','신발 신기 전에 발에 먼저 신는 걸 찾아봐!','나는 늘 두 짝이 함께 다녀. 그런데 빨래하면 한 짝이 자꾸 없어져! 나는 무엇일까?'],
+    ['👟','운동화','끈을 묶어서 신는 신발을 찾아봐!','나를 신으면 빨리 달릴 수 있어. 현관에서 너를 기다리고 있지. 나는 무엇일까?'],
+    ['🎸','기타','줄을 튕겨서 소리를 내는 악기를 찾아봐!','나는 줄이 여섯 개야. "띵가띵가" 노래에 맞춰 연주해. 나는 무엇일까?'],
+    ['🥁','북','채로 "둥둥" 두드리는 악기를 찾아봐!','나는 두드릴수록 소리가 커져. 행진할 때 앞장서. 나는 무엇일까?'],
+    ['☂️','우산','비 올 때 펼쳐서 쓰는 걸 찾아봐!','나는 맑은 날엔 접혀 있다가 비가 오면 활짝 펴져. 나는 무엇일까?'],
+    ['🔑','열쇠','문을 열 때 쓰는 작은 걸 찾아봐!','나는 자물쇠랑 짝꿍이야. 구멍에 넣고 돌리면 "철컥!" 나는 무엇일까?'],
+    ['🪁','연','바람 부는 날 하늘 높이 날리는 걸 찾아봐!','나는 긴 줄에 매달려 하늘에서 춤을 춰. 설날에 많이 날리지. 나는 무엇일까?'],
+    ['🪀','요요','줄에 매달려 오르락내리락하는 장난감을 찾아봐!','나는 손가락에 줄을 걸고 던지면 다시 손으로 돌아와. 나는 무엇일까?'],
+    ['🛁','욕조','물을 받아 몸을 씻는 곳을 찾아봐!','나에게 물을 가득 채우면 고무 오리가 둥둥 떠. 나는 무엇일까?'],
+  ],
+  sky: [
+    ['☀️','해','낮에 하늘에서 뜨겁게 빛나는 걸 찾아봐!','나는 아침에 떠서 저녁에 져. 나 덕분에 낮이 밝아. 나는 무엇일까?'],
+    ['🌙','달','밤하늘의 노란 초승달을 찾아봐!','나는 밤에만 나와. 날마다 모양이 조금씩 바뀌어. 나는 무엇일까?'],
+    ['⭐','별','뾰족뾰족 모서리가 다섯 개인 걸 찾아봐!','나는 밤하늘에서 반짝반짝 빛나. 작은 나를 부르는 노래도 있어! 나는 무엇일까?'],
+    ['☁️','구름','하늘에 둥실 떠 있는 하얀 솜 같은 걸 찾아봐!','나는 솜사탕처럼 생겼어. 나한테서 비가 내려. 나는 무엇일까?'],
+    ['🌈','무지개','일곱 가지 색깔 다리를 찾아봐!','나는 비가 그친 뒤 해가 나면 하늘에 생겨. 빨주노초파남보! 나는 무엇일까?'],
+    ['⚡','번개','하늘에서 "번쩍" 하는 지그재그를 찾아봐!','나는 "번쩍!" 하고 나면 "우르릉 쾅쾅" 천둥이 따라와. 나는 무엇일까?'],
+    ['❄️','눈송이','하얗고 차가운 눈 결정을 찾아봐!','나는 겨울 하늘에서 사뿐사뿐 내려와. 손에 닿으면 녹아 버려. 나는 무엇일까?'],
+    ['🪐','토성','둥근 고리를 두른 행성을 찾아봐!','나는 우주에 사는 행성이야. 허리에 커다란 훌라후프를 두르고 있어. 나는 무엇일까?'],
+    ['☄️','혜성','긴 불꽃 꼬리를 달고 날아가는 걸 찾아봐!','나는 우주를 날아가며 반짝이는 긴 꼬리를 남겨. 나는 무엇일까?'],
+    ['🌍','지구','우리가 사는 파랗고 초록색인 행성을 찾아봐!','나는 바다와 땅이 있는 행성이야. 너도 나한테 살고 있어! 나는 무엇일까?'],
+    ['🔥','불','뜨겁고 활활 타오르는 걸 찾아봐!','나는 뜨거워서 만지면 안 돼. 캠핑 가서 마시멜로를 구울 때 필요해. 나는 무엇일까?'],
+    ['💧','물방울','"똑똑" 떨어지는 파란 물방울을 찾아봐!','나는 수도꼭지에서 "똑, 똑" 떨어져. 나는 무엇일까?'],
+    ['🌋','화산','꼭대기에서 불이 뿜어져 나오는 산을 찾아봐!','나는 산인데 화가 나면 뜨거운 용암을 "펑!" 뿜어. 나는 무엇일까?'],
+    ['🌪️','회오리바람','빙글빙글 도는 바람을 찾아봐!','나는 바람이 빙글빙글 돌면서 물건을 하늘로 휙 날려 버려. 나는 무엇일까?'],
+    ['🛸','비행접시','외계인이 타는 둥근 접시 모양 탈것을 찾아봐!','나는 접시처럼 납작하고 동그래. 다른 별에서 지구로 날아와. 나는 무엇일까?'],
+    ['🧑‍🚀','우주비행사','헬멧을 쓰고 우주에 가는 사람을 찾아봐!','나는 로켓을 타고 우주에 가. 우주에서는 몸이 둥둥 떠다녀. 나는 누구일까?'],
+  ],
+};
+POOLS.all = Object.values(POOLS).flat();
+
 const STAGES = [
-  { name:'숲속',     cols:3, rows:3, boxes:2, covers:['🌳','🌲','🌳','🍄'], empties:['🐛','🍂','🐜','🌰'], bg:'linear-gradient(160deg,#c3f0ca 0%,#6fcf87 100%)' },
-  { name:'바닷가',   cols:4, rows:3, boxes:3, covers:['🐚','🪨','🏖️','🦀'], empties:['🌊','🫧','🦐','⭐'], bg:'linear-gradient(160deg,#a8e6ff 0%,#ffe5a8 100%)' },
-  { name:'내 방',    cols:4, rows:4, boxes:3, covers:['🛋️','🧺','📚','🪑'], empties:['🧦','🖍️','🧩','🪙'], bg:'linear-gradient(160deg,#ffd6e8 0%,#c9b6ff 100%)' },
-  { name:'눈 나라',  cols:5, rows:4, boxes:4, covers:['⛄','🌲','🏔️','☃️'], empties:['❄️','🧤','🧣','🐧'], bg:'linear-gradient(160deg,#e8f6ff 0%,#a9c9ef 100%)' },
-  { name:'꽃밭',     cols:5, rows:5, boxes:4, covers:['🌻','🌷','🌹','🌼'], empties:['🐝','🐞','🦋','🐌'], bg:'linear-gradient(160deg,#fff6b0 0%,#9be08f 100%)' },
-  { name:'바닷속',   cols:6, rows:5, boxes:5, covers:['🪸','🐙','🐠','🪼'], empties:['🫧','🦑','🐟','🐡'], bg:'linear-gradient(160deg,#5ec8f2 0%,#1d6fa8 100%)' },
-  { name:'우주',     cols:6, rows:6, boxes:5, covers:['🪐','🌑','☄️','🛸'], empties:['✨','👽','🛰️','🌟'], bg:'linear-gradient(160deg,#4b3a8f 0%,#14102e 100%)' },
-  { name:'보물섬',   cols:6, rows:6, boxes:6, covers:['🌴','🏝️','🪨','⛰️'], empties:['🦜','🐒','🥥','🦴'], bg:'linear-gradient(160deg,#ffe29a 0%,#ff9a6b 100%)' },
+  { name:'숲속',       pool:'forest', cols:3, rows:3, boxes:3, level:'name',   bg:'linear-gradient(160deg,#c3f0ca 0%,#6fcf87 100%)' },
+  { name:'과일가게',   pool:'fruit',  cols:3, rows:3, boxes:3, level:'desc',   bg:'linear-gradient(160deg,#fff1c1 0%,#ffb88c 100%)' },
+  { name:'바닷속',     pool:'sea',    cols:4, rows:3, boxes:4, level:'desc',   bg:'linear-gradient(160deg,#7fd6f7 0%,#2a7fc0 100%)' },
+  { name:'동물원',     pool:'zoo',    cols:4, rows:3, boxes:4, level:'desc',   bg:'linear-gradient(160deg,#fff6b0 0%,#9be08f 100%)' },
+  { name:'탈것 마을',  pool:'ride',   cols:4, rows:3, boxes:4, level:'riddle', bg:'linear-gradient(160deg,#e3ecf7 0%,#93abc9 100%)' },
+  { name:'내 방',      pool:'room',   cols:4, rows:4, boxes:5, level:'riddle', bg:'linear-gradient(160deg,#ffd6e8 0%,#c9b6ff 100%)' },
+  { name:'하늘과 우주',pool:'sky',    cols:4, rows:4, boxes:5, level:'riddle', bg:'linear-gradient(160deg,#5b4aa8 0%,#1a1440 100%)' },
+  { name:'보물섬',     pool:'all',    cols:4, rows:4, boxes:6, level:'riddle', bg:'linear-gradient(160deg,#ffe29a 0%,#ff9a6b 100%)' },
 ];
 const SAVE_KEY = 'boxHunt.v1';
 
 let save = loadSave();
 let stageIdx = 0;
 let tiles = [];
-let found = 0;
-let taps = 0;
+let targets = [];
+let clueIdx = 0;
+let misses = 0;
+let missesThisClue = 0;
 let hints = 3;
+let busy = false;
 let stagePrizes = [];
 
 function loadSave() {
   try {
     const s = JSON.parse(localStorage.getItem(SAVE_KEY));
-    if (s && Array.isArray(s.treasure)) return { stage: s.stage || 0, treasure: s.treasure };
+    if (s && Array.isArray(s.treasure)) return { stage: Math.min(s.stage || 0, STAGES.length - 1), treasure: s.treasure };
   } catch (e) {}
   return { stage: 0, treasure: [] };
 }
@@ -305,6 +502,19 @@ function beep(freqs, dur = 0.12, type = 'sine') {
   } catch (e) {}
 }
 
+const canSpeak = 'speechSynthesis' in window;
+function speak(text) {
+  if (!canSpeak) return;
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text.replace(/["!]/g, ' '));
+    u.lang = 'ko-KR';
+    u.rate = 0.95;
+    u.pitch = 1.1;
+    speechSynthesis.speak(u);
+  } catch (e) {}
+}
+
 const $ = id => document.getElementById(id);
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 function shuffle(a) {
@@ -314,39 +524,60 @@ function shuffle(a) {
   }
   return a;
 }
+function hasBatchim(word) {
+  const c = word.charCodeAt(word.length - 1);
+  return c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 !== 0;
+}
+
+function clueFor(item, level) {
+  const [, name, desc, riddle] = item;
+  if (level === 'name') return `${name}${hasBatchim(name) ? '을' : '를'} 찾아봐!`;
+  return level === 'desc' ? desc : riddle;
+}
 
 function startStage(i) {
   stageIdx = i;
   const st = STAGES[i];
   document.body.style.setProperty('--bg', st.bg);
   $('stageLabel').textContent = `${i + 1}단계 ${st.name}`;
-  found = 0; taps = 0; hints = 3; stagePrizes = [];
+  clueIdx = 0; misses = 0; missesThisClue = 0; hints = 3; busy = false; stagePrizes = [];
   $('hintLeft').textContent = hints;
   $('hintBtn').disabled = false;
 
-  const total = st.cols * st.rows;
-  const contents = shuffle(Array.from({ length: total }, (_, k) => k < st.boxes));
+  const items = shuffle([...POOLS[st.pool]]).slice(0, st.cols * st.rows);
+  targets = shuffle(items.map((_, k) => k)).slice(0, st.boxes);
   const grid = $('grid');
   grid.innerHTML = '';
-  grid.style.gridTemplateColumns = `repeat(${st.cols}, 1fr)`;
-  tiles = contents.map((isBox, k) => {
+  tiles = items.map((item, k) => {
     const el = document.createElement('div');
     el.className = 'tile';
-    el.innerHTML = `<div class="under">${isBox ? BOX : pick(st.empties)}</div><div class="cover">${pick(st.covers)}</div>`;
-    el.addEventListener('click', () => openTile(k));
+    el.innerHTML = `<div class="under">${BOX}</div><div class="cover">${item[0]}</div>`;
+    el.addEventListener('click', () => tapTile(k));
     grid.appendChild(el);
-    return { el, isBox, open: false };
+    return { el, item, done: false };
   });
   renderSlots();
   layout();
+  showClue();
+}
+
+function showClue() {
+  missesThisClue = 0;
+  const text = clueFor(tiles[targets[clueIdx]].item, STAGES[stageIdx].level);
+  $('clueText').textContent = text;
+  const card = $('clue');
+  card.classList.remove('new');
+  void card.offsetWidth;
+  card.classList.add('new');
+  speak(text);
 }
 
 function layout() {
   const st = STAGES[stageIdx];
   const field = $('field');
-  const gap = 8;
+  const gap = 10;
   const w = field.clientWidth, h = field.clientHeight;
-  const cell = Math.floor(Math.min((w - gap * (st.cols - 1)) / st.cols, (h - gap * (st.rows - 1)) / st.rows, 110));
+  const cell = Math.floor(Math.min((w - gap * (st.cols - 1)) / st.cols, (h - gap * (st.rows - 1)) / st.rows, 120));
   const grid = $('grid');
   grid.style.setProperty('--cell', cell + 'px');
   grid.style.gridTemplateColumns = `repeat(${st.cols}, ${cell}px)`;
@@ -356,38 +587,62 @@ function layout() {
 function renderSlots() {
   const st = STAGES[stageIdx];
   let html = '';
-  for (let k = 0; k < st.boxes; k++) html += k < found ? BOX : `<span class="slot-empty">${BOX}</span>`;
+  for (let k = 0; k < st.boxes; k++) html += k < clueIdx ? BOX : `<span class="slot-empty">${BOX}</span>`;
   $('slots').innerHTML = html;
 }
 
-function openTile(k) {
+let toastTimer;
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+function tapTile(k) {
   const t = tiles[k];
-  if (t.open) return;
-  t.open = true;
-  taps++;
-  t.el.classList.remove('hinting');
-  t.el.classList.add('open', t.isBox ? 'box' : 'empty');
-  if (t.isBox) {
-    found++;
-    beep([660, 880, 1320], 0.1, 'triangle');
-    burst(t.el);
-    const prize = pick(PRIZES);
-    stagePrizes.push(prize);
-    save.treasure.push(prize);
-    setTimeout(() => { t.el.querySelector('.under').textContent = prize; }, 700);
-    renderSlots();
-    if (found === STAGES[stageIdx].boxes) {
-      save.stage = Math.min(stageIdx + 1, STAGES.length - 1);
-      writeSave();
-      updateTreasureCount();
-      $('hintBtn').disabled = true;
-      setTimeout(showClear, 1200);
-    } else {
-      writeSave();
-      updateTreasureCount();
-    }
+  if (busy || t.done) return;
+  if (k === targets[clueIdx]) return found(t);
+
+  misses++;
+  missesThisClue++;
+  t.el.classList.remove('wrong');
+  void t.el.offsetWidth;
+  t.el.classList.add('wrong');
+  beep([280, 220], 0.1, 'square');
+  const name = t.item[1];
+  const msg = `그건 ${name}${hasBatchim(name) ? '이야' : '야'}. 다시 찾아봐!`;
+  toast(msg);
+  speak(msg);
+  if (missesThisClue >= 2) tiles[targets[clueIdx]].el.classList.add('glow');
+}
+
+function found(t) {
+  busy = true;
+  t.done = true;
+  t.el.classList.remove('glow', 'hinting');
+  t.el.classList.add('open', 'box');
+  beep([660, 880, 1320], 0.1, 'triangle');
+  burst(t.el);
+  const name = t.item[1];
+  speak(`딩동댕! ${name}${hasBatchim(name) ? '이었어' : '였어'}! 상자 발견!`);
+  const prize = pick(PRIZES);
+  stagePrizes.push(prize);
+  save.treasure.push(prize);
+  setTimeout(() => { t.el.querySelector('.under').textContent = prize; }, 800);
+  clueIdx++;
+  renderSlots();
+  updateTreasureCount();
+
+  if (clueIdx === STAGES[stageIdx].boxes) {
+    save.stage = Math.min(stageIdx + 1, STAGES.length - 1);
+    writeSave();
+    $('hintBtn').disabled = true;
+    setTimeout(showClear, 1600);
   } else {
-    beep([300], 0.08, 'square');
+    writeSave();
+    setTimeout(() => { busy = false; showClue(); }, 1900);
   }
 }
 
@@ -410,38 +665,36 @@ function burst(el) {
 }
 
 function useHint() {
-  if (hints <= 0) return;
-  const hidden = tiles.filter(t => t.isBox && !t.open);
-  if (!hidden.length) return;
+  if (hints <= 0 || busy) return;
   hints--;
   $('hintLeft').textContent = hints;
   if (hints === 0) $('hintBtn').disabled = true;
-  const t = pick(hidden);
-  t.el.classList.remove('hinting');
-  void t.el.offsetWidth;
-  t.el.classList.add('hinting');
-  setTimeout(() => t.el.classList.remove('hinting'), 1600);
+  const el = tiles[targets[clueIdx]].el;
+  el.classList.remove('hinting');
+  void el.offsetWidth;
+  el.classList.add('hinting');
+  setTimeout(() => el.classList.remove('hinting'), 1600);
   beep([520, 620], 0.1);
 }
 
 function showClear() {
   const st = STAGES[stageIdx];
-  const extra = taps - st.boxes;
-  const total = st.cols * st.rows;
-  const stars = extra <= Math.ceil(total * 0.2) ? 3 : extra <= Math.ceil(total * 0.45) ? 2 : 1;
+  const stars = misses <= 1 ? 3 : misses <= 3 ? 2 : 1;
   $('stars').innerHTML = [1, 2, 3].map(n => `<span class="${n <= stars ? '' : 'off'}">⭐</span>`).join('');
   $('prizes').textContent = stagePrizes.join(' ');
   const last = stageIdx === STAGES.length - 1;
+  const missText = misses === 0 ? '한 번도 안 틀렸어요! 대단해요!' : `${misses}번 틀렸지만 끝까지 찾았어요!`;
   if (last) {
     $('clearEmoji').textContent = '🏆';
     $('clearTitle').textContent = '모든 상자를 찾았어요!';
-    $('clearText').innerHTML = `최고의 상자 탐험가예요! 👑<br>보물 가방에 선물이 <b>${save.treasure.length}개</b> 있어요.`;
+    $('clearText').innerHTML = `최고의 수수께끼 탐정이에요! 👑<br>보물 가방에 선물이 <b>${save.treasure.length}개</b> 있어요.`;
     $('nextBtn').textContent = '처음부터 다시 🔄';
     beep([523, 659, 784, 1047, 1319], 0.18, 'triangle');
+    speak('모든 상자를 찾았어! 최고의 수수께끼 탐정이야!');
   } else {
     $('clearEmoji').textContent = '🎉';
     $('clearTitle').textContent = `${st.name} 상자를 다 찾았어요!`;
-    $('clearText').textContent = `${taps}번 만에 찾았어요. 상자 안에서 나온 선물:`;
+    $('clearText').textContent = `${missText} 상자에서 나온 선물:`;
     $('nextBtn').textContent = `다음: ${STAGES[stageIdx + 1].name} ▶`;
     beep([523, 659, 784, 1047], 0.15, 'triangle');
   }
@@ -470,6 +723,9 @@ $('nextBtn').addEventListener('click', () => {
   startStage(next);
 });
 $('hintBtn').addEventListener('click', useHint);
+$('speakBtn').addEventListener('click', () => speak($('clueText').textContent));
+$('clue').addEventListener('click', e => { if (e.target !== $('speakBtn')) speak($('clueText').textContent); });
+if (!canSpeak) $('speakBtn').style.display = 'none';
 $('treasureBtn').addEventListener('click', () => {
   $('collection').innerHTML = save.treasure.length
     ? save.treasure.join(' ')
@@ -484,7 +740,9 @@ if (save.stage > 0) {
   $('startBtn').textContent = `${save.stage + 1}단계부터 계속하기`;
   $('resumeWrap').style.display = 'block';
 }
-startStage(save.stage);
+stageIdx = save.stage;
+document.body.style.setProperty('--bg', STAGES[stageIdx].bg);
+$('stageLabel').textContent = `${stageIdx + 1}단계 ${STAGES[stageIdx].name}`;
 $('startOverlay').classList.add('show');
 </script>
 </body>
