@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>숨은 상자 찾기</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&display=swap');
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body {
+  font-family:'Fredoka','Segoe UI',sans-serif;
+  overflow:hidden;
+  touch-action:manipulation;
+  user-select:none;
+  -webkit-user-select:none;
+  width:100vw;
+  height:100vh;
+  height:100svh;
+}
+body {
+  background:var(--bg, linear-gradient(160deg,#c3f0ca 0%,#7fd38f 100%));
+  transition:background 0.6s;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  color:#333;
+  padding:12px 12px calc(12px + env(safe-area-inset-bottom));
+}
+header {
+  width:100%;
+  max-width:640px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:10px;
+  gap:8px;
+}
+header a.back, .chip {
+  text-decoration:none;
+  background:rgba(255,255,255,0.75);
+  padding:8px 14px;
+  border-radius:20px;
+  color:#444;
+  font-size:0.95em;
+  border:2px solid rgba(255,255,255,0.9);
+  box-shadow:0 2px 6px rgba(0,0,0,0.1);
+  white-space:nowrap;
+}
+h1 {
+  font-size:1.6em;
+  color:#fff;
+  text-shadow:0 2px 0 rgba(0,0,0,0.18);
+  text-align:center;
+  flex:1;
+}
+.status {
+  width:100%;
+  max-width:640px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+  margin-bottom:10px;
+}
+.found {
+  font-size:1.25em;
+  font-weight:600;
+  background:rgba(255,255,255,0.85);
+  padding:6px 14px;
+  border-radius:16px;
+  box-shadow:0 2px 6px rgba(0,0,0,0.1);
+}
+.found .slots { letter-spacing:2px; }
+.slot-empty { opacity:0.25; filter:grayscale(1); }
+button.hint {
+  font-family:inherit;
+  font-size:1em;
+  border:none;
+  background:#fff3b0;
+  color:#7a5b00;
+  padding:8px 14px;
+  border-radius:16px;
+  box-shadow:0 3px 0 #e0c560;
+  cursor:pointer;
+}
+button.hint:disabled { opacity:0.45; cursor:default; }
+button.hint:active:not(:disabled) { transform:translateY(2px); box-shadow:0 1px 0 #e0c560; }
+
+#field {
+  flex:1;
+  width:100%;
+  max-width:640px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:0;
+}
+#grid {
+  display:grid;
+  gap:8px;
+}
+.tile {
+  position:relative;
+  border-radius:18%;
+  background:rgba(255,255,255,0.35);
+  border:3px solid rgba(255,255,255,0.6);
+  cursor:pointer;
+  overflow:visible;
+}
+.tile .under, .tile .cover {
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:calc(var(--cell) * 0.58);
+  line-height:1;
+}
+.tile .under { opacity:0; transform:scale(0.4); transition:all 0.3s; }
+.tile .cover {
+  transition:transform 0.45s cubic-bezier(.3,1.6,.5,1), opacity 0.45s;
+  filter:drop-shadow(0 4px 2px rgba(0,0,0,0.18));
+}
+.tile:not(.open):hover .cover { transform:scale(1.08) rotate(-4deg); }
+.tile.open { cursor:default; }
+.tile.open .cover { transform:translateY(-70%) rotate(-20deg) scale(0.7); opacity:0; }
+.tile.open .under { opacity:1; transform:scale(1); }
+.tile.open.empty { background:rgba(255,255,255,0.15); border-color:rgba(255,255,255,0.3); }
+.tile.open.empty .under { opacity:0.55; font-size:calc(var(--cell) * 0.4); }
+.tile.open.box {
+  background:rgba(255,236,140,0.9);
+  border-color:#ffd23f;
+  box-shadow:0 0 18px 4px rgba(255,210,63,0.75);
+}
+.tile.open.box .under { animation:pop 0.6s ease; }
+.tile.hinting .cover { animation:wiggle 0.5s ease 3; }
+@keyframes pop {
+  0% { transform:scale(0.3); }
+  60% { transform:scale(1.35) rotate(8deg); }
+  100% { transform:scale(1); }
+}
+@keyframes wiggle {
+  0%,100% { transform:rotate(0); }
+  25% { transform:rotate(-14deg) scale(1.1); }
+  75% { transform:rotate(14deg) scale(1.1); }
+}
+.spark {
+  position:fixed;
+  pointer-events:none;
+  font-size:22px;
+  z-index:20;
+  animation:fly 0.9s ease-out forwards;
+}
+@keyframes fly {
+  from { transform:translate(0,0) scale(1); opacity:1; }
+  to { transform:translate(var(--dx),var(--dy)) scale(0.4); opacity:0; }
+}
+
+.overlay {
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.45);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:30;
+  padding:16px;
+}
+.overlay.show { display:flex; }
+.panel {
+  background:#fff;
+  border-radius:24px;
+  padding:26px 22px;
+  max-width:380px;
+  width:100%;
+  text-align:center;
+  box-shadow:0 10px 40px rgba(0,0,0,0.3);
+  animation:pop 0.5s ease;
+}
+.panel .big { font-size:3.4em; margin-bottom:6px; }
+.panel h2 { font-size:1.6em; margin-bottom:8px; }
+.panel p { color:#555; font-size:1.05em; line-height:1.5; margin-bottom:14px; }
+.stars { font-size:2.2em; margin-bottom:10px; letter-spacing:4px; }
+.stars .off { filter:grayscale(1); opacity:0.3; }
+.prizes { font-size:1.8em; margin-bottom:14px; letter-spacing:4px; }
+.panel button {
+  font-family:inherit;
+  font-size:1.2em;
+  border:none;
+  background:#48c774;
+  color:#fff;
+  padding:12px 28px;
+  border-radius:18px;
+  box-shadow:0 4px 0 #2f9e57;
+  cursor:pointer;
+  margin:4px;
+}
+.panel button.alt { background:#a0a8b8; box-shadow:0 4px 0 #7d8596; font-size:1em; }
+.panel button:active { transform:translateY(3px); box-shadow:0 1px 0 #2f9e57; }
+.collection {
+  font-size:1.6em;
+  line-height:1.5;
+  max-height:40vh;
+  overflow-y:auto;
+  margin-bottom:14px;
+  word-break:break-all;
+}
+.small { font-size:0.85em; color:#888; }
+</style>
+</head>
+<body>
+  <header>
+    <a class="back" href="../">← Back</a>
+    <h1 id="title">📦 숨은 상자 찾기</h1>
+    <button class="chip" id="treasureBtn" style="font-family:inherit;cursor:pointer;">🎒 <span id="treasureCount">0</span></button>
+  </header>
+
+  <div class="status">
+    <div class="found"><span id="stageLabel">1단계</span> · <span class="slots" id="slots"></span></div>
+    <button class="hint" id="hintBtn">💡 힌트 <span id="hintLeft">3</span></button>
+  </div>
+
+  <div id="field"><div id="grid"></div></div>
+
+  <div class="overlay" id="startOverlay">
+    <div class="panel">
+      <div class="big">📦🔍</div>
+      <h2>숨은 상자 찾기</h2>
+      <p>나무, 조개, 눈사람 밑에<br>상자가 숨어 있어요!<br>톡 눌러서 <b>상자를 모두</b> 찾아보세요.<br>상자 안에는 선물이 들어 있어요 🎁</p>
+      <button id="startBtn">시작!</button>
+      <div id="resumeWrap" style="display:none; margin-top:6px;">
+        <button class="alt" id="fromStartBtn">처음부터</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="clearOverlay">
+    <div class="panel">
+      <div class="big" id="clearEmoji">🎉</div>
+      <h2 id="clearTitle">상자를 다 찾았어요!</h2>
+      <div class="stars" id="stars"></div>
+      <p id="clearText"></p>
+      <div class="prizes" id="prizes"></div>
+      <button id="nextBtn">다음 단계 ▶</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="treasureOverlay">
+    <div class="panel">
+      <div class="big">🎒</div>
+      <h2>내 보물 가방</h2>
+      <div class="collection" id="collection"></div>
+      <button id="closeTreasure">닫기</button>
+    </div>
+  </div>
+
+<script>
+const BOX = '📦';
+const PRIZES = ['🧸','🚗','🦖','🎈','🍭','⚽','🪀','🦄','🚀','🍩','🐶','🐱','🐰','🦁','🐼','🐸','🌈','⭐','💎','👑','🎨','🎸','🚂','🚁','🍓','🍦','🧁','🦋','🐬','🪁','🏆','🔮'];
+const STAGES = [
+  { name:'숲속',     cols:3, rows:3, boxes:2, covers:['🌳','🌲','🌳','🍄'], empties:['🐛','🍂','🐜','🌰'], bg:'linear-gradient(160deg,#c3f0ca 0%,#6fcf87 100%)' },
+  { name:'바닷가',   cols:4, rows:3, boxes:3, covers:['🐚','🪨','🏖️','🦀'], empties:['🌊','🫧','🦐','⭐'], bg:'linear-gradient(160deg,#a8e6ff 0%,#ffe5a8 100%)' },
+  { name:'내 방',    cols:4, rows:4, boxes:3, covers:['🛋️','🧺','📚','🪑'], empties:['🧦','🖍️','🧩','🪙'], bg:'linear-gradient(160deg,#ffd6e8 0%,#c9b6ff 100%)' },
+  { name:'눈 나라',  cols:5, rows:4, boxes:4, covers:['⛄','🌲','🏔️','☃️'], empties:['❄️','🧤','🧣','🐧'], bg:'linear-gradient(160deg,#e8f6ff 0%,#a9c9ef 100%)' },
+  { name:'꽃밭',     cols:5, rows:5, boxes:4, covers:['🌻','🌷','🌹','🌼'], empties:['🐝','🐞','🦋','🐌'], bg:'linear-gradient(160deg,#fff6b0 0%,#9be08f 100%)' },
+  { name:'바닷속',   cols:6, rows:5, boxes:5, covers:['🪸','🐙','🐠','🪼'], empties:['🫧','🦑','🐟','🐡'], bg:'linear-gradient(160deg,#5ec8f2 0%,#1d6fa8 100%)' },
+  { name:'우주',     cols:6, rows:6, boxes:5, covers:['🪐','🌑','☄️','🛸'], empties:['✨','👽','🛰️','🌟'], bg:'linear-gradient(160deg,#4b3a8f 0%,#14102e 100%)' },
+  { name:'보물섬',   cols:6, rows:6, boxes:6, covers:['🌴','🏝️','🪨','⛰️'], empties:['🦜','🐒','🥥','🦴'], bg:'linear-gradient(160deg,#ffe29a 0%,#ff9a6b 100%)' },
+];
+const SAVE_KEY = 'boxHunt.v1';
+
+let save = loadSave();
+let stageIdx = 0;
+let tiles = [];
+let found = 0;
+let taps = 0;
+let hints = 3;
+let stagePrizes = [];
+
+function loadSave() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SAVE_KEY));
+    if (s && Array.isArray(s.treasure)) return { stage: s.stage || 0, treasure: s.treasure };
+  } catch (e) {}
+  return { stage: 0, treasure: [] };
+}
+function writeSave() {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {}
+}
+
+let audio;
+function beep(freqs, dur = 0.12, type = 'sine') {
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    let t = audio.currentTime;
+    for (const f of freqs) {
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.type = type; o.frequency.value = f;
+      g.gain.setValueAtTime(0.15, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      o.connect(g).connect(audio.destination);
+      o.start(t); o.stop(t + dur);
+      t += dur * 0.8;
+    }
+  } catch (e) {}
+}
+
+const $ = id => document.getElementById(id);
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function startStage(i) {
+  stageIdx = i;
+  const st = STAGES[i];
+  document.body.style.setProperty('--bg', st.bg);
+  $('stageLabel').textContent = `${i + 1}단계 ${st.name}`;
+  found = 0; taps = 0; hints = 3; stagePrizes = [];
+  $('hintLeft').textContent = hints;
+  $('hintBtn').disabled = false;
+
+  const total = st.cols * st.rows;
+  const contents = shuffle(Array.from({ length: total }, (_, k) => k < st.boxes));
+  const grid = $('grid');
+  grid.innerHTML = '';
+  grid.style.gridTemplateColumns = `repeat(${st.cols}, 1fr)`;
+  tiles = contents.map((isBox, k) => {
+    const el = document.createElement('div');
+    el.className = 'tile';
+    el.innerHTML = `<div class="under">${isBox ? BOX : pick(st.empties)}</div><div class="cover">${pick(st.covers)}</div>`;
+    el.addEventListener('click', () => openTile(k));
+    grid.appendChild(el);
+    return { el, isBox, open: false };
+  });
+  renderSlots();
+  layout();
+}
+
+function layout() {
+  const st = STAGES[stageIdx];
+  const field = $('field');
+  const gap = 8;
+  const w = field.clientWidth, h = field.clientHeight;
+  const cell = Math.floor(Math.min((w - gap * (st.cols - 1)) / st.cols, (h - gap * (st.rows - 1)) / st.rows, 110));
+  const grid = $('grid');
+  grid.style.setProperty('--cell', cell + 'px');
+  grid.style.gridTemplateColumns = `repeat(${st.cols}, ${cell}px)`;
+  grid.style.gridAutoRows = cell + 'px';
+}
+
+function renderSlots() {
+  const st = STAGES[stageIdx];
+  let html = '';
+  for (let k = 0; k < st.boxes; k++) html += k < found ? BOX : `<span class="slot-empty">${BOX}</span>`;
+  $('slots').innerHTML = html;
+}
+
+function openTile(k) {
+  const t = tiles[k];
+  if (t.open) return;
+  t.open = true;
+  taps++;
+  t.el.classList.remove('hinting');
+  t.el.classList.add('open', t.isBox ? 'box' : 'empty');
+  if (t.isBox) {
+    found++;
+    beep([660, 880, 1320], 0.1, 'triangle');
+    burst(t.el);
+    const prize = pick(PRIZES);
+    stagePrizes.push(prize);
+    save.treasure.push(prize);
+    setTimeout(() => { t.el.querySelector('.under').textContent = prize; }, 700);
+    renderSlots();
+    if (found === STAGES[stageIdx].boxes) {
+      save.stage = Math.min(stageIdx + 1, STAGES.length - 1);
+      writeSave();
+      updateTreasureCount();
+      $('hintBtn').disabled = true;
+      setTimeout(showClear, 1200);
+    } else {
+      writeSave();
+      updateTreasureCount();
+    }
+  } else {
+    beep([300], 0.08, 'square');
+  }
+}
+
+function burst(el) {
+  const r = el.getBoundingClientRect();
+  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  const bits = ['✨','⭐','🌟','💛'];
+  for (let i = 0; i < 10; i++) {
+    const s = document.createElement('div');
+    s.className = 'spark';
+    s.textContent = pick(bits);
+    const a = (Math.PI * 2 * i) / 10, d = 60 + Math.random() * 50;
+    s.style.left = (cx - 11) + 'px';
+    s.style.top = (cy - 11) + 'px';
+    s.style.setProperty('--dx', Math.cos(a) * d + 'px');
+    s.style.setProperty('--dy', Math.sin(a) * d + 'px');
+    document.body.appendChild(s);
+    setTimeout(() => s.remove(), 950);
+  }
+}
+
+function useHint() {
+  if (hints <= 0) return;
+  const hidden = tiles.filter(t => t.isBox && !t.open);
+  if (!hidden.length) return;
+  hints--;
+  $('hintLeft').textContent = hints;
+  if (hints === 0) $('hintBtn').disabled = true;
+  const t = pick(hidden);
+  t.el.classList.remove('hinting');
+  void t.el.offsetWidth;
+  t.el.classList.add('hinting');
+  setTimeout(() => t.el.classList.remove('hinting'), 1600);
+  beep([520, 620], 0.1);
+}
+
+function showClear() {
+  const st = STAGES[stageIdx];
+  const extra = taps - st.boxes;
+  const total = st.cols * st.rows;
+  const stars = extra <= Math.ceil(total * 0.2) ? 3 : extra <= Math.ceil(total * 0.45) ? 2 : 1;
+  $('stars').innerHTML = [1, 2, 3].map(n => `<span class="${n <= stars ? '' : 'off'}">⭐</span>`).join('');
+  $('prizes').textContent = stagePrizes.join(' ');
+  const last = stageIdx === STAGES.length - 1;
+  if (last) {
+    $('clearEmoji').textContent = '🏆';
+    $('clearTitle').textContent = '모든 상자를 찾았어요!';
+    $('clearText').innerHTML = `최고의 상자 탐험가예요! 👑<br>보물 가방에 선물이 <b>${save.treasure.length}개</b> 있어요.`;
+    $('nextBtn').textContent = '처음부터 다시 🔄';
+    beep([523, 659, 784, 1047, 1319], 0.18, 'triangle');
+  } else {
+    $('clearEmoji').textContent = '🎉';
+    $('clearTitle').textContent = `${st.name} 상자를 다 찾았어요!`;
+    $('clearText').textContent = `${taps}번 만에 찾았어요. 상자 안에서 나온 선물:`;
+    $('nextBtn').textContent = `다음: ${STAGES[stageIdx + 1].name} ▶`;
+    beep([523, 659, 784, 1047], 0.15, 'triangle');
+  }
+  $('clearOverlay').classList.add('show');
+}
+
+function updateTreasureCount() {
+  $('treasureCount').textContent = save.treasure.length;
+}
+
+$('startBtn').addEventListener('click', () => {
+  $('startOverlay').classList.remove('show');
+  startStage(save.stage);
+});
+$('fromStartBtn').addEventListener('click', () => {
+  save.stage = 0;
+  writeSave();
+  $('startOverlay').classList.remove('show');
+  startStage(0);
+});
+$('nextBtn').addEventListener('click', () => {
+  $('clearOverlay').classList.remove('show');
+  const next = stageIdx === STAGES.length - 1 ? 0 : stageIdx + 1;
+  save.stage = next;
+  writeSave();
+  startStage(next);
+});
+$('hintBtn').addEventListener('click', useHint);
+$('treasureBtn').addEventListener('click', () => {
+  $('collection').innerHTML = save.treasure.length
+    ? save.treasure.join(' ')
+    : '<span class="small">아직 비어 있어요.<br>상자를 찾으면 선물이 들어와요!</span>';
+  $('treasureOverlay').classList.add('show');
+});
+$('closeTreasure').addEventListener('click', () => $('treasureOverlay').classList.remove('show'));
+window.addEventListener('resize', layout);
+
+updateTreasureCount();
+if (save.stage > 0) {
+  $('startBtn').textContent = `${save.stage + 1}단계부터 계속하기`;
+  $('resumeWrap').style.display = 'block';
+}
+startStage(save.stage);
+$('startOverlay').classList.add('show');
+</script>
+</body>
+</html>
