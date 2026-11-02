@@ -8,7 +8,8 @@
     "login": "./deploy.sh login",
     "preview": "./deploy.sh preview",
     "deploy": "./deploy.sh prod",
-    "voice": "node box-hunt/make-voice.mjs"
+    "voice": "node box-hunt/make-voice.mjs",
+    "voice:hero": "node hero-squad/make-voice.mjs"
   },
   "dependencies": {
     "@netlify/blobs": "^8"
