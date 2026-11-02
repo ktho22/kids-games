@@ -195,6 +195,15 @@
   .lv.on { border-color: #2b7cff; background: #eaf2ff; }
   .lv b { display: inline-block; width: 22px; }
   .panel label { display: flex; gap: 8px; align-items: center; margin: 12px 0; font-size: 15px; }
+  .panel input { -webkit-user-select: text; user-select: text; padding: 10px; border: 2px solid #ddd; border-radius: 10px; font-size: 16px; font-family: inherit; min-width: 0; }
+  .cloudbox { border-top: 1px solid #eee; margin-top: 14px; padding-top: 12px; }
+  .cloudbox h4 { margin-bottom: 6px; }
+  .cloudbox b { color: #2b7cff; font-size: 17px; letter-spacing: 1px; }
+  .claim { display: flex; gap: 6px; margin-bottom: 6px; }
+  .claim #cCode { flex: 1; text-transform: uppercase; }
+  .claim #cPin { width: 76px; }
+  .claim button { padding: 10px 12px; border-radius: 10px; background: #2b7cff; color: #fff; font-size: 14px; white-space: nowrap; }
+  #cMsg { min-height: 1.4em; color: #2b7cff; }
   .panel .btns { display: flex; gap: 8px; justify-content: space-between; margin-top: 8px; }
   .panel .btns button { padding: 10px 14px; border-radius: 10px; background: #eee; color: #222; font-size: 14px; }
   .panel .btns .danger { background: #ffe3e3; color: #c00; }
@@ -228,7 +237,7 @@
 <body>
 
 <section id="home" class="screen rays">
-  <div class="corner l">⭐ <span id="homeStars">0</span></div>
+  <div class="corner l">⭐ <span id="homeStars">0</span> <span id="cloudDot"></span></div>
   <button class="corner r" id="gear">⚙️ 어른 <small>(길게)</small></button>
   <div class="logo">
     <div class="t1 hfont">영서와 친구들의</div>
@@ -296,6 +305,17 @@
     <p>문제 난이도는 아이가 맞히는 정도에 따라 자동으로 오르내려요. 시작점을 바꾸고 싶을 때만 아래에서 고르세요.<br>지금 난이도: <b id="curLv"></b></p>
     <div id="lvList"></div>
     <label><input type="checkbox" id="voiceT"> 목소리로 읽어 주기</label>
+    <div class="cloudbox">
+      <h4>☁️ 클라우드 저장</h4>
+      <p id="cloudInfo"></p>
+      <p>다른 기기(아이패드·폰)나 다른 주소에서 이어 하려면, <u>그 기기에서</u> 이 설정을 열고 아래에 위 코드와 PIN을 넣으세요. 그 뒤로는 두 기기가 알아서 합쳐져요.</p>
+      <div class="claim">
+        <input id="cCode" placeholder="코드" autocapitalize="characters" autocomplete="off" spellcheck="false">
+        <input id="cPin" placeholder="PIN" inputmode="numeric" maxlength="4" autocomplete="off">
+        <button id="cGo">불러오기</button>
+      </div>
+      <p id="cMsg"></p>
+    </div>
     <div class="btns">
       <button class="danger" id="resetB">처음부터 다시</button>
       <button class="primary" id="closeP">닫기</button>
@@ -438,7 +458,86 @@ function loadSave() {
   return freshSave();
 }
 let S = loadSave();
-function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {} }
+function persist(fromCloud) {
+  if (!fromCloud) { S.savedAt = Date.now(); scheduleSync(); }
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {}
+}
+
+// ---------- cloud save ----------
+// Every device gets a code + PIN automatically. Progress only ever grows, so
+// syncing is a merge both here and on the server — nothing to choose between.
+const CLOUD_KEY = 'heroSquad.cloud';
+// `netlify dev` serves the function on localhost too.
+const CLOUD_URL = location.hostname.endsWith('ktho22-kids-games.netlify.app') || location.hostname === 'localhost'
+  ? '/.netlify/functions/hero-save'
+  : 'https://ktho22-kids-games.netlify.app/.netlify/functions/hero-save';
+let cloud = (() => { try { return JSON.parse(localStorage.getItem(CLOUD_KEY)); } catch (e) { return null; } })();
+let cloudOk = false, lastSync = 0, syncing = null, syncAgain = false, syncTimer = null;
+function saveCloud() {
+  try { cloud ? localStorage.setItem(CLOUD_KEY, JSON.stringify(cloud)) : localStorage.removeItem(CLOUD_KEY); } catch (e) {}
+}
+async function cloudCall(action, payload) {
+  const res = await fetch(CLOUD_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action, ...payload }) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) { const err = new Error(data.error || 'error'); err.status = res.status; throw err; }
+  return data;
+}
+const progressOf = s => ({ episode: s.episode, level: s.level, streak: s.streak, recent: s.recent, heroes: s.heroes, pokes: s.pokes, villains: s.villains, stars: s.stars, savedAt: s.savedAt || 0 });
+// Same rule as the server: collections are unions, counters take the max,
+// difficulty comes from whichever side changed most recently.
+function mergeProgress(local, remote) {
+  const union = (x, y) => [...x, ...y.filter(v => !x.includes(v))];
+  const newer = (remote.savedAt || 0) >= (local.savedAt || 0) ? remote : local;
+  return {
+    episode: Math.max(local.episode, remote.episode),
+    stars: Math.max(local.stars, remote.stars),
+    heroes: union(remote.heroes, local.heroes),
+    pokes: union(remote.pokes, local.pokes),
+    villains: union(remote.villains, local.villains),
+    level: newer.level, streak: newer.streak, recent: newer.recent,
+    savedAt: Math.max(local.savedAt || 0, remote.savedAt || 0),
+  };
+}
+function adopt(remote) {
+  Object.assign(S, mergeProgress(S, remote));
+  persist(true);
+  if ($('home').classList.contains('on')) showHome();
+}
+function scheduleSync() { clearTimeout(syncTimer); syncTimer = setTimeout(cloudSync, 2500); }
+async function cloudSync() {
+  if (syncing) { syncAgain = true; return syncing; }
+  syncing = (async () => {
+    try {
+      if (!cloud) {
+        const r = await cloudCall('create', { state: progressOf(S) });
+        cloud = { code: r.code, ownerToken: r.ownerToken, pin: r.pin };
+        saveCloud();
+      } else {
+        adopt((await cloudCall('sync', { code: cloud.code, ownerToken: cloud.ownerToken, state: progressOf(S) })).state);
+      }
+      cloudOk = true;
+      lastSync = Date.now();
+    } catch (e) {
+      cloudOk = false;
+      // The save is gone or no longer ours: start a new one on the next try.
+      if (e.status === 403 || e.status === 404) { cloud = null; saveCloud(); }
+    }
+    renderCloudInfo();
+  })();
+  await syncing;
+  syncing = null;
+  if (syncAgain) { syncAgain = false; return cloudSync(); }
+}
+function renderCloudInfo() {
+  $('cloudDot').textContent = cloudOk ? '☁️' : '';
+  if (!cloud) {
+    $('cloudInfo').innerHTML = '⏳ 저장 코드를 만드는 중이에요 (인터넷이 필요해요)';
+    return;
+  }
+  const when = !cloudOk ? '⏳ 인터넷이 연결되면 자동으로 저장돼요'
+    : Date.now() - lastSync < 60000 ? '✅ 방금 저장됨' : `✅ ${Math.round((Date.now() - lastSync) / 60000)}분 전에 저장됨`;
+  $('cloudInfo').innerHTML = `이 기기의 저장 코드 <b>${cloud.code}</b> · PIN <b>${cloud.pin}</b><br>${when}`;
+}
 
 const $ = id => document.getElementById(id);
 const ri = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
@@ -1165,6 +1264,8 @@ function openParent() {
     b.onclick = () => { S.level = +b.dataset.l; S.streak = 0; S.recent = []; persist(); openParent(); };
   });
   $('voiceT').checked = S.voice;
+  $('cCode').value = ''; $('cPin').value = ''; $('cMsg').textContent = '';
+  renderCloudInfo();
   $('resetB').textContent = '처음부터 다시';
   $('resetB').dataset.armed = '';
   $('parent').classList.add('on');
@@ -1199,12 +1300,40 @@ $('resetB').onclick = e => {
   const voice = S.voice;
   S = freshSave();
   S.voice = voice;
+  // Only this device starts over; the old code + PIN can still bring it back.
+  cloud = null;
+  cloudOk = false;
+  saveCloud();
   persist();
   $('parent').classList.remove('on');
   showHome();
 };
 
+$('cGo').onclick = async () => {
+  const code = $('cCode').value.trim().toUpperCase(), pin = $('cPin').value.trim();
+  if (!code || !/^\d{4}$/.test(pin)) { $('cMsg').textContent = '코드와 4자리 PIN을 넣어 주세요'; return; }
+  $('cMsg').textContent = '불러오는 중…';
+  try {
+    const r = await cloudCall('claim', { code, pin });
+    cloud = { code: r.code, ownerToken: r.ownerToken, pin };
+    saveCloud();
+    // Keep this device's cards, but take the difficulty from the save being continued.
+    S.savedAt = 0;
+    adopt(r.state);
+    await cloudSync();
+    $('cMsg').textContent = `불러왔어요! 히어로 ${S.heroes.length}명 · 포켓몬 ${S.pokes.length}마리 🎉`;
+  } catch (e) {
+    $('cMsg').textContent = e.status === 403 ? 'PIN이 맞지 않아요'
+      : e.status === 404 ? '그 코드로 된 저장이 없어요'
+      : e.status === 429 ? 'PIN을 여러 번 틀렸어요. 10분 뒤에 다시 해 주세요'
+      : '연결이 안 돼요. 인터넷을 확인해 주세요';
+  }
+};
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') cloudSync(); });
+window.addEventListener('online', () => cloudSync());
+
 showHome();
+cloudSync();
 </script>
 </body>
 </html>
