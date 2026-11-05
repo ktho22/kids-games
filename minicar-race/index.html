@@ -163,6 +163,58 @@ h1, h2, h3, .btn {
   border-left: 4px solid var(--orange);
 }
 
+/* Saved builds */
+.saved-builds { margin-top: 12px; }
+.saved-builds .sb-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 8px;
+}
+.saved-builds .sb-list {
+  display: flex; flex-direction: column; gap: 6px;
+  max-height: 180px; overflow-y: auto;
+}
+.saved-build {
+  display: flex; align-items: center; gap: 8px;
+  background: #F3F4F6; border-radius: 12px;
+  padding: 8px 10px; font-size: 0.85em;
+}
+.saved-build .sb-name { flex: 1; font-weight: 700; }
+.saved-build .sb-parts { font-size: 0.9em; letter-spacing: 1px; }
+.saved-build .sb-actions { display: flex; gap: 4px; }
+.sb-empty { color: #888; font-size: 0.85em; text-align: center; padding: 10px; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 24px; left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: rgba(45,52,54,0.95); color: white;
+  padding: 12px 22px; border-radius: 16px;
+  font-weight: 700; font-size: 0.95em;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  opacity: 0; transition: all 0.35s ease;
+  z-index: 2000; pointer-events: none;
+  max-width: 90vw; text-align: center;
+}
+.toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+/* Quit confirm overlay */
+.confirm-overlay {
+  position: fixed; top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0,0,0,0.7);
+  display: none; align-items: center; justify-content: center;
+  z-index: 1100;
+}
+.confirm-overlay.active { display: flex; }
+.confirm-card {
+  background: white; border-radius: 20px;
+  padding: 28px; text-align: center;
+  max-width: 360px; width: 90%;
+}
+.confirm-card h3 { margin-bottom: 10px; font-size: 1.4em; }
+.confirm-card p { color: #555; margin-bottom: 18px; }
+.confirm-buttons { display: flex; gap: 10px; justify-content: center; }
+
 /* ===== SHOP ===== */
 #shop { gap: 16px; }
 .shop-grid {
@@ -363,6 +415,13 @@ h1, h2, h3, .btn {
           💡 Try different parts! Each choice has trade-offs.
         </div>
       </div>
+      <div class="saved-builds">
+        <div class="sb-header">
+          <h3>💾 내 빌드</h3>
+          <button class="btn btn-small btn-green" onclick="saveCurrentBuild()">+ 현재 저장</button>
+        </div>
+        <div class="sb-list" id="savedBuildsList"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -384,9 +443,22 @@ h1, h2, h3, .btn {
     <span id="raceTrackName">🏁 Speed Circuit</span>
     <span id="raceLap">Lap 1/3</span>
     <span id="raceTimer">0:00</span>
+    <button class="btn btn-small btn-gray" onclick="askQuitRace()">🚪 포기</button>
   </div>
   <canvas id="raceCanvas"></canvas>
   <div class="race-standings" id="raceStandings"></div>
+</div>
+
+<!-- ===== QUIT CONFIRM ===== -->
+<div class="confirm-overlay" id="quitConfirm">
+  <div class="confirm-card">
+    <h3>레이스를 포기할까요?</h3>
+    <p>지금 나가면 이번 레이스의 상금과 경험치는 받을 수 없어요.</p>
+    <div class="confirm-buttons">
+      <button class="btn btn-gray" onclick="closeQuitConfirm()">계속 레이스</button>
+      <button class="btn btn-pink" onclick="confirmQuitRace()">포기하기</button>
+    </div>
+  </div>
 </div>
 
 <!-- ===== RESULT OVERLAY ===== -->
@@ -422,7 +494,9 @@ let gameState = {
   wins: 0,
   ownedParts: new Set(),
   equipped: { engine: 'small', wheels: 'standard', body: 'light', spoiler: 'none', booster: 'none' },
+  savedBuilds: [], // [{ name, equipped }]
 };
+const MAX_SAVED_BUILDS = 6;
 
 // ============================================
 // PARTS DATABASE
@@ -537,9 +611,9 @@ const TRACKS = [
     weights: { speed: 0.5, accel: 0.6, handling: 1.8, durability: 0.8 },
     color: '#00BCD4', innerColor: '#00838F',
     shape: 'ice' },
-  { id: 'volcano', name: 'Volcano Run', icon: '🌋', level: 8, laps: 3,
-    desc: 'Extreme heat & danger!', bonus: 'Durability or bust!',
-    weights: { speed: 0.8, accel: 0.9, handling: 0.8, durability: 1.8 },
+  { id: 'volcano', name: 'Volcano Run', icon: '🌋', level: 8, laps: 2,
+    desc: 'Extreme heat & danger!', bonus: 'Tough & steady wins!',
+    weights: { speed: 1.0, accel: 1.0, handling: 1.0, durability: 1.3 },
     color: '#F44336', innerColor: '#B71C1C',
     shape: 'volcano' },
   { id: 'rainbow', name: 'Rainbow Road', icon: '🌈', level: 9, laps: 3,
@@ -620,6 +694,7 @@ function loadGame() {
   if (data) {
     const parsed = JSON.parse(data);
     gameState = { ...parsed, ownedParts: new Set(parsed.ownedParts) };
+    if (!Array.isArray(gameState.savedBuilds)) gameState.savedBuilds = [];
   }
   // Ensure starter parts are owned
   for (let cat in PARTS) {
@@ -627,6 +702,67 @@ function loadGame() {
       if (PARTS[cat].items[id].cost === 0) gameState.ownedParts.add(`${cat}_${id}`);
     }
   }
+}
+
+// ============================================
+// SAVED BUILDS (Car presets)
+// ============================================
+function saveCurrentBuild() {
+  if (gameState.savedBuilds.length >= MAX_SAVED_BUILDS) {
+    showToast(`슬롯이 가득 찼어요! (최대 ${MAX_SAVED_BUILDS}개) 먼저 하나를 지워주세요.`);
+    return;
+  }
+  const defaultName = `빌드 ${gameState.savedBuilds.length + 1}`;
+  const name = (prompt('이 자동차 빌드의 이름을 정해주세요:', defaultName) || '').trim();
+  if (!name) return;
+  gameState.savedBuilds.push({
+    name: name.slice(0, 20),
+    equipped: { ...gameState.equipped },
+  });
+  saveGame();
+  renderGarage();
+  showToast(`💾 "${name}" 저장 완료!`);
+}
+
+function loadBuild(idx) {
+  const build = gameState.savedBuilds[idx];
+  if (!build) return;
+  // Only apply parts the player still owns & has unlocked
+  for (let cat in build.equipped) {
+    const partId = build.equipped[cat];
+    if (PARTS[cat] && PARTS[cat].items[partId]
+        && isPartOwned(cat, partId) && isPartUnlocked(cat, partId)) {
+      gameState.equipped[cat] = partId;
+    }
+  }
+  saveGame();
+  renderGarage();
+  showToast(`🔧 "${build.name}" 불러왔어요!`);
+}
+
+function deleteBuild(idx) {
+  const build = gameState.savedBuilds[idx];
+  if (!build) return;
+  if (!confirm(`"${build.name}" 빌드를 삭제할까요?`)) return;
+  gameState.savedBuilds.splice(idx, 1);
+  saveGame();
+  renderGarage();
+}
+
+// Tiny toast helper
+let toastTimer = null;
+function showToast(msg) {
+  let el = document.getElementById('toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'toast';
+    el.className = 'toast';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
 }
 
 // ============================================
@@ -689,6 +825,34 @@ function renderGarage() {
   }
 
   renderStats();
+  renderSavedBuilds();
+}
+
+function renderSavedBuilds() {
+  const list = document.getElementById('savedBuildsList');
+  if (!list) return;
+  list.innerHTML = '';
+  if (!gameState.savedBuilds.length) {
+    list.innerHTML = '<div class="sb-empty">저장된 빌드가 없어요. 마음에 드는 조합을 저장해보세요!</div>';
+    return;
+  }
+  gameState.savedBuilds.forEach((build, idx) => {
+    const icons = Object.keys(build.equipped).map(cat => {
+      const pid = build.equipped[cat];
+      return PARTS[cat] && PARTS[cat].items[pid] ? PARTS[cat].items[pid].icon : '';
+    }).join('');
+    const row = document.createElement('div');
+    row.className = 'saved-build';
+    row.innerHTML = `
+      <span class="sb-parts">${icons}</span>
+      <span class="sb-name">${build.name}</span>
+      <span class="sb-actions">
+        <button class="btn btn-small btn-blue" onclick="loadBuild(${idx})">불러오기</button>
+        <button class="btn btn-small btn-gray" onclick="deleteBuild(${idx})">🗑️</button>
+      </span>
+    `;
+    list.appendChild(row);
+  });
 }
 
 function renderStats() {
@@ -814,6 +978,31 @@ function renderTrackSelect() {
 // ============================================
 let raceState = null;
 let raceAnimFrame = null;
+let raceCountdownInterval = null;
+
+function askQuitRace() {
+  if (!raceState || raceState.phase === 'finished') return;
+  raceState.paused = true;
+  document.getElementById('quitConfirm').classList.add('active');
+}
+
+function closeQuitConfirm() {
+  document.getElementById('quitConfirm').classList.remove('active');
+  if (raceState) raceState.paused = false;
+  if (raceState && raceState.phase === 'racing') {
+    const canvas = document.getElementById('raceCanvas');
+    raceLoop(canvas.getContext('2d'), canvas);
+  }
+}
+
+function confirmQuitRace() {
+  document.getElementById('quitConfirm').classList.remove('active');
+  if (raceAnimFrame) { cancelAnimationFrame(raceAnimFrame); raceAnimFrame = null; }
+  if (raceCountdownInterval) { clearInterval(raceCountdownInterval); raceCountdownInterval = null; }
+  raceState = null;
+  showScreen('mainMenu');
+  showToast('레이스를 포기했어요. 다시 도전해봐요!');
+}
 
 function startRace(track) {
   showScreen('race');
@@ -903,17 +1092,21 @@ function generateAICars(track) {
   const names = ['Red Racer', 'Blue Bolt', 'Green Machine'];
   const colors = ['#EF4444', '#3B82F6', '#22C55E'];
   const emojis = ['🔴', '🔵', '🟢'];
-  const difficultyBase = 35 + (track.level - 1) * 6;
+  // Kid-friendly difficulty curve: gentler slope & softer ceiling
+  // Old: 35 + (lvl-1)*6  →  lvl8=77, lvl10=89 (very hard)
+  // New: 28 + (lvl-1)*3.5 →  lvl8≈53, lvl10≈60 (winnable for kids)
+  const difficultyBase = 28 + (track.level - 1) * 3.5;
+  const topCap = Math.min(80, 45 + track.level * 3.5); // softer ceiling per track
 
   return names.map((name, i) => {
-    const variance = () => Math.floor(Math.random() * 20 - 10);
+    const variance = () => Math.floor(Math.random() * 16 - 8); // ±8 instead of ±10
     return {
       name, color: colors[i], emoji: emojis[i],
       stats: {
-        speed: Math.min(95, difficultyBase + variance() + (i === 0 ? 10 : 0)),
-        accel: Math.min(95, difficultyBase + variance() + (i === 1 ? 10 : 0)),
-        handling: Math.min(95, difficultyBase + variance() + (i === 2 ? 10 : 0)),
-        durability: Math.min(95, difficultyBase + variance()),
+        speed: Math.min(topCap, difficultyBase + variance() + (i === 0 ? 8 : 0)),
+        accel: Math.min(topCap, difficultyBase + variance() + (i === 1 ? 8 : 0)),
+        handling: Math.min(topCap, difficultyBase + variance() + (i === 2 ? 8 : 0)),
+        durability: Math.min(topCap, difficultyBase + variance()),
       }
     };
   });
@@ -921,7 +1114,8 @@ function generateAICars(track) {
 
 function raceCountdown(ctx, canvas) {
   let count = 3;
-  const countInterval = setInterval(() => {
+  raceCountdownInterval = setInterval(() => {
+    if (!raceState) { clearInterval(raceCountdownInterval); raceCountdownInterval = null; return; }
     drawTrack(ctx, canvas);
     // Draw countdown
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
@@ -933,7 +1127,8 @@ function raceCountdown(ctx, canvas) {
     ctx.fillText(count > 0 ? count : 'GO!', canvas.width / 2, canvas.height / 2);
 
     if (count <= 0) {
-      clearInterval(countInterval);
+      clearInterval(raceCountdownInterval);
+      raceCountdownInterval = null;
       raceState.phase = 'racing';
       raceLoop(ctx, canvas);
     }
@@ -943,6 +1138,7 @@ function raceCountdown(ctx, canvas) {
 
 function raceLoop(ctx, canvas) {
   if (!raceState || raceState.phase === 'finished') return;
+  if (raceState.paused) return;
 
   const dt = 1 / 60;
   raceState.time += dt;
