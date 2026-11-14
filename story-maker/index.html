@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>이야기 만들기 · Story Maker</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&display=swap');
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body {
+  font-family:'Fredoka','Apple SD Gothic Neo','Malgun Gothic','Segoe UI',sans-serif;
+  touch-action:manipulation;
+  user-select:none;
+  -webkit-user-select:none;
+  min-height:100vh;
+  min-height:100svh;
+}
+body {
+  background:linear-gradient(165deg,#ffe7c2 0%,#ffc9a8 45%,#f6a6c1 100%);
+  color:#3b2d4f;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  padding:12px 12px calc(16px + env(safe-area-inset-bottom));
+}
+header {
+  width:100%; max-width:680px;
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  margin-bottom:12px;
+}
+.chip, header a.back {
+  font-family:inherit; cursor:pointer; text-decoration:none;
+  background:rgba(255,255,255,0.8); color:#5a4470;
+  padding:8px 14px; border-radius:20px; font-size:0.95em;
+  border:2px solid #fff; box-shadow:0 2px 6px rgba(0,0,0,0.1);
+  white-space:nowrap;
+}
+.lang { display:flex; background:rgba(255,255,255,0.7); border-radius:20px; padding:3px; border:2px solid #fff; }
+.lang button {
+  font-family:inherit; border:none; background:none; cursor:pointer;
+  padding:6px 10px; border-radius:16px; font-size:0.9em; color:#6b5a80;
+}
+.lang button.on { background:#7b5cd6; color:#fff; font-weight:600; }
+
+main { width:100%; max-width:680px; flex:1; display:flex; flex-direction:column; }
+.screen { display:none; flex-direction:column; align-items:center; gap:16px; flex:1; }
+.screen.on { display:flex; }
+
+/* start */
+.logo { font-size:4.5em; margin-top:16px; animation:bob 2.4s ease-in-out infinite; }
+@keyframes bob { 50% { transform:translateY(-8px) rotate(-4deg); } }
+h1 { font-size:2em; color:#fff; text-shadow:0 3px 0 rgba(120,60,90,0.35); text-align:center; line-height:1.25; }
+.sub { text-align:center; color:#6d4f6a; font-size:1.05em; line-height:1.5; word-break:keep-all; max-width:440px; }
+.sub .en, .both .en { display:block; }
+.big {
+  font-family:inherit; font-size:1.35em; font-weight:600; cursor:pointer;
+  border:none; border-radius:22px; padding:16px 28px; min-width:240px;
+  background:#7b5cd6; color:#fff; box-shadow:0 5px 0 #5a3fae;
+}
+.big.alt { background:#fff; color:#7b5cd6; box-shadow:0 5px 0 #d9c9f2; }
+.big:active { transform:translateY(3px); box-shadow:0 2px 0 #5a3fae; }
+.big.alt:active { box-shadow:0 2px 0 #d9c9f2; }
+.big:disabled { opacity:0.4; }
+
+/* pick */
+.steps { display:flex; gap:8px; justify-content:center; }
+.steps span {
+  width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  background:rgba(255,255,255,0.45); font-size:1.4em; border:3px solid rgba(255,255,255,0.6);
+  filter:grayscale(1); opacity:0.6;
+}
+.steps span.done { filter:none; opacity:1; background:#fff; }
+.steps span.now { filter:none; opacity:1; border-color:#7b5cd6; animation:pulse 1.2s infinite; }
+@keyframes pulse { 50% { transform:scale(1.1); } }
+.ask {
+  background:#fff; border-radius:20px; padding:12px 18px; width:100%;
+  display:flex; align-items:center; gap:12px; box-shadow:0 4px 0 rgba(0,0,0,0.08);
+}
+.ask .t { flex:1; font-size:1.3em; font-weight:600; color:#4a3570; word-break:keep-all; line-height:1.35; }
+.ask .t small { display:block; font-size:0.72em; font-weight:400; color:#8a7aa0; }
+.speak {
+  font-size:1.5em; border:none; background:#efe9ff; border-radius:50%;
+  width:50px; height:50px; flex-shrink:0; cursor:pointer;
+}
+.speak:active { transform:scale(0.92); }
+
+.cards { display:flex; gap:12px; justify-content:center; width:100%; perspective:900px; }
+.card {
+  width:31%; max-width:170px; aspect-ratio:3/4; position:relative; cursor:pointer;
+  transform-style:preserve-3d; transition:transform 0.6s, opacity 0.4s, scale 0.4s;
+  animation:deal 0.45s backwards;
+}
+.card:nth-child(2) { animation-delay:0.1s; }
+.card:nth-child(3) { animation-delay:0.2s; }
+@keyframes deal { from { transform:translateY(-60px) rotate(-10deg); opacity:0; } }
+.card .face, .card .back {
+  position:absolute; inset:0; border-radius:18px; backface-visibility:hidden; -webkit-backface-visibility:hidden;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
+  border:4px solid #fff; box-shadow:0 6px 0 rgba(0,0,0,0.12), 0 8px 18px rgba(0,0,0,0.12);
+}
+.card .back {
+  background:repeating-linear-gradient(45deg,var(--c1) 0 14px,var(--c2) 14px 28px);
+  color:#fff; font-size:3em; font-weight:600; text-shadow:0 3px 0 rgba(0,0,0,0.2);
+}
+.card .face { background:#fffdf7; transform:rotateY(180deg); padding:8px; text-align:center; }
+.card .face .e { font-size:3.2em; line-height:1.1; }
+.card .face .w { font-size:1.05em; font-weight:600; color:#4a3570; word-break:keep-all; line-height:1.25; }
+.card .face .w small { display:block; font-weight:400; font-size:0.82em; color:#8a7aa0; }
+.card.flip { transform:rotateY(180deg); }
+.card.picked { scale:1.1; z-index:2; }
+.card.picked .face { border-color:#ffd54a; box-shadow:0 0 0 4px #ffd54a, 0 8px 22px rgba(0,0,0,0.2); }
+.card.other { opacity:0.35; scale:0.92; }
+.row { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+.small {
+  font-family:inherit; font-size:1em; cursor:pointer; border:none; border-radius:16px;
+  padding:10px 16px; background:#fff3b0; color:#7a5b00; box-shadow:0 3px 0 #e0c560;
+}
+.small:active { transform:translateY(2px); box-shadow:0 1px 0 #e0c560; }
+.small:disabled { opacity:0.4; }
+
+.story {
+  width:100%; background:rgba(255,255,255,0.85); border-radius:20px; padding:14px 16px;
+  display:flex; flex-direction:column; gap:8px; min-height:60px;
+}
+.story:empty { display:none; }
+.line { font-size:1.1em; line-height:1.5; word-break:keep-all; padding:4px 8px; border-radius:10px; cursor:pointer; }
+.line .en { display:block; font-size:0.88em; color:#7a6a92; }
+.line.new { animation:pop 0.5s; }
+.line.reading { background:#fff1a8; }
+@keyframes pop { from { opacity:0; transform:translateY(8px); } }
+
+/* book */
+.book {
+  width:100%; background:#fffdf7; border-radius:22px; border:5px solid #fff;
+  box-shadow:0 8px 0 rgba(0,0,0,0.1), 0 10px 26px rgba(0,0,0,0.15);
+  overflow:hidden; display:flex; flex-direction:column;
+}
+.pic {
+  position:relative; height:200px; display:flex; align-items:center; justify-content:center; gap:10px;
+  background:linear-gradient(180deg,var(--sky1,#bfe6ff),var(--sky2,#e8f7ff));
+  overflow:hidden;
+}
+.pic .bg { position:absolute; font-size:9em; opacity:0.22; right:-10px; bottom:-30px; }
+.pic .a { font-size:5em; position:relative; animation:bob 2.2s ease-in-out infinite; }
+.pic .b { font-size:3.6em; position:relative; animation:bob 2.6s ease-in-out infinite reverse; }
+.book .title { font-size:1.6em; font-weight:600; text-align:center; padding:6px 0; color:#4a3570; word-break:keep-all; }
+.book .title .en { display:block; font-size:0.6em; color:#8a7aa0; }
+.book .txt { padding:16px 18px 10px; display:flex; flex-direction:column; gap:6px; min-height:130px; }
+.book .txt .line { font-size:1.25em; }
+.pager { display:flex; align-items:center; justify-content:space-between; padding:10px 14px 14px; gap:8px; }
+.pager .num { color:#8a7aa0; font-size:0.95em; }
+.pager button { font-family:inherit; font-size:1.4em; border:none; background:#efe9ff; border-radius:14px; width:56px; height:48px; cursor:pointer; }
+.pager button:disabled { opacity:0.3; }
+
+/* library */
+.lib { width:100%; display:flex; flex-direction:column; gap:10px; }
+.lib .item {
+  background:#fff; border-radius:16px; padding:12px 14px; display:flex; align-items:center; gap:12px;
+  box-shadow:0 3px 0 rgba(0,0,0,0.08); cursor:pointer;
+}
+.lib .item .e { font-size:2em; }
+.lib .item .n { flex:1; font-weight:600; color:#4a3570; word-break:keep-all; }
+.lib .item .n small { display:block; font-weight:400; color:#9a8ab0; font-size:0.8em; }
+.lib .item .del { border:none; background:none; font-size:1.2em; cursor:pointer; opacity:0.5; padding:6px; }
+.empty { text-align:center; color:#8a6a7a; padding:30px 0; }
+
+.confetti { position:fixed; top:-30px; font-size:1.6em; pointer-events:none; animation:fall linear forwards; z-index:9; }
+@keyframes fall { to { transform:translateY(110vh) rotate(540deg); } }
+#toast {
+  position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:rgba(40,30,60,0.88);
+  color:#fff; padding:10px 18px; border-radius:16px; font-size:0.95em; opacity:0; transition:opacity 0.3s;
+  pointer-events:none; z-index:10; text-align:center; max-width:90vw;
+}
+#toast.on { opacity:1; }
+@media (max-width:420px) {
+  h1 { font-size:1.6em; }
+  .card .face .e { font-size:2.5em; }
+  .card .face .w { font-size:0.9em; }
+  .ask .t { font-size:1.12em; }
+  .pic { height:160px; }
+  .pic .a { font-size:4em; }
+  .lang button { padding:6px 8px; font-size:0.82em; }
+}
+</style>
+</head>
+<body>
+<header>
+  <a class="back" href="../">←</a>
+  <div class="lang" id="lang">
+    <button data-l="ko">한국어</button>
+    <button data-l="en">English</button>
+    <button data-l="both">한+영</button>
+  </div>
+</header>
+
+<main>
+  <section class="screen on" id="sStart">
+    <div class="logo">📖</div>
+    <h1 id="tTitle"></h1>
+    <p class="sub" id="tSub"></p>
+    <button class="big" id="bNew"></button>
+    <button class="big alt" id="bLib"></button>
+  </section>
+
+  <section class="screen" id="sPick">
+    <div class="steps" id="steps"></div>
+    <div class="ask">
+      <div class="t" id="askT"></div>
+      <button class="speak" id="askSpeak">🔊</button>
+    </div>
+    <div class="cards" id="cards"></div>
+    <div class="row">
+      <button class="small" id="bShuffle"></button>
+      <button class="big" id="bNext" style="display:none"></button>
+    </div>
+    <div class="story" id="story"></div>
+  </section>
+
+  <section class="screen" id="sBook">
+    <div class="book">
+      <div class="pic" id="pic"></div>
+      <div class="txt" id="pageTxt"></div>
+      <div class="pager">
+        <button id="bPrev">◀</button>
+        <span class="num" id="pageNum"></span>
+        <button id="bFwd">▶</button>
+      </div>
+    </div>
+    <div class="row">
+      <button class="small" id="bRead"></button>
+      <button class="small" id="bAgain"></button>
+      <button class="small" id="bHome"></button>
+    </div>
+  </section>
+
+  <section class="screen" id="sLib">
+    <h1 id="tLib"></h1>
+    <div class="lib" id="lib"></div>
+    <button class="big alt" id="bLibBack"></button>
+  </section>
+</main>
+<div id="toast"></div>
+
+<script>
+// ---------- story pieces ----------
+// Korean text uses {C:이} style slots: the hero's name followed by the right particle.
+// English text uses {C} for "the <hero>", capitalised automatically at sentence start.
+const HEROES = [
+  { id:'dino',    e:'🦖', ko:'용감한 공룡',     en:'brave dinosaur' },
+  { id:'bunny',   e:'🐰', ko:'깡충깡충 토끼',   en:'hoppy bunny' },
+  { id:'robot',   e:'🤖', ko:'꼬마 로봇',       en:'little robot' },
+  { id:'dragon',  e:'🐉', ko:'아기 용',         en:'baby dragon' },
+  { id:'fairy',   e:'🧚', ko:'반짝 요정',       en:'sparkly fairy' },
+  { id:'kitten',  e:'🐱', ko:'장난꾸러기 고양이', en:'playful kitten' },
+  { id:'hero',    e:'🦸', ko:'꼬마 히어로',     en:'little hero' },
+  { id:'penguin', e:'🐧', ko:'뒤뚱뒤뚱 펭귄',   en:'waddly penguin' },
+  { id:'unicorn', e:'🦄', ko:'무지개 유니콘',   en:'rainbow unicorn' },
+  { id:'alien',   e:'👽', ko:'초록 외계인',     en:'green alien' },
+  { id:'bear',    e:'🐻', ko:'졸린 곰',         en:'sleepy bear' },
+  { id:'fox',     e:'🦊', ko:'똑똑한 여우',     en:'clever fox' },
+];
+const PLACES = [
+  { id:'candy',  e:'🍭', ko:'사탕 숲',      en:'in a candy forest',        sky:['#ffd6ec','#fff0f7'] },
+  { id:'sea',    e:'🌊', ko:'깊은 바닷속',  en:'deep under the sea',       sky:['#7fc8f0','#c8ecff'] },
+  { id:'moon',   e:'🌙', ko:'달나라',       en:'on the moon',              sky:['#2b2a5c','#5b5aa0'] },
+  { id:'cloud',  e:'🏰', ko:'구름 위 성',   en:'in a castle on the clouds', sky:['#bfe6ff','#ffffff'] },
+  { id:'volcano',e:'🌋', ko:'화산 섬',      en:'on a volcano island',      sky:['#ffb38a','#ffe2c8'] },
+  { id:'city',   e:'🏙️', ko:'커다란 도시',  en:'in a big city',            sky:['#a9c6e8','#e6eef8'] },
+  { id:'snow',   e:'❄️', ko:'눈의 나라',    en:'in a land of snow',        sky:['#d8ecff','#ffffff'] },
+  { id:'tree',   e:'🌳', ko:'나무 위 집',   en:'in a tree house',          sky:['#b8e8a8','#eaffdf'] },
+  { id:'desert', e:'🏜️', ko:'모래 사막',    en:'in a sandy desert',        sky:['#ffd98a','#fff3d0'] },
+  { id:'mush',   e:'🍄', ko:'버섯 마을',    en:'in a mushroom village',    sky:['#cfe9b0','#f6ffe8'] },
+];
+const PROBLEMS = [
+  { id:'egg',    e:'🥚', ko:'커다란 알', en:'giant egg',
+    sko:'어느 날, 하늘에서 커다란 알이 뚝 떨어졌어요!', sen:'One day, a giant egg fell from the sky!' },
+  { id:'map',    e:'🗺️', ko:'보물 지도', en:'treasure map',
+    sko:'어느 날, {C:이} 낡은 보물 지도를 발견했어요!', sen:'One day, {C} found an old treasure map!' },
+  { id:'bird',   e:'🐣', ko:'길 잃은 아기 새', en:'lost baby bird',
+    sko:'어느 날, 길을 잃은 아기 새가 엉엉 울고 있었어요.', sen:'One day, a lost baby bird was crying and crying.' },
+  { id:'monster',e:'👾', ko:'간식 도둑 괴물', en:'snack thief',
+    sko:'어느 날, 장난꾸러기 괴물이 마을 간식을 몽땅 가져갔어요!', sen:'One day, a naughty monster took all the snacks in town!' },
+  { id:'color',  e:'🌈', ko:'사라진 색깔', en:'lost colors',
+    sko:'어느 날, 세상의 색깔이 모두 사라져 버렸어요!', sen:'One day, all the colors in the world disappeared!' },
+  { id:'gift',   e:'🎁', ko:'잃어버린 선물', en:'lost present',
+    sko:'어느 날, {C:이} 친구에게 줄 생일 선물을 잃어버렸어요.', sen:'One day, {C} lost a birthday present for a friend.' },
+  { id:'wind',   e:'🌪️', ko:'커다란 바람', en:'big wind',
+    sko:'어느 날, 커다란 바람이 불어서 {C:의} 모자가 휙 날아갔어요!', sen:'One day, a big wind blew the hat right off {C}!' },
+  { id:'door',   e:'🚪', ko:'잠긴 문', en:'locked door',
+    sko:'어느 날, 반짝이는 문이 나타났는데 꽁꽁 잠겨 있었어요.', sen:'One day, a shiny door appeared, but it was locked tight.' },
+  { id:'sun',    e:'🌞', ko:'늦잠 잔 해님', en:'sleepy sun',
+    sko:'어느 날, 해님이 늦잠을 자서 아침이 오지 않았어요!', sen:'One day, the sun overslept and morning did not come!' },
+  { id:'music',  e:'🎵', ko:'사라진 노래', en:'lost songs',
+    sko:'어느 날, 마을의 노래가 모두 사라져 조용해졌어요.', sen:'One day, all the songs in town went quiet.' },
+];
+const ITEMS = [
+  { id:'wand',     e:'🪄', ko:'마법 지팡이',   en:'a magic wand',
+    sko:'지팡이를 휘두르자 반짝반짝 별가루가 쏟아졌어요.', sen:'Swish! Sparkly star dust poured out everywhere.' },
+  { id:'balloon',  e:'🎈', ko:'커다란 풍선',   en:'a big balloon',
+    sko:'{C:은} 풍선을 타고 하늘 높이 둥실둥실 날아올랐어요.', sen:'{C} floated up, up, high into the sky.' },
+  { id:'light',    e:'🔦', ko:'반짝 손전등',   en:'a shiny flashlight',
+    sko:'손전등을 켜자 숨어 있던 길이 환하게 보였어요.', sen:'Click! The light showed a hidden path.' },
+  { id:'cookie',   e:'🍪', ko:'마법 쿠키',     en:'a magic cookie',
+    sko:'쿠키를 한 입 먹자 {C:이} 열 배나 힘이 세졌어요!', sen:'One bite, and {C} became ten times stronger!' },
+  { id:'horn',     e:'🎺', ko:'신기한 나팔',   en:'a wonderful trumpet',
+    sko:'나팔을 뿌우 불자 친구들이 모두 달려왔어요.', sen:'Toot toot! All the friends came running to help.' },
+  { id:'compass',  e:'🧭', ko:'길 찾는 나침반', en:'a magic compass',
+    sko:'나침반 바늘이 빙글빙글 돌더니 정답을 가리켰어요.', sen:'The needle spun round and round, then pointed the right way.' },
+  { id:'shoes',    e:'👟', ko:'번개 신발',     en:'a pair of lightning shoes',
+    sko:'신발을 신자 {C:이} 번개처럼 빨리 달렸어요!', sen:'With them on, {C} ran as fast as lightning!' },
+  { id:'bubble',   e:'🫧', ko:'비눗방울 막대', en:'a bubble wand',
+    sko:'커다란 비눗방울이 퐁퐁 나와서 모두를 감싸 주었어요.', sen:'Pop pop! Giant bubbles floated out and kept everyone safe.' },
+  { id:'brush',    e:'🖌️', ko:'무지개 붓',     en:'a rainbow paintbrush',
+    sko:'붓으로 슥슥 그리자 그림이 진짜로 변했어요!', sen:'Swish swish! Everything it painted came to life!' },
+];
+const ENDINGS = [
+  { id:'party',  e:'🎉', ko:'신나는 파티',   en:'a big party',
+    sko:'그래서 모두 함께 신나는 파티를 열었어요.', sen:'So everyone had a big, happy party.' },
+  { id:'friend', e:'🤝', ko:'단짝 친구',     en:'best friends',
+    sko:'그날부터 {C:은} 모두의 단짝 친구가 되었어요.', sen:'From that day on, {C} was everyone\'s best friend.' },
+  { id:'medal',  e:'🏅', ko:'금메달',        en:'a gold medal',
+    sko:'마을 사람들은 {C}에게 반짝이는 금메달을 주었어요.', sen:'The whole town gave {C} a shiny gold medal.' },
+  { id:'sleep',  e:'😴', ko:'쿨쿨 잠',       en:'sweet dreams',
+    sko:'모험을 마친 {C:은} 포근한 침대에서 쿨쿨 잠들었어요.', sen:'After the adventure, {C} fell fast asleep in a cozy bed.' },
+  { id:'icecream',e:'🍦', ko:'아이스크림',   en:'ice cream',
+    sko:'모두 둘러앉아 달콤한 아이스크림을 나눠 먹었어요.', sen:'Everyone sat together and shared sweet ice cream.' },
+  { id:'star',   e:'🌟', ko:'새로운 별',     en:'a new star',
+    sko:'그날 밤, 하늘에 {C} 모양의 별이 반짝이기 시작했어요.', sen:'That night, a new star shaped like {C} began to twinkle.' },
+  { id:'dance',  e:'💃', ko:'신나는 춤',     en:'a happy dance',
+    sko:'기분이 좋아진 모두가 신나게 춤을 추었어요.', sen:'Everyone felt so happy that they danced and danced.' },
+  { id:'home',   e:'🏡', ko:'집으로',        en:'home again',
+    sko:'{C:은} 집으로 돌아와 엄마에게 오늘 이야기를 들려주었어요.', sen:'{C} went home and told Mom all about the day.' },
+];
+
+const STEPS = [
+  { key:'hero',    pool:HEROES,   icon:'🦸', c:['#ff8fb1','#ff6f9c'],
+    ko:'누가 주인공일까요?',     en:'Who is the hero?' },
+  { key:'place',   pool:PLACES,   icon:'🗺️', c:['#6fc3ff','#45a8f0'],
+    ko:'어디에 살까요?',         en:'Where does the hero live?' },
+  { key:'problem', pool:PROBLEMS, icon:'❗', c:['#ffb347','#ff9a1f'],
+    ko:'무슨 일이 생겼을까요?',  en:'What happened?' },
+  { key:'item',    pool:ITEMS,    icon:'🎒', c:['#8be08b','#5cc85c'],
+    ko:'가방 속에 무엇이 있을까요?', en:'What is in the bag?' },
+  { key:'ending',  pool:ENDINGS,  icon:'🌈', c:['#b99cff','#9677f0'],
+    ko:'이야기는 어떻게 끝날까요?', en:'How does the story end?' },
+];
+
+const UI = {
+  title:   { ko:'이야기 만들기',         en:'Story Maker' },
+  sub:     { ko:'카드를 골라서 나만의 이야기책을 만들어요!', en:'Pick cards and make your own storybook!' },
+  newS:    { ko:'✨ 새 이야기 만들기',    en:'✨ Make a New Story' },
+  lib:     { ko:'📚 내 이야기책',         en:'📚 My Storybooks' },
+  shuffle: { ko:'🔄 카드 다시 섞기',      en:'🔄 New Cards' },
+  next:    { ko:'다음 ▶',                en:'Next ▶' },
+  finish:  { ko:'📖 이야기책 보기',       en:'📖 Open My Book' },
+  read:    { ko:'🔊 처음부터 읽기',       en:'🔊 Read from Start' },
+  again:   { ko:'✨ 또 만들기',           en:'✨ Make Another' },
+  home:    { ko:'🏠 처음으로',            en:'🏠 Home' },
+  back:    { ko:'← 돌아가기',            en:'← Back' },
+  empty:   { ko:'아직 이야기책이 없어요. 하나 만들어 볼까요?', en:'No books yet. Let\'s make one!' },
+  end:     { ko:'끝!',                   en:'The End!' },
+  saved:   { ko:'📚 이야기책에 저장했어요', en:'📚 Saved to My Storybooks' },
+  sound:   { ko:'🔇 소리가 안 들리면 볼륨과 무음 모드를 확인해 주세요', en:'🔇 No sound? Check the volume and silent mode.' },
+};
+
+// ---------- language helpers ----------
+function hasBatchim(word) {
+  const ch = word.trim().slice(-1);
+  const code = ch.charCodeAt(0) - 0xAC00;
+  if (code < 0 || code > 11171) return false;
+  return code % 28 !== 0;
+}
+const JOSA = { '이':['이','가'], '은':['은','는'], '을':['을','를'], '과':['과','와'], '의':['의','의'] };
+function ko(tpl, hero) {
+  return tpl.replace(/\{C(?::(.))?\}/g, (_, j) => {
+    if (!j) return hero.ko;
+    const [a, b] = JOSA[j];
+    return hero.ko + (hasBatchim(hero.ko) ? a : b);
+  });
+}
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+const article = w => (/^[aeiou]/i.test(w) ? 'an ' : 'a ') + w;
+function en(tpl, hero) {
+  return cap(tpl.replace(/\{C\}/g, 'the ' + hero.en));
+}
+const titleCase = s => s.replace(/\b\w/g, c => c.toUpperCase());
+
+// Builds the story as pages of [ko, en] sentence pairs.
+function buildStory(p) {
+  const h = p.hero, pl = p.place, pr = p.problem, it = p.item, e = p.ending;
+  const pages = [
+    { pic:[h.e, pl.e], lines:[
+      [`옛날 옛날, ${pl.ko}에 ${h.ko}${hasBatchim(h.ko) ? '이' : '가'} 살았어요.`,
+       `Once upon a time, ${article(h.en)} lived ${pl.en}.`] ] },
+    { pic:[pr.e, h.e], lines:[ [ko(pr.sko, h), en(pr.sen, h)] ] },
+    { pic:[h.e, it.e], lines:[
+      [`하지만 ${ko('{C:은}', h)} 걱정하지 않았어요. 가방에서 ${it.ko}${hasBatchim(it.ko) ? '을' : '를'} 꺼냈지요!`,
+       `But ${'the ' + h.en} was not worried. Out of the bag came ${it.en}!`],
+      [ko(it.sko, h), en(it.sen, h)],
+      ['덕분에 문제가 모두 해결되었어요!', 'And just like that, the problem was solved!'] ] },
+    { pic:[e.e, h.e], lines:[ [ko(e.sko, h), en(e.sen, h)], [UI.end.ko, UI.end.en] ] },
+  ];
+  const title = [`${h.ko}의 대모험`, `The ${titleCase(h.en)}'s Big Adventure`];
+  return { title, pages };
+}
+// Sentence(s) revealed right after each card is picked.
+function linesForStep(stepIdx, p) {
+  const full = {};
+  STEPS.forEach(st => full[st.key] = p[st.key] || st.pool[0]); // later pages aren't shown yet
+  const s = buildStory(full).pages;
+  if (stepIdx === 0) return [[`주인공은 ${p.hero.ko}!`, `Our hero is ${article(p.hero.en)}!`]];
+  if (stepIdx === 1) return s[0].lines;
+  if (stepIdx === 2) return s[1].lines;
+  if (stepIdx === 3) return s[2].lines;
+  return s[3].lines;
+}
+
+// ---------- state ----------
+const SAVE_KEY = 'story-maker-v1';
+let save = { lang:'ko', stories:[] };
+try { Object.assign(save, JSON.parse(localStorage.getItem(SAVE_KEY)) || {}); } catch (e) {}
+const persist = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} };
+
+let lang = save.lang;
+let step = 0, picks = {}, hand = [], chosen = false, shuffles = 0;
+let book = null, page = 0;
+
+const $ = id => document.getElementById(id);
+const pick = a => a[Math.floor(Math.random() * a.length)];
+function shuffleArr(a) {
+  a = a.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+const esc = s => s.replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+
+// Text for a [ko, en] pair in the current language mode.
+function pairHTML(k, e) {
+  if (lang === 'ko') return esc(k);
+  if (lang === 'en') return esc(e);
+  return `${esc(k)}<span class="en">${esc(e)}</span>`;
+}
+const t = key => pairHTML(UI[key].ko, UI[key].en);
+const tPlain = key => lang === 'en' ? UI[key].en : UI[key].ko;
+function labelHTML(o) {
+  const enShow = o.en.replace(/^(in|on|deep under) (an?|the) /i, '').replace(/^(a pair of|an?) /i, '');
+  if (lang === 'ko') return esc(o.ko);
+  if (lang === 'en') return esc(enShow);
+  return `${esc(o.ko)}<small>${esc(enShow)}</small>`;
+}
+
+// ---------- speech ----------
+const canSpeak = 'speechSynthesis' in window;
+let voices = { ko:null, en:null };
+function pickVoices() {
+  const vs = speechSynthesis.getVoices();
+  voices.ko = vs.find(v => /^ko/i.test(v.lang) && /yuna|유나|google/i.test(v.name)) || vs.find(v => /^ko/i.test(v.lang)) || null;
+  voices.en = vs.find(v => /^en[-_]US/i.test(v.lang) && /samantha|google us|aria|jenny/i.test(v.name))
+    || vs.find(v => /^en[-_]US/i.test(v.lang)) || vs.find(v => /^en/i.test(v.lang)) || null;
+}
+if (canSpeak) { pickVoices(); speechSynthesis.onvoiceschanged = pickVoices; }
+
+let speakGen = 0, soundWarned = false;
+// Speaks a list of [ko, en] pairs in the current language mode. onEach(i) fires as pair i starts.
+function speakPairs(pairs, onEach, onDone) {
+  const gen = ++speakGen;
+  const queue = [];
+  pairs.forEach((p, i) => {
+    if (lang !== 'en') queue.push({ text:p[0], l:'ko', i });
+    if (lang !== 'ko') queue.push({ text:p[1], l:'en', i });
+  });
+  if (canSpeak) speechSynthesis.cancel();
+  let n = 0, started = false;
+  const next = () => {
+    if (gen !== speakGen) return;
+    if (n >= queue.length) { onDone && onDone(); return; }
+    const q = queue[n++];
+    onEach && onEach(q.i);
+    if (!canSpeak) { setTimeout(next, 1800); return; }
+    const u = new SpeechSynthesisUtterance(q.text.replace(/[!"]/g, ' '));
+    u.lang = q.l === 'ko' ? 'ko-KR' : 'en-US';
+    if (voices[q.l]) u.voice = voices[q.l];
+    u.rate = q.l === 'ko' ? 0.95 : 0.85;
+    u.pitch = 1.1;
+    let fired = false;
+    const go = () => { if (!fired) { fired = true; setTimeout(next, 250); } };
+    u.onstart = () => { started = true; };
+    u.onend = u.onerror = go;
+    setTimeout(go, 1500 + q.text.length * 160); // in case onend never fires
+    window.__utterance = u;
+    speechSynthesis.resume();
+    speechSynthesis.speak(u);
+  };
+  next();
+  setTimeout(() => {
+    if (gen === speakGen && !started && !soundWarned && canSpeak) { soundWarned = true; toast(tPlain('sound')); }
+  }, 3000);
+}
+function stopSpeak() { speakGen++; if (canSpeak) speechSynthesis.cancel(); }
+
+// ---------- sound fx ----------
+let actx = null;
+function blip(notes) {
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    let tm = actx.currentTime;
+    for (const f of notes) {
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = 'triangle'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.12, tm); g.gain.exponentialRampToValueAtTime(0.001, tm + 0.18);
+      o.connect(g).connect(actx.destination); o.start(tm); o.stop(tm + 0.2); tm += 0.1;
+    }
+  } catch (e) {}
+}
+
+function toast(msg) {
+  const el = $('toast'); el.textContent = msg; el.classList.add('on');
+  clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('on'), 2600);
+}
+function confetti() {
+  const set = ['⭐','✨','🎉','💖','🌈','🎈'];
+  for (let i = 0; i < 26; i++) {
+    const d = document.createElement('div');
+    d.className = 'confetti'; d.textContent = pick(set);
+    d.style.left = Math.random() * 100 + 'vw';
+    d.style.animationDuration = 2 + Math.random() * 2 + 's';
+    d.style.animationDelay = Math.random() * 0.6 + 's';
+    document.body.appendChild(d);
+    setTimeout(() => d.remove(), 4800);
+  }
+}
+
+// ---------- screens ----------
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
+  window.scrollTo(0, 0);
+}
+function renderStart() {
+  $('tTitle').innerHTML = t('title');
+  $('tSub').innerHTML = t('sub');
+  $('bNew').innerHTML = esc(tPlain('newS'));
+  $('bLib').innerHTML = esc(tPlain('lib')) + (save.stories.length ? ` (${save.stories.length})` : '');
+}
+
+function startStory() {
+  stopSpeak();
+  step = 0; picks = {};
+  $('story').innerHTML = '';
+  show('sPick');
+  dealStep();
+}
+function dealStep() {
+  const s = STEPS[step];
+  chosen = false; shuffles = 0;
+  hand = shuffleArr(s.pool).slice(0, 3);
+  renderPick();
+  speakPairs([[s.ko, s.en]]);
+}
+function renderPick() {
+  const s = STEPS[step];
+  $('steps').innerHTML = STEPS.map((x, i) =>
+    `<span class="${i < step || (i === step && chosen) ? 'done' : i === step ? 'now' : ''}">${i < step || (i === step && chosen) ? picks[x.key].e : x.icon}</span>`).join('');
+  $('askT').innerHTML = lang === 'both' ? `${esc(s.ko)}<small>${esc(s.en)}</small>` : esc(lang === 'en' ? s.en : s.ko);
+  $('cards').innerHTML = hand.map((o, i) => `
+    <div class="card" data-i="${i}" style="--c1:${s.c[0]};--c2:${s.c[1]}">
+      <div class="back">?</div>
+      <div class="face"><div class="e">${o.e}</div><div class="w">${labelHTML(o)}</div></div>
+    </div>`).join('');
+  $('bShuffle').innerHTML = esc(tPlain('shuffle'));
+  $('bShuffle').style.display = '';
+  $('bShuffle').disabled = shuffles >= 2;
+  $('bNext').style.display = 'none';
+  $('bNext').innerHTML = esc(tPlain(step === STEPS.length - 1 ? 'finish' : 'next'));
+  renderStoryLines();
+}
+function renderStoryLines() {
+  const pairs = [];
+  for (let i = 0; i < STEPS.length; i++) {
+    if (!picks[STEPS[i].key] || (i === step && !chosen)) break;
+    pairs.push(...linesForStep(i, picks));
+  }
+  $('story').innerHTML = pairs.map(p => `<div class="line" data-k="${esc(p[0])}" data-e="${esc(p[1])}">${pairHTML(p[0], p[1])}</div>`).join('');
+}
+
+function chooseCard(i) {
+  if (chosen) return;
+  chosen = true;
+  const s = STEPS[step], o = hand[i];
+  picks[s.key] = o;
+  blip([523, 659, 784]);
+  const cards = [...$('cards').children];
+  cards.forEach((c, j) => {
+    setTimeout(() => c.classList.add('flip'), j === i ? 0 : 450);
+    c.classList.add(j === i ? 'picked' : 'other');
+  });
+  $('bShuffle').style.display = 'none';
+  // update step dots and reveal this step's sentences
+  $('steps').children[step].className = 'done';
+  $('steps').children[step].textContent = o.e;
+  const before = $('story').children.length;
+  renderStoryLines();
+  const lines = [...$('story').children];
+  lines.slice(before).forEach(l => l.classList.add('new'));
+  const newPairs = linesForStep(step, picks);
+  setTimeout(() => {
+    speakPairs(newPairs, k => {
+      lines.forEach(l => l.classList.remove('reading'));
+      lines[before + k] && lines[before + k].classList.add('reading');
+    }, () => lines.forEach(l => l.classList.remove('reading')));
+    $('bNext').style.display = '';
+    $('story').lastElementChild.scrollIntoView({ behavior:'smooth', block:'nearest' });
+  }, 700);
+}
+
+function nextStep() {
+  stopSpeak();
+  if (step < STEPS.length - 1) { step++; dealStep(); return; }
+  // finished: save and open the book
+  const rec = { id:Date.now().toString(36), at:Date.now() };
+  STEPS.forEach(s => rec[s.key] = picks[s.key].id);
+  save.stories.unshift(rec);
+  save.stories = save.stories.slice(0, 30);
+  persist();
+  confetti();
+  blip([523, 659, 784, 1047]);
+  toast(tPlain('saved'));
+  openBook(picks, true);
+}
+
+function picksFromRecord(r) {
+  const out = {};
+  for (const s of STEPS) {
+    const o = s.pool.find(x => x.id === r[s.key]);
+    if (!o) return null;
+    out[s.key] = o;
+  }
+  return out;
+}
+
+function openBook(p, autoRead) {
+  book = { picks:p, ...buildStory(p) };
+  page = -1; // cover
+  show('sBook');
+  $('bRead').innerHTML = esc(tPlain('read'));
+  $('bAgain').innerHTML = esc(tPlain('again'));
+  $('bHome').innerHTML = esc(tPlain('home'));
+  renderPage();
+  if (autoRead) setTimeout(readAll, 900);
+}
+function renderPage() {
+  const p = book.picks;
+  const pic = $('pic');
+  pic.style.setProperty('--sky1', p.place.sky[0]);
+  pic.style.setProperty('--sky2', p.place.sky[1]);
+  if (page < 0) {
+    pic.innerHTML = `<div class="bg">${p.place.e}</div><div class="a">${p.hero.e}</div><div class="b">${p.item.e}</div>`;
+    $('pageTxt').innerHTML = `<div class="title line" data-k="${esc(book.title[0])}" data-e="${esc(book.title[1])}">${pairHTML(book.title[0], book.title[1])}</div>`;
+  } else {
+    const pg = book.pages[page];
+    pic.innerHTML = `<div class="bg">${p.place.e}</div><div class="a">${pg.pic[0]}</div><div class="b">${pg.pic[1]}</div>`;
+    $('pageTxt').innerHTML = pg.lines.map(l => `<div class="line" data-k="${esc(l[0])}" data-e="${esc(l[1])}">${pairHTML(l[0], l[1])}</div>`).join('');
+  }
+  $('pageNum').textContent = page < 0 ? '📖' : `${page + 1} / ${book.pages.length}`;
+  $('bPrev').disabled = page < 0;
+  $('bFwd').disabled = page >= book.pages.length - 1;
+}
+function readPage(onDone) {
+  const lines = [...$('pageTxt').children];
+  const pairs = lines.map(l => [l.dataset.k, l.dataset.e]);
+  speakPairs(pairs, i => {
+    lines.forEach(l => l.classList.remove('reading'));
+    lines[i] && lines[i].classList.add('reading');
+  }, () => { lines.forEach(l => l.classList.remove('reading')); onDone && onDone(); });
+}
+function readAll() {
+  page = -1; renderPage();
+  const gen = speakGen + 1;
+  const go = () => {
+    readPage(() => {
+      if (speakGen !== gen + page + 1) return; // interrupted by user
+      if (page < book.pages.length - 1) { setTimeout(() => { page++; renderPage(); go(); }, 500); }
+    });
+  };
+  go();
+}
+function turn(d) {
+  stopSpeak();
+  page = Math.max(-1, Math.min(book.pages.length - 1, page + d));
+  blip([440]);
+  renderPage();
+  readPage();
+}
+
+function renderLib() {
+  $('tLib').innerHTML = t('lib');
+  $('bLibBack').innerHTML = esc(tPlain('back'));
+  const items = save.stories.map(r => ({ r, p:picksFromRecord(r) })).filter(x => x.p);
+  if (!items.length) { $('lib').innerHTML = `<div class="empty">${t('empty')}</div>`; return; }
+  $('lib').innerHTML = items.map(({ r, p }) => {
+    const st = buildStory(p);
+    const d = new Date(r.at);
+    return `<div class="item" data-id="${r.id}">
+      <div class="e">${p.hero.e}${p.place.e}</div>
+      <div class="n">${pairHTML(st.title[0], st.title[1])}<small>${d.getMonth() + 1}/${d.getDate()} · ${p.problem.e} ${p.item.e} ${p.ending.e}</small></div>
+      <button class="del" data-del="${r.id}">🗑️</button>
+    </div>`;
+  }).join('');
+}
+
+function setLang(l) {
+  lang = save.lang = l; persist();
+  document.documentElement.lang = l === 'en' ? 'en' : 'ko';
+  document.querySelectorAll('#lang button').forEach(b => b.classList.toggle('on', b.dataset.l === l));
+  stopSpeak();
+  renderStart();
+  const cur = document.querySelector('.screen.on').id;
+  if (cur === 'sPick') {
+    const flipped = chosen;
+    renderPick();
+    if (flipped) {
+      const i = hand.indexOf(picks[STEPS[step].key]);
+      [...$('cards').children].forEach((c, j) => c.classList.add('flip', j === i ? 'picked' : 'other'));
+      $('bShuffle').style.display = 'none';
+      $('bNext').style.display = '';
+    }
+  }
+  if (cur === 'sBook') { $('bRead').innerHTML = esc(tPlain('read')); $('bAgain').innerHTML = esc(tPlain('again')); $('bHome').innerHTML = esc(tPlain('home')); renderPage(); }
+  if (cur === 'sLib') renderLib();
+}
+
+// ---------- events ----------
+document.querySelectorAll('#lang button').forEach(b => b.onclick = () => setLang(b.dataset.l));
+$('bNew').onclick = startStory;
+$('bLib').onclick = () => { stopSpeak(); renderLib(); show('sLib'); };
+$('bLibBack').onclick = () => { renderStart(); show('sStart'); };
+$('cards').onclick = e => { const c = e.target.closest('.card'); if (c) chooseCard(+c.dataset.i); };
+$('bShuffle').onclick = () => {
+  if (chosen || shuffles >= 2) return;
+  const s = STEPS[step];
+  const left = s.pool.filter(o => !hand.includes(o));
+  hand = shuffleArr(left).slice(0, 3);
+  shuffles++;
+  const n = shuffles;
+  renderPick();
+  shuffles = n; $('bShuffle').disabled = shuffles >= 2;
+  blip([392, 330]);
+};
+$('bNext').onclick = nextStep;
+$('askSpeak').onclick = () => { const s = STEPS[step]; speakPairs([[s.ko, s.en]]); };
+$('story').onclick = e => { const l = e.target.closest('.line'); if (l) speakPairs([[l.dataset.k, l.dataset.e]]); };
+$('pageTxt').onclick = e => { const l = e.target.closest('.line'); if (l) speakPairs([[l.dataset.k, l.dataset.e]]); };
+$('bPrev').onclick = () => turn(-1);
+$('bFwd').onclick = () => turn(1);
+$('bRead').onclick = () => { stopSpeak(); readAll(); };
+$('bAgain').onclick = startStory;
+$('bHome').onclick = () => { stopSpeak(); renderStart(); show('sStart'); };
+$('lib').onclick = e => {
+  const del = e.target.closest('[data-del]');
+  if (del) {
+    e.stopPropagation();
+    save.stories = save.stories.filter(r => r.id !== del.dataset.del);
+    persist(); renderLib(); return;
+  }
+  const it = e.target.closest('.item');
+  if (!it) return;
+  const r = save.stories.find(x => x.id === it.dataset.id);
+  const p = r && picksFromRecord(r);
+  if (p) openBook(p, true);
+};
+
+setLang(lang);
+</script>
+</body>
+</html>
