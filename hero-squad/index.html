@@ -49,6 +49,7 @@
   .row { display: flex; gap: 12px; justify-content: center; align-items: center; flex-wrap: wrap; }
   .pill { background: rgba(0,0,0,.35); border: 3px solid rgba(255,255,255,.25); border-radius: 999px; padding: 10px 20px; font-size: clamp(17px, 3.6vmin, 24px); }
   .pill:active { transform: scale(.95); }
+  .dexgoal { text-align: center; font-size: clamp(16px, 3.4vmin, 22px); padding: 4px 10px 8px; opacity: .9; }
   .corner { position: absolute; top: max(12px, env(safe-area-inset-top)); font-size: clamp(18px, 3.6vmin, 24px); }
   .corner.l { left: 14px; }
   .corner.r { right: 10px; opacity: .55; padding: 6px 10px; border-radius: 999px; }
@@ -237,7 +238,7 @@
 <body>
 
 <section id="home" class="screen rays">
-  <div class="corner l">⭐ <span id="homeStars">0</span> <span id="cloudDot"></span></div>
+  <div class="corner l">⭐ <span id="homeStars">0</span> <span id="cloudDot"></span><br><small id="homeLv"></small></div>
   <button class="corner r" id="gear">⚙️ 어른 <small>(길게)</small></button>
   <div class="logo">
     <div class="t1 hfont">영서와 친구들의</div>
@@ -295,6 +296,7 @@
       <button data-t="villain">👿 빌런 <small></small></button>
     </div>
   </div>
+  <div class="dexgoal" id="dexGoal"></div>
   <div class="dexgrid" id="dexgrid"></div>
 </section>
 <div class="zoom" id="zoom"></div>
@@ -302,7 +304,7 @@
 <div class="modal" id="parent">
   <div class="panel">
     <h3>어른용 설정</h3>
-    <p>문제 난이도는 아이가 맞히는 정도에 따라 자동으로 오르내려요. 시작점을 바꾸고 싶을 때만 아래에서 고르세요.<br>지금 난이도: <b id="curLv"></b></p>
+    <p>문제 난이도는 고정이에요. 카드 도감(히어로·포켓몬·빌런)을 전부 모으면 다음 단계로 올라가고 도감은 새로 시작해요. 직접 바꾸고 싶을 때만 아래에서 고르세요.<br>지금 난이도: <b id="curLv"></b></p>
     <div id="lvList"></div>
     <label><input type="checkbox" id="voiceT"> 목소리로 읽어 주기</label>
     <div class="cloudbox">
@@ -401,6 +403,8 @@ const LINE = {
   openCard: '선물 카드가 왔어! 눌러서 열어 봐!',
   newHero: '새 히어로가 팀에 들어왔어!',
   allHeroes: '히어로를 전부 모았어! 보너스 별을 줄게!',
+  dexDone: '우와! 카드 도감을 전부 모았어! 이제 레벨 업!',
+  newDex: '새 도감을 처음부터 모아 보자!',
   hint: '블록을 세어 보면 알 수 있어!',
   stepCatch: '포켓몬 친구를 모으자!',
   stepCharge: '히어로 파워를 충전하자!',
@@ -448,12 +452,12 @@ const LEVEL_DESC = [
 ];
 
 function freshSave() {
-  return { episode: 1, level: 1, heroes: [...STARTERS], pokes: [], villains: [], stars: 0, voice: true, streak: 0, recent: [] };
+  return { episode: 1, level: 1, season: 0, cleared: [], heroes: [...STARTERS], pokes: [], villains: [], stars: 0, voice: true, streak: 0, recent: [] };
 }
 function loadSave() {
   try {
     const s = JSON.parse(localStorage.getItem(SAVE_KEY));
-    if (s && Array.isArray(s.heroes)) return Object.assign(freshSave(), s);
+    if (s && Array.isArray(s.heroes)) return Object.assign(freshSave(), s, { cleared: Array.isArray(s.cleared) ? s.cleared : [] });
   } catch (e) {}
   return freshSave();
 }
@@ -482,18 +486,24 @@ async function cloudCall(action, payload) {
   if (!res.ok) { const err = new Error(data.error || 'error'); err.status = res.status; throw err; }
   return data;
 }
-const progressOf = s => ({ episode: s.episode, level: s.level, streak: s.streak, recent: s.recent, heroes: s.heroes, pokes: s.pokes, villains: s.villains, stars: s.stars, savedAt: s.savedAt || 0 });
+const progressOf = s => ({ episode: s.episode, level: s.level, season: s.season || 0, cleared: s.cleared || [], streak: s.streak, recent: s.recent, heroes: s.heroes, pokes: s.pokes, villains: s.villains, stars: s.stars, savedAt: s.savedAt || 0 });
 // Same rule as the server: collections are unions, counters take the max,
-// difficulty comes from whichever side changed most recently.
+// difficulty comes from whichever side changed most recently. A finished dex
+// starts a new season with an empty dex, so the side with the later season
+// wins the collections and the level outright.
 function mergeProgress(local, remote) {
   const union = (x, y) => [...x, ...y.filter(v => !x.includes(v))];
-  const newer = (remote.savedAt || 0) >= (local.savedAt || 0) ? remote : local;
+  const ls = local.season || 0, rs = remote.season || 0;
+  const newer = rs !== ls ? (rs > ls ? remote : local) : (remote.savedAt || 0) >= (local.savedAt || 0) ? remote : local;
+  const same = rs === ls;
   return {
     episode: Math.max(local.episode, remote.episode),
     stars: Math.max(local.stars, remote.stars),
-    heroes: union(remote.heroes, local.heroes),
-    pokes: union(remote.pokes, local.pokes),
-    villains: union(remote.villains, local.villains),
+    season: Math.max(ls, rs),
+    cleared: union(remote.cleared || [], local.cleared || []).sort((a, b) => a - b),
+    heroes: same ? union(remote.heroes, local.heroes) : newer.heroes,
+    pokes: same ? union(remote.pokes, local.pokes) : newer.pokes,
+    villains: same ? union(remote.villains, local.villains) : newer.villains,
     level: newer.level, streak: newer.streak, recent: newer.recent,
     savedAt: Math.max(local.savedAt || 0, remote.savedAt || 0),
   };
@@ -700,20 +710,16 @@ function choices(ans) {
   for (let k = 1; out.length < 3; k++) add([ans + k + 2, ans - k - 2]);
   return shuffle(out);
 }
-// Counts toward auto-difficulty: 4 first-try answers in a row → harder; 2 misses in the last 3 → easier.
+// The level stays fixed; it only goes up when the whole card dex is filled (see showReward).
 function record(firstTry) {
   S.recent.push(firstTry ? 1 : 0);
   if (S.recent.length > 6) S.recent.shift();
-  if (firstTry) {
-    S.streak++;
-    addStars(1);
-    if (S.streak >= 4 && S.level < 6) { S.level++; S.streak = 0; S.recent = []; }
-  } else {
-    S.streak = 0;
-    if (S.recent.slice(-3).filter(x => !x).length >= 2 && S.level > 1) { S.level--; S.recent = []; }
-  }
+  if (firstTry) { S.streak++; addStars(1); } else S.streak = 0;
   persist();
 }
+const DEX_TOTAL = () => HEROES.length + POKE.length + VILLAINS.length;
+const dexHave = () => S.heroes.length + S.pokes.length + S.villains.length;
+const dexFull = () => HEROES.every(h => S.heroes.includes(h.id)) && POKE.every(p => S.pokes.includes(p[0])) && VILLAINS.every(v => S.villains.includes(v.id));
 function addStars(n) {
   S.stars += n;
   if (ep) ep.stars += n;
@@ -725,7 +731,8 @@ function addStars(n) {
 function bossHP(L) { return [0, ri(9, 10), ri(16, 18), ri(40, 69), ri(40, 79), ri(70, 99), ri(70, 99)][L]; }
 // Three attack numbers for the heroes; each leaves at least `keep` HP for the turns still to come.
 function bossPowers(hp, L, keep) {
-  for (let l = L; l >= 1; l--) {
+  const order = [...Array(L).keys()].map(i => L - i).concat([...Array(6 - L).keys()].map(i => L + 1 + i));
+  for (const l of order) {
     const c = [];
     for (let b = 1; b <= hp - keep; b++) if (SUB_OK[l](hp, b)) c.push(b);
     // Prefer hits of at most ~60% so the fight lasts all three turns.
@@ -937,7 +944,8 @@ async function playEpisode() {
 
 function pickPoke() {
   let pool = POKE.filter(p => !LEGEND.includes(p[0]));
-  if (S.episode >= 4 && Math.random() < 0.1) pool = POKE.filter(p => LEGEND.includes(p[0]));
+  const regularDone = pool.every(p => S.pokes.includes(p[0]));
+  if ((S.pokes.length >= 4 && Math.random() < 0.1) || (regularDone && Math.random() < 0.6)) pool = POKE.filter(p => LEGEND.includes(p[0]));
   const fresh = pool.filter(p => !S.pokes.includes(p[0]));
   if (fresh.length && Math.random() < 0.8) pool = fresh;
   return pick(pool);
@@ -1204,6 +1212,17 @@ function showReward() {
   const nh = HEROES.find(h => !S.heroes.includes(h.id));
   if (nh) S.heroes.push(nh.id); else addStars(5);
   S.episode++;
+  // Full dex: next level, and the dex starts over for it.
+  let lvUp = 0;
+  if (dexFull()) {
+    if (!S.cleared.includes(S.level)) S.cleared.push(S.level);
+    if (S.level < 6) {
+      lvUp = ++S.level;
+      S.season = (S.season || 0) + 1;
+      S.heroes = [...STARTERS]; S.pokes = []; S.villains = [];
+      S.streak = 0; S.recent = [];
+    }
+  }
   persist();
   $('defeated').innerHTML = cardHTML('villain', v.id, v.name) + '<div class="stamp">격파!</div>';
   $('flipFront').innerHTML = nh ? heroCard(nh) : '<div class="bonus">⭐ +5</div>';
@@ -1220,7 +1239,16 @@ function showReward() {
     setTimeout(() => sparks($('flip'), ['⭐', '🌟', '✨', '💫'], 20), 400);
     $('rewardMsg').textContent = nh ? `${nh.name} 합류! 🎉` : '히어로를 다 모았어! 보너스 별 ⭐5';
     say(nh ? [LINE.newHero, nh.name] : [LINE.allHeroes]);
-    setTimeout(() => $('after').classList.add('on'), 900);
+    if (lvUp) {
+      setTimeout(() => {
+        $('rewardMsg').textContent = `🏆 도감 완성! 이제 레벨 ${lvUp}! 새 도감을 모아 보자!`;
+        banner(`레벨 ${lvUp}!`, 2400);
+        sparks($('rewardMsg'), ['🏆', '⭐', '🌟', '✨'], 24);
+        sfx.win();
+        say([LINE.dexDone, `${numKo(lvUp)} 단계`, LINE.newDex]);
+      }, 2200);
+    }
+    setTimeout(() => $('after').classList.add('on'), lvUp ? 3000 : 900);
   };
 }
 
@@ -1234,12 +1262,16 @@ function showHome() {
   $('squad').innerHTML = order.map(heroCard).join('') + partner;
   $('goSub').textContent = `에피소드 ${S.episode} · ${villainFor(S.episode).name}${objJosa(villainFor(S.episode).name)} 막아라`;
   $('homeStars').textContent = S.stars;
-  $('dexCount').textContent = `${S.heroes.length + S.pokes.length + S.villains.length}장`;
+  $('dexCount').textContent = `${dexHave()}/${DEX_TOTAL()}`;
+  $('homeLv').textContent = `레벨 ${S.level}` + (S.cleared.length ? ' ' + '🏆'.repeat(S.cleared.length) : '');
 }
 
 let dexTab = 'hero';
 function renderDex() {
   const tabs = $('tabs').children;
+  $('dexGoal').textContent = S.level < 6
+    ? `레벨 ${S.level} 도감 ${dexHave()}/${DEX_TOTAL()} · 전부 모으면 레벨 ${S.level + 1}!`
+    : `레벨 ${S.level} 도감 ${dexHave()}/${DEX_TOTAL()}`;
   const counts = { hero: `${S.heroes.length}/${HEROES.length}`, poke: `${S.pokes.length}/${POKE.length}`, villain: `${S.villains.length}/${VILLAINS.length}` };
   for (const b of tabs) { b.classList.toggle('on', b.dataset.t === dexTab); b.querySelector('small').textContent = counts[b.dataset.t]; }
   let items;

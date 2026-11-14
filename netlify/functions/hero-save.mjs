@@ -51,6 +51,8 @@ function sanitize(s) {
   return {
     episode: num(s.episode, 1, 9999, 1),
     level: num(s.level, 1, 6, 1),
+    season: num(s.season, 0, 99, 0),
+    cleared: list(s.cleared, 6).map(x => num(x, 1, 6, 1)),
     streak: num(s.streak, 0, 99, 0),
     recent: list(s.recent, 6).map(x => (x ? 1 : 0)),
     heroes: list(s.heroes, 100),
@@ -62,17 +64,22 @@ function sanitize(s) {
 }
 // Collections are unions (stored order first, so "newest hero" stays last),
 // counters take the larger value, and the difficulty state comes from
-// whichever device changed it most recently.
+// whichever device changed it most recently. Filling the dex starts a new
+// season with an empty dex at the next level; the later season wins the
+// collections and level outright so a stale device can't refill the dex.
 export function mergeState(stored, incoming) {
   const a = sanitize(stored), b = sanitize(incoming);
   const union = (x, y) => [...x, ...y.filter(v => !x.includes(v))];
-  const newer = b.savedAt >= a.savedAt ? b : a;
+  const same = a.season === b.season;
+  const newer = !same ? (b.season > a.season ? b : a) : b.savedAt >= a.savedAt ? b : a;
   return {
     episode: Math.max(a.episode, b.episode),
     stars: Math.max(a.stars, b.stars),
-    heroes: union(a.heroes, b.heroes),
-    pokes: union(a.pokes, b.pokes),
-    villains: union(a.villains, b.villains),
+    season: Math.max(a.season, b.season),
+    cleared: [...new Set([...a.cleared, ...b.cleared])].sort((x, y) => x - y),
+    heroes: same ? union(a.heroes, b.heroes) : newer.heroes,
+    pokes: same ? union(a.pokes, b.pokes) : newer.pokes,
+    villains: same ? union(a.villains, b.villains) : newer.villains,
     level: newer.level,
     streak: newer.streak,
     recent: newer.recent,
