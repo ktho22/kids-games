@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#121418">
+<title>울타리 치기</title>
+<style>
+:root {
+  --bg: #121418; --panel: #1b1f26; --panel2: #232831; --line-c: #2e3440;
+  --text: #e8eaee; --muted: #8b93a1; --dot: #8b93a1;
+  --fence: #f2c14e; --fence-done: #5fd38d; --bad: #ff6b6b; --ok: #5c6b60; --x: #6c7480;
+  --font: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', 'Segoe UI', sans-serif;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100%; }
+body {
+  display: flex; flex-direction: column; align-items: center;
+  padding: calc(12px + env(safe-area-inset-top)) 16px calc(20px + env(safe-area-inset-bottom));
+  user-select: none; -webkit-user-select: none; word-break: keep-all;
+}
+button { font-family: var(--font); cursor: pointer; }
+.wrap { width: 100%; max-width: 560px; display: flex; flex-direction: column; gap: 12px; }
+
+.top { display: flex; align-items: center; gap: 10px; }
+.top a, .icon {
+  width: 40px; height: 40px; flex: none; border-radius: 10px; display: grid; place-items: center;
+  background: var(--panel); border: 1px solid var(--line-c); color: var(--text); text-decoration: none; font-size: 18px;
+}
+.top h1 { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; flex: 1; }
+.timer { font-variant-numeric: tabular-nums; font-size: 18px; font-weight: 700; color: var(--fence); min-width: 64px; text-align: right; }
+
+.tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; background: var(--panel); padding: 4px; border-radius: 12px; border: 1px solid var(--line-c); }
+.tabs button {
+  border: 0; background: transparent; color: var(--muted); padding: 9px 4px; border-radius: 9px;
+  font-size: 14px; font-weight: 700; line-height: 1.2;
+}
+.tabs button small { display: block; font-size: 11px; font-weight: 500; opacity: 0.8; }
+.tabs button.on { background: var(--panel2); color: var(--text); box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset; }
+
+.status { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); padding: 0 2px; min-height: 18px; }
+
+.board-box {
+  position: relative; background: var(--panel); border: 1px solid var(--line-c); border-radius: 16px;
+  padding: 8px; aspect-ratio: 1 / 1; width: 100%;
+}
+svg#board { width: 100%; height: 100%; display: block; touch-action: none; cursor: pointer; }
+.dot { fill: var(--dot); }
+.clue { fill: var(--text); font-weight: 700; text-anchor: middle; dominant-baseline: central; font-family: var(--font); }
+.clue.ok { fill: var(--ok); }
+.clue.bad { fill: var(--bad); }
+.edge { stroke: var(--fence); stroke-linecap: round; opacity: 0; transition: opacity .08s; }
+.edge.on { opacity: 1; }
+.edge.hint { animation: blink .5s 3; }
+.xm { stroke: var(--x); stroke-linecap: round; opacity: 0; }
+.xm.on { opacity: 1; }
+.vbad { fill: var(--bad); }
+.solved .edge.on { stroke: var(--fence-done); }
+@keyframes blink { 50% { opacity: .15; } }
+
+.loading {
+  position: absolute; inset: 0; display: grid; place-items: center; border-radius: 16px;
+  background: rgba(18,20,24,0.75); color: var(--muted); font-size: 15px;
+}
+
+.tools { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.tools button {
+  background: var(--panel); border: 1px solid var(--line-c); color: var(--text); border-radius: 12px;
+  padding: 10px 4px; font-size: 13px; font-weight: 600; display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.tools button span { font-size: 20px; }
+.tools button:active { background: var(--panel2); }
+.tools button:disabled { opacity: 0.4; }
+
+.mode { display: flex; gap: 8px; }
+.mode button {
+  flex: 1; background: var(--panel); border: 1px solid var(--line-c); color: var(--muted);
+  border-radius: 12px; padding: 10px; font-size: 14px; font-weight: 700;
+}
+.mode button.on { color: var(--text); border-color: var(--fence); }
+
+.modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: grid; place-items: center; padding: 16px; z-index: 10; }
+.modal { background: var(--panel); border: 1px solid var(--line-c); border-radius: 18px; padding: 22px 20px; max-width: 420px; width: 100%; }
+.modal h2 { font-size: 20px; margin-bottom: 12px; }
+.modal p, .modal li { color: #c7ccd4; font-size: 14.5px; line-height: 1.6; }
+.modal ul { padding-left: 18px; margin: 8px 0 12px; }
+.modal .ex { display: flex; justify-content: center; margin: 10px 0 4px; }
+.modal .row { display: flex; gap: 8px; margin-top: 16px; }
+.modal .row button { flex: 1; padding: 12px; border-radius: 12px; border: 1px solid var(--line-c); background: var(--panel2); color: var(--text); font-size: 15px; font-weight: 700; }
+.modal .row button.primary { background: var(--fence); color: #1b1f26; border-color: var(--fence); }
+.big { font-size: 34px; font-weight: 800; color: var(--fence-done); font-variant-numeric: tabular-nums; margin: 4px 0 6px; }
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <a href="../" aria-label="게임 목록">←</a>
+    <h1>울타리 치기</h1>
+    <span class="timer" id="timer">0:00</span>
+    <button class="icon" id="helpBtn" aria-label="규칙">?</button>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button data-mode="easy">쉬움<small>5×5</small></button>
+    <button data-mode="mid">보통<small>7×7</small></button>
+    <button data-mode="hard">어려움<small>10×10</small></button>
+    <button data-mode="daily">오늘의 문제<small id="dailyLabel">7×7</small></button>
+  </div>
+
+  <div class="status"><span id="info"></span><span id="best"></span></div>
+
+  <div class="board-box" id="boardBox">
+    <svg id="board" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div class="loading hidden" id="loading">문제 만드는 중…</div>
+  </div>
+
+  <div class="mode">
+    <button id="modeLine" class="on">✏️ 선 긋기</button>
+    <button id="modeX">✖ 없음 표시</button>
+  </div>
+
+  <div class="tools">
+    <button id="undoBtn"><span>↩️</span>되돌리기</button>
+    <button id="hintBtn"><span>💡</span>힌트</button>
+    <button id="resetBtn"><span>🧹</span>지우기</button>
+    <button id="newBtn"><span>🔄</span>새 문제</button>
+  </div>
+</div>
+
+<div class="modal-bg hidden" id="helpModal">
+  <div class="modal">
+    <h2>규칙</h2>
+    <p>점과 점 사이에 선을 그어 <b>울타리 하나</b>를 완성하세요.</p>
+    <ul>
+      <li>칸 안의 숫자는 그 칸의 네 변 중 <b>울타리가 지나가는 변의 개수</b>입니다.</li>
+      <li>숫자가 없는 칸은 몇 개든 상관없습니다.</li>
+      <li>울타리는 끊기지 않고 한 바퀴 이어진 <b>닫힌 고리 하나</b>여야 합니다.</li>
+      <li>울타리는 갈라지거나 스스로 교차할 수 없습니다.</li>
+    </ul>
+    <div class="ex" id="exBox"></div>
+    <p style="font-size:13px;color:var(--muted)">변을 탭하면 선이 생기고, 한 번 더 탭하면 ✖(선 없음), 또 탭하면 지워집니다. 드래그하면 여러 변을 한 번에 그을 수 있습니다. 아래의 ✖ 모드에서는 탭이 바로 ✖ 표시가 됩니다.</p>
+    <div class="row"><button class="primary" id="helpClose">시작하기</button></div>
+  </div>
+</div>
+
+<div class="modal-bg hidden" id="winModal">
+  <div class="modal" style="text-align:center">
+    <h2>울타리 완성!</h2>
+    <div class="big" id="winTime">0:00</div>
+    <p id="winInfo"></p>
+    <div class="row">
+      <button id="winClose">판 보기</button>
+      <button class="primary" id="winNext">새 문제</button>
+    </div>
+  </div>
+</div>
+
+<script src="engine.js"></script>
+<script>
+(function () {
+  'use strict';
+  const F = window.FenceEngine;
+  const LEVELS = {
+    easy:  { R: 5,  C: 5,  guess: false, keep: 0.45, maxNodes: 500, budgetMs: 1500, name: '쉬움' },
+    mid:   { R: 7,  C: 7,  guess: false, keep: 0.30, maxNodes: 500, budgetMs: 2000, name: '보통' },
+    hard:  { R: 10, C: 10, guess: true,  keep: 0,    maxNodes: 800, budgetMs: 3500, name: '어려움' },
+    daily: { R: 7,  C: 7,  guess: true,  keep: 0,    maxNodes: 800, budgetMs: 3000, name: '오늘의 문제' },
+  };
+  const CELL = 10, PAD = 3;
+  const $ = id => document.getElementById(id);
+  const svg = $('board');
+  const NS = 'http://www.w3.org/2000/svg';
+
+  const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem('fence.' + k)); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem('fence.' + k, JSON.stringify(v)); } catch (e) {} },
+  };
+
+  let mode = store.get('mode') || 'easy';
+  if (!LEVELS[mode]) mode = 'easy';
+  let G = null, P = null;          // 격자, 문제
+  let st = null;                    // 0 빈 칸, 1 선, 2 ✖
+  let undo = [], hints = 0, elapsed = 0, solved = false;
+  let edgeEls = [], xEls = [], clueEls = [], vbadEls = [];
+  let drawMode = 1;                 // 1 선, 2 ✖
+  let tickStart = 0, timerId = 0;
+
+  function todayKey() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function daySeed(key) {
+    let h = 2166136261;
+    for (const ch of 'fence:' + key) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  }
+  function fmt(sec) {
+    sec = Math.floor(sec);
+    const m = Math.floor(sec / 60), s = sec % 60;
+    return m + ':' + String(s).padStart(2, '0');
+  }
+
+  // ---------- 타이머 ----------
+  function now() { return Date.now() / 1000; }
+  function curElapsed() { return elapsed + (tickStart ? now() - tickStart : 0); }
+  function startTimer() {
+    if (solved || tickStart) return;
+    tickStart = now();
+    clearInterval(timerId);
+    timerId = setInterval(() => { $('timer').textContent = fmt(curElapsed()); }, 500);
+  }
+  function stopTimer() {
+    if (tickStart) { elapsed += now() - tickStart; tickStart = 0; }
+    clearInterval(timerId);
+    $('timer').textContent = fmt(elapsed);
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { stopTimer(); save(); }
+    else if (P && !solved && $('helpModal').classList.contains('hidden')) startTimer();
+  });
+  window.addEventListener('pagehide', save);
+
+  // ---------- 저장 ----------
+  function save() {
+    if (!P) return;
+    store.set('cur.' + mode, {
+      P, st: Array.from(st), elapsed: curElapsed(), hints, solved,
+      day: mode === 'daily' ? todayKey() : null,
+    });
+  }
+
+  // ---------- 문제 불러오기 / 만들기 ----------
+  function load(m, fresh) {
+    stopTimer();
+    save();
+    mode = m;
+    store.set('mode', mode);
+    document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
+    const saved = store.get('cur.' + mode);
+    const dailyOk = mode !== 'daily' || (saved && saved.day === todayKey());
+    if (!fresh && saved && saved.P && dailyOk) {
+      setup(saved.P, saved.st, saved.elapsed || 0, saved.hints || 0, !!saved.solved);
+      return;
+    }
+    $('loading').classList.remove('hidden');
+    // 로딩 문구가 먼저 그려지도록 한 프레임 쉰다
+    requestAnimationFrame(() => setTimeout(() => {
+      const seed = mode === 'daily' ? daySeed(todayKey()) : null;
+      const p = F.generate(LEVELS[mode], seed);
+      $('loading').classList.add('hidden');
+      setup(p, null, 0, 0, false);
+      save();
+    }, 30));
+  }
+
+  function setup(p, savedSt, el, h, sv) {
+    P = p;
+    G = F.makeGeom(p.R, p.C);
+    st = savedSt && savedSt.length === G.E ? Int8Array.from(savedSt) : new Int8Array(G.E);
+    elapsed = el; hints = h; solved = sv; undo = [];
+    build();
+    refresh();
+    $('timer').textContent = fmt(elapsed);
+    updateInfo();
+    if (!solved && $('helpModal').classList.contains('hidden')) startTimer();
+  }
+
+  function updateInfo() {
+    const L = LEVELS[mode];
+    const n = P.clues.filter(x => x >= 0).length;
+    $('info').textContent = (mode === 'daily' ? todayKey() + ' · ' : '') + `${P.R}×${P.C} · 숫자 ${n}개` + (hints ? ` · 힌트 ${hints}번` : '');
+    const best = store.get('best.' + mode);
+    $('best').textContent = best != null ? '최고 기록 ' + fmt(best) : '';
+    $('undoBtn').disabled = !undo.length || solved;
+    $('hintBtn').disabled = solved;
+  }
+
+  // ---------- 판 그리기 ----------
+  function el(tag, attrs, parent) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function vxy(v) { const r = Math.floor(v / (G.C + 1)), c = v % (G.C + 1); return [PAD + c * CELL, PAD + r * CELL]; }
+
+  function build() {
+    const W = G.C * CELL + PAD * 2, H = G.R * CELL + PAD * 2;
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    $('boardBox').style.aspectRatio = `${W} / ${H}`;
+    svg.innerHTML = '';
+    const big = Math.max(G.R, G.C);
+    const sw = big >= 10 ? 1.25 : big >= 7 ? 1.4 : 1.6;
+    const dotR = big >= 10 ? 0.8 : 0.95;
+    const gClue = el('g', {}, svg), gX = el('g', {}, svg), gE = el('g', {}, svg), gD = el('g', {}, svg);
+    clueEls = []; edgeEls = []; xEls = []; vbadEls = [];
+    for (let i = 0; i < G.R * G.C; i++) {
+      const r = Math.floor(i / G.C), c = i % G.C;
+      const t = el('text', { x: PAD + c * CELL + CELL / 2, y: PAD + r * CELL + CELL / 2 + 0.3, class: 'clue', 'font-size': 6 }, gClue);
+      t.textContent = P.clues[i] >= 0 ? P.clues[i] : '';
+      clueEls.push(t);
+    }
+    for (let e = 0; e < G.E; e++) {
+      const [x1, y1] = vxy(G.eA[e]), [x2, y2] = vxy(G.eB[e]);
+      edgeEls.push(el('line', { x1, y1, x2, y2, class: 'edge', 'stroke-width': sw }, gE));
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, s = 1.1;
+      xEls.push(el('path', { d: `M${mx - s} ${my - s}L${mx + s} ${my + s}M${mx + s} ${my - s}L${mx - s} ${my + s}`, class: 'xm', 'stroke-width': 0.5 }, gX));
+    }
+    for (let v = 0; v < G.V; v++) {
+      const [x, y] = vxy(v);
+      el('circle', { cx: x, cy: y, r: dotR, class: 'dot' }, gD);
+      vbadEls.push(el('circle', { cx: x, cy: y, r: dotR * 1.6, class: 'vbad hidden' }, gD));
+    }
+  }
+
+  function refresh() {
+    for (let e = 0; e < G.E; e++) {
+      edgeEls[e].classList.toggle('on', st[e] === 1);
+      xEls[e].classList.toggle('on', st[e] === 2);
+    }
+    const res = F.check(G, P.clues, st);
+    for (let i = 0; i < clueEls.length; i++) {
+      clueEls[i].classList.toggle('ok', res.cellStatus[i] === 1 && P.clues[i] >= 0);
+      clueEls[i].classList.toggle('bad', res.cellStatus[i] === -1);
+    }
+    const bad = new Set(res.badVerts);
+    vbadEls.forEach((c, v) => c.classList.toggle('hidden', !bad.has(v)));
+    svg.classList.toggle('solved', solved);
+    return res;
+  }
+
+  // ---------- 입력 ----------
+  function toGrid(ev) {
+    const pt = svg.createSVGPoint();
+    pt.x = ev.clientX; pt.y = ev.clientY;
+    const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+    return [(p.x - PAD) / CELL, (p.y - PAD) / CELL];
+  }
+  function nearestEdge(gx, gy, maxD) {
+    let best = -1, bd = maxD;
+    const hr = Math.round(gy), hc = Math.floor(gx);
+    if (hr >= 0 && hr <= G.R && hc >= 0 && hc < G.C) {
+      const d = Math.abs(gy - hr);
+      if (d < bd) { bd = d; best = G.hid(hr, hc); }
+    }
+    const vc = Math.round(gx), vr = Math.floor(gy);
+    if (vc >= 0 && vc <= G.C && vr >= 0 && vr < G.R) {
+      const d = Math.abs(gx - vc);
+      if (d < bd) { bd = d; best = G.vvid(vr, vc); }
+    }
+    return best;
+  }
+
+  let stroke = null;
+  function setEdge(e, val) {
+    if (st[e] === val) return;
+    stroke.changes.push([e, st[e]]);
+    st[e] = val;
+  }
+  svg.addEventListener('pointerdown', ev => {
+    if (!P || solved) return;
+    ev.preventDefault();
+    const [gx, gy] = toGrid(ev);
+    const e = nearestEdge(gx, gy, 0.45);
+    if (e < 0) return;
+    svg.setPointerCapture(ev.pointerId);
+    let val;
+    if (drawMode === 2) val = st[e] === 2 ? 0 : 2;
+    else val = (st[e] + 1) % 3;
+    stroke = { val, changes: [], seen: new Set([e]), id: ev.pointerId };
+    setEdge(e, val);
+    startTimer();
+    afterChange(false);
+  });
+  svg.addEventListener('pointermove', ev => {
+    if (!stroke || ev.pointerId !== stroke.id) return;
+    const [gx, gy] = toGrid(ev);
+    const e = nearestEdge(gx, gy, 0.3);
+    if (e < 0 || stroke.seen.has(e)) return;
+    // 드래그 중에는 처음 고른 상태를 그대로 칠한다 (선→✖ 순환은 탭에서만)
+    stroke.seen.add(e);
+    setEdge(e, stroke.val);
+    afterChange(false);
+  });
+  function endStroke(ev) {
+    if (!stroke || (ev && ev.pointerId !== stroke.id)) return;
+    if (stroke.changes.length) undo.push(stroke.changes);
+    stroke = null;
+    afterChange(true);
+  }
+  svg.addEventListener('pointerup', endStroke);
+  svg.addEventListener('pointercancel', endStroke);
+
+  function afterChange(final) {
+    const res = refresh();
+    if (final) { updateInfo(); save(); }
+    if (res.done && !solved) win();
+  }
+
+  function win() {
+    solved = true;
+    if (stroke) { if (stroke.changes.length) undo.push(stroke.changes); stroke = null; }
+    stopTimer();
+    // 남은 ✖ 표시는 정리해서 울타리만 보이게
+    for (let e = 0; e < G.E; e++) if (st[e] === 2) st[e] = 0;
+    refresh();
+    const t = elapsed;
+    const key = 'best.' + mode;
+    const best = store.get(key);
+    let msg = `${LEVELS[mode].name} ${P.R}×${P.C}`;
+    if (hints) msg += ` · 힌트 ${hints}번 사용 (기록에는 남지 않아요)`;
+    else if (best == null || t < best) { store.set(key, t); msg += best == null ? ' · 첫 기록!' : ` · 최고 기록 경신! (이전 ${fmt(best)})`; }
+    else msg += ` · 최고 기록 ${fmt(best)}`;
+    $('winTime').textContent = fmt(t);
+    $('winInfo').textContent = msg;
+    $('winNext').textContent = mode === 'daily' ? '다른 난이도' : '새 문제';
+    updateInfo();
+    save();
+    setTimeout(() => $('winModal').classList.remove('hidden'), 450);
+  }
+
+  // ---------- 버튼 ----------
+  $('modeLine').onclick = () => { drawMode = 1; $('modeLine').classList.add('on'); $('modeX').classList.remove('on'); };
+  $('modeX').onclick = () => { drawMode = 2; $('modeX').classList.add('on'); $('modeLine').classList.remove('on'); };
+  $('undoBtn').onclick = () => {
+    if (solved || !undo.length) return;
+    const ch = undo.pop();
+    for (let i = ch.length - 1; i >= 0; i--) st[ch[i][0]] = ch[i][1];
+    afterChange(true);
+  };
+  $('resetBtn').onclick = () => {
+    if (solved) { load(mode, false); return; }
+    const ch = [];
+    for (let e = 0; e < G.E; e++) if (st[e]) { ch.push([e, st[e]]); st[e] = 0; }
+    if (ch.length) undo.push(ch);
+    afterChange(true);
+  };
+  $('hintBtn').onclick = () => {
+    if (solved) return;
+    const sol = P.solution;
+    let target = -1, val = 0;
+    // 1) 잘못 그은 선 → ✖
+    for (let e = 0; e < G.E; e++) if (st[e] === 1 && !sol[e]) { target = e; val = 2; break; }
+    // 2) 잘못 표시한 ✖ → 지우고 선
+    if (target < 0) for (let e = 0; e < G.E; e++) if (st[e] === 2 && sol[e]) { target = e; val = 1; break; }
+    // 3) 이미 그은 선에 이어지는 정답 선
+    if (target < 0) {
+      const cand = [];
+      for (let e = 0; e < G.E; e++) {
+        if (!sol[e] || st[e] === 1) continue;
+        const touch = [G.eA[e], G.eB[e]].some(v => G.vertEdges[v].some(f => st[f] === 1));
+        cand.push([touch ? 0 : 1, Math.random(), e]);
+      }
+      cand.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      if (cand.length) { target = cand[0][2]; val = 1; }
+    }
+    if (target < 0) return;
+    undo.push([[target, st[target]]]);
+    st[target] = val;
+    hints++;
+    startTimer();
+    const elx = val === 1 ? edgeEls[target] : xEls[target];
+    elx.classList.remove('hint'); void elx.getBBox(); elx.classList.add('hint');
+    setTimeout(() => elx.classList.remove('hint'), 1600);
+    afterChange(true);
+  };
+  $('newBtn').onclick = () => {
+    if (mode === 'daily') { load('daily', false); return; }
+    load(mode, true);
+  };
+  document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => { if (b.dataset.mode !== mode) load(b.dataset.mode, false); });
+
+  function openHelp() { stopTimer(); $('helpModal').classList.remove('hidden'); }
+  $('helpBtn').onclick = openHelp;
+  $('helpClose').onclick = () => { $('helpModal').classList.add('hidden'); store.set('seenHelp', true); if (P && !solved) startTimer(); };
+  $('winClose').onclick = () => $('winModal').classList.add('hidden');
+  $('winNext').onclick = () => {
+    $('winModal').classList.add('hidden');
+    load(mode === 'daily' ? 'mid' : mode, mode !== 'daily');
+  };
+
+  // 규칙 창의 예시 그림 (2×2, 정답 포함)
+  (function example() {
+    const ex = el('svg', { viewBox: '0 0 46 46', width: 120, height: 120 });
+    const P0 = 3, C0 = 13.3;
+    const nums = [[3, 2, '.'], ['.', 2, 2], [0, '.', 3]];
+    nums.forEach((row, r) => row.forEach((n, c) => {
+      if (n === '.') return;
+      const t = el('text', { x: P0 + c * C0 + C0 / 2, y: P0 + r * C0 + C0 / 2 + 0.4, class: 'clue', 'font-size': 7 }, ex);
+      t.textContent = n;
+    }));
+    // 정답 고리: 좌상 → 우 → 아래 …
+    const path = [[0,0],[2,0],[2,1],[3,1],[3,3],[2,3],[2,2],[1,2],[1,1],[0,1],[0,0]];
+    const d = path.map((p, i) => (i ? 'L' : 'M') + (P0 + p[0] * C0) + ' ' + (P0 + p[1] * C0)).join('');
+    el('path', { d, fill: 'none', stroke: 'var(--fence-done)', 'stroke-width': 1.6, 'stroke-linejoin': 'round' }, ex);
+    for (let r = 0; r <= 3; r++) for (let c = 0; c <= 3; c++) el('circle', { cx: P0 + c * C0, cy: P0 + r * C0, r: 1, class: 'dot' }, ex);
+    $('exBox').appendChild(ex);
+  })();
+
+  if (!store.get('seenHelp')) $('helpModal').classList.remove('hidden');
+  load(mode, false);
+})();
+</script>
+</body>
+</html>
